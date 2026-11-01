@@ -11,7 +11,7 @@ Route::get('/', function () {
 });
 
 Route::post('ai/ask', [\App\Http\Controllers\AiAssistantController::class, 'ask'])
-     ->middleware(['throttle:30,1'])
+     ->middleware(['throttle:15,1'])
      ->name('ai.ask');
 
 Route::get('/dashboard', function () {
@@ -39,6 +39,8 @@ Route::middleware(['auth'])->group(function () {
          ->name('vehicles.regenerate-key');
     Route::post('vehicles/{vehicle}/thresholds', [VehicleController::class, 'saveThresholds'])
          ->name('vehicles.thresholds');
+    Route::post('vehicles/{vehicle}/sketchfab-uid', [VehicleController::class, 'updateSketchfabUid'])
+         ->name('vehicles.sketchfab-uid');
 
     // Stage 4 — Diagnostics
     Route::get('diagnostics/export/dataset', [DiagnosticController::class, 'exportDataset'])
@@ -52,7 +54,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('diagnostics/{diagnostic}/status', [DiagnosticController::class, 'status'])
          ->name('diagnostics.status');
     Route::post('diagnostics/{diagnostic}/ai-ask', [\App\Http\Controllers\DiagnosticAiController::class, 'ask'])
-         ->middleware(['throttle:30,1'])
+         ->middleware(['throttle:15,1'])
          ->name('diagnostics.ai.ask');
 
 

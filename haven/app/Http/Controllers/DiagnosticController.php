@@ -19,15 +19,40 @@ class DiagnosticController extends Controller
     /* ─────────────────────────────────────────────
        LIST  /diagnostics
     ───────────────────────────────────────────── */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $diagnostics = Auth::user()
-            ->diagnostics()
-            ->with('vehicle')
-            ->latest()
-            ->paginate(15);
+        $vehicles       = Auth::user()->vehicles()->orderBy('make')->get();
+        $selectedVid    = $request->query('vehicle_id') ?? $vehicles->first()?->id;
+        $selectedVehicle = $vehicles->firstWhere('id', $selectedVid) ?? $vehicles->first();
 
-        return view('diagnostics.index', compact('diagnostics'));
+        $query = Auth::user()->diagnostics()->with('vehicle')->latest();
+        if ($selectedVid) {
+            $query->where('vehicle_id', $selectedVid);
+        }
+        $diagnostics = $query->paginate(8)->withQueryString();
+
+        // Per-vehicle stats
+        $vehicleStats = [];
+        foreach ($vehicles as $v) {
+            $vDiags = Auth::user()->diagnostics()->where('vehicle_id', $v->id);
+            $vehicleStats[$v->id] = [
+                'total'     => $vDiags->count(),
+                'completed' => $vDiags->clone()->where('status', 'completed')->count(),
+                'latest'    => $vDiags->clone()->latest()->first(),
+            ];
+        }
+
+        // Overall stats
+        $total     = Auth::user()->diagnostics()->count();
+        $completed = Auth::user()->diagnostics()->where('status', 'completed')->count();
+        $conditions = Auth::user()->diagnostics()->whereNotNull('ml_condition')
+                        ->selectRaw('ml_condition, count(*) as cnt')
+                        ->groupBy('ml_condition')->orderByDesc('cnt')->get();
+
+        return view('diagnostics.index', compact(
+            'diagnostics', 'vehicles', 'selectedVehicle',
+            'selectedVid', 'vehicleStats', 'total', 'completed', 'conditions'
+        ));
     }
 
     /* ─────────────────────────────────────────────
@@ -36,9 +61,10 @@ class DiagnosticController extends Controller
     public function create(Request $request): View
     {
         $vehicles = Auth::user()->vehicles()->orderBy('make')->get();
-        $selectedVehicleId = $request->query('vehicle_id');
+        $selectedVehicleId = $request->query('vehicle_id') ?? $vehicles->first()?->id;
+        $recentDiagnostics = Auth::user()->diagnostics()->with('vehicle')->latest()->take(8)->get();
 
-        return view('diagnostics.create', compact('vehicles', 'selectedVehicleId'));
+        return view('diagnostics.create', compact('vehicles', 'selectedVehicleId', 'recentDiagnostics'));
     }
 
     /* ─────────────────────────────────────────────
@@ -135,12 +161,13 @@ class DiagnosticController extends Controller
     {
         $this->authorizeOwner($diagnostic);
         $diagnostic->load('vehicle');
+        $recentDiagnostics = Auth::user()->diagnostics()->with('vehicle')->latest()->take(8)->get();
 
         $aiRecommendations = ($diagnostic->status === 'completed' && $diagnostic->ml_condition)
             ? $aiService->generateRecommendations($diagnostic)
             : null;
 
-        return view('diagnostics.show', compact('diagnostic', 'aiRecommendations'));
+        return view('diagnostics.show', compact('diagnostic', 'aiRecommendations', 'recentDiagnostics'));
     }
 
     /* ─────────────────────────────────────────────

@@ -193,4 +193,30 @@ class VehicleController extends Controller
         return redirect()->route('profile.edit')
             ->with('thresholds_saved', "Alert thresholds updated for {$vehicle->display_name}.");
     }
+
+    /**
+     * Update 3D Sketchfab Model UID for a vehicle.
+     * POST /vehicles/{vehicle}/sketchfab-uid
+     */
+    public function updateSketchfabUid(Request $request, Vehicle $vehicle)
+    {
+        $this->authorizeOwner($vehicle);
+
+        $validated = $request->validate([
+            'sketchfab_uid' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        $vehicle->update(['sketchfab_uid' => $validated['sketchfab_uid'] ? trim($validated['sketchfab_uid']) : null]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success'       => true,
+                'sketchfab_uid' => $vehicle->sketchfab_uid,
+                'model_name'    => $vehicle->sketchfab_model_name,
+                'message'       => '3D vehicle model updated successfully.',
+            ]);
+        }
+
+        return back()->with('status', '3D vehicle model updated.');
+    }
 }

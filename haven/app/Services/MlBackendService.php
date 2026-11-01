@@ -137,9 +137,10 @@ class MlBackendService
         $tempC   = $diagnostic->temperature_c;
         $rpm     = $diagnostic->rpm;
         $voltage = $diagnostic->voltage_v;
+        $mode    = $diagnostic->recording_mode ?? 'idle';
 
         // Rule-based mock using stored vibration & hardware sensor stats
-        [$condition, $confidence, $topClasses, $sensorWarnings] = $this->mockRules($peakG, $rmsG, $crest, $tempC, $rpm, $voltage);
+        [$condition, $confidence, $topClasses, $sensorWarnings] = $this->mockRules($peakG, $rmsG, $crest, $tempC, $rpm, $voltage, $mode);
 
         $featuresUsed = ['peak_g', 'rms_g', 'crest_factor'];
         if (!is_null($tempC))   $featuresUsed[] = 'ds18b20_temperature';
@@ -173,7 +174,7 @@ class MlBackendService
         ];
     }
 
-    private function mockRules(float $peakG, float $rmsG, float $crest, ?float $tempC, ?int $rpm, ?float $voltage): array
+    private function mockRules(float $peakG, float $rmsG, float $crest, ?float $tempC, ?int $rpm, ?float $voltage, string $mode = 'idle'): array
     {
         // 4 Thesis-Approved Engine Fault Classes (UMak CET Capstone Scope)
         $classes = ['normal', 'misfire', 'loose_component', 'valve_clearance'];
@@ -227,7 +228,7 @@ class MlBackendService
         }
 
         // 4. Normal Engine Operation: Baseline reading within healthy envelope (calibrated for Idle vs Revving mode)
-        $isRevving = ($diagnostic->recording_mode === 'revving');
+        $isRevving = ($mode === 'revving');
         $normalPeakLimit = $isRevving ? 2.2 : 1.8;
         $normalRmsLimit  = $isRevving ? 0.45 : 0.35;
 

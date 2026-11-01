@@ -23,6 +23,7 @@ class Vehicle extends Model
         'transmission',
         'mileage_km',
         'notes',
+        'sketchfab_uid',
         'device_key',
         'alert_thresholds',
     ];
@@ -57,6 +58,65 @@ class Vehicle extends Model
     public function getDisplayNameAttribute(): string
     {
         return $this->nickname ?: "{$this->year} {$this->make} {$this->model}";
+    }
+
+    /**
+     * Resolve verified Sketchfab 3D vehicle UID based on make/model.
+     * Returns null if no verified accurate 3D model exists, so the system shifts to 2D blueprint.
+     */
+    public function getSketchfabUidAttribute(): ?string
+    {
+        // 1. If user set an explicit custom 3D model UID, use it
+        if (!empty($this->attributes['sketchfab_uid'])) {
+            return $this->attributes['sketchfab_uid'];
+        }
+
+        $make     = strtolower(trim($this->make ?? ''));
+        $model    = strtolower(trim($this->model ?? ''));
+        $combined = "{$make} {$model}";
+
+        // 2. Strict, verified accurate 3D model mappings ONLY
+        if (str_contains($combined, 'corolla')) {
+            return '36f95efb0585464cae43a25a3b3392e8'; // 2014 Toyota Corolla EU Sedan
+        }
+        if (str_contains($combined, 'civic')) {
+            return 'd5ca29a5d2f341b691118ffb5560b19b'; // 2022 Honda Civic Sedan
+        }
+        if (str_contains($combined, 'camry')) {
+            return '53f8cbf2483940fba956f4e740a3a4ae'; // 2025 Toyota Camry Hybrid Sedan
+        }
+        if (str_contains($combined, 'supra')) {
+            return 'b7616ec43ecf4ffd8ed810d94f15eea6'; // Toyota Supra Coupe
+        }
+        if (str_contains($combined, 'model 3')) {
+            return '5ef9b845aaf44203b6d04e2c677e444f'; // Tesla Model 3 Sedan
+        }
+        if (str_contains($combined, 'model y')) {
+            return 'c0a86cac582d4b33aba0fb1b1912d970'; // Tesla Model Y Crossover
+        }
+        if (str_contains($combined, 'elantra')) {
+            return '4ba1b1b0eb844e318cc708ada1f2f51f'; // 2024 Hyundai Elantra N Sedan
+        }
+        if (str_contains($combined, 'mustang')) {
+            return '5f4e3965f79540a9888b5d05acea5943'; // Ford Mustang
+        }
+
+        // 3. No generic guessing! If no verified 3D asset exists, return NULL.
+        // The interface will shift to 2D Blueprint with sensor pins.
+        return null;
+    }
+
+    /**
+     * Check if a verified 3D model is available for this vehicle.
+     */
+    public function has3dModel(): bool
+    {
+        return !empty($this->sketchfab_uid);
+    }
+
+    public function getSketchfabModelNameAttribute(): string
+    {
+        return "{$this->year} {$this->make} {$this->model}";
     }
 
     /**

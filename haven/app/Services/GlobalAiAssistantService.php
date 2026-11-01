@@ -94,10 +94,38 @@ class GlobalAiAssistantService
             }
         }
 
-        // Try Gemini First (Recommended)
+        // 1. Try Groq First (Ultra-fast LLM Inference)
+        if ($groqKey) {
+            try {
+                $model = config('services.groq.model', 'openai/gpt-oss-120b');
+                $response = Http::timeout(8)->withToken($groqKey)->post('https://api.groq.com/openai/v1/chat/completions', [
+                    'model' => $model,
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user', 'content' => $question],
+                    ],
+                    'temperature' => 0.4,
+                    'max_tokens' => 650,
+                ]);
+
+                if ($response->successful()) {
+                    $json = $response->json();
+                    $text = $json['choices'][0]['message']['content'] ?? null;
+                    if ($text) {
+                        return trim($text);
+                    }
+                } else {
+                    Log::warning('HAVEN AI Groq call failed', ['status' => $response->status(), 'body' => $response->body()]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('HAVEN AI Groq exception: ' . $e->getMessage());
+            }
+        }
+
+        // 2. Try Gemini (Fallback)
         if ($geminiKey) {
             try {
-                $model = config('services.gemini.model') ?: env('GEMINI_MODEL', 'gemini-flash-lite-latest');
+                $model = config('services.gemini.model', 'gemini-1.5-flash');
                 $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$geminiKey}";
 
                 $response = Http::timeout(8)->post($url, [
@@ -126,32 +154,6 @@ class GlobalAiAssistantService
                 }
             } catch (\Throwable $e) {
                 Log::warning('HAVEN AI Gemini exception: ' . $e->getMessage());
-            }
-        }
-
-        // Try Groq (Ultra-fast Llama)
-        if ($groqKey) {
-            try {
-                $model = config('services.groq.model', 'llama-3.3-70b-versatile');
-                $response = Http::timeout(8)->withToken($groqKey)->post('https://api.groq.com/openai/v1/chat/completions', [
-                    'model' => $model,
-                    'messages' => [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ['role' => 'user', 'content' => $question],
-                    ],
-                    'temperature' => 0.4,
-                    'max_tokens' => 650,
-                ]);
-
-                if ($response->successful()) {
-                    $json = $response->json();
-                    $text = $json['choices'][0]['message']['content'] ?? null;
-                    if ($text) {
-                        return trim($text);
-                    }
-                }
-            } catch (\Throwable $e) {
-                Log::warning('HAVEN AI Groq exception: ' . $e->getMessage());
             }
         }
 
