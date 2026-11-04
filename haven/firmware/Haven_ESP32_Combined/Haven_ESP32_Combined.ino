@@ -9,24 +9,25 @@
 #include <DallasTemperature.h>
 #include <driver/i2s.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
 #include <math.h>
 
 // ============================================================
 // HAVEN AI - ESP32 FIVE SENSOR DAQ & AUTOMOTIVE INGEST NODE
 // Complies with ISO/SAE 21434 Hardware Key Authentication
+// With NVS Preferences & Captive Portal Provisioning (192.168.4.1)
 // ============================================================
 
-// ── 1. NETWORK & HAVEN CONFIGURATION ────────────────────────
-// ⚠️ Set to the same Wi-Fi your laptop is connected to:
-const char* wifiSSID     = "GFiber_FC756";       // ← YOUR WI-FI NAME
-const char* wifiPassword = "4C34FA60";   // ← YOUR WI-FI PASSWORD
+Preferences prefs;
 
-// HAVEN Server Endpoint (Your Laptop's IP):
-const char* havenServerUrl = "http://192.168.254.106:8000/api/v1/telemetry/ingest";
-const char* havenDeviceKey = "hvn_dev_cde1c79d141a9cdcb064d3ef4b9e63f2";
-const int   vehicleId      = 1;
+// ── 1. NETWORK & HAVEN CONFIGURATION (Fallbacks stored in flash) ──
+char wifiSSID[64]      = "GFiber_FC756";
+char wifiPassword[64]  = "4C34FA60";
+char havenServerUrl[128] = "http://192.168.254.106:8000/api/v1/telemetry/ingest";
+char havenDeviceKey[64] = "hvn_dev_cde1c79d141a9cdcb064d3ef4b9e63f2";
+int  vehicleId         = 1;
 
-// Also host local AP for standalone fallback if needed
+// Standalone fallback AP for mobile provisioning: http://192.168.4.1/config
 const char* apSSID     = "HAVEN_AI_LOCAL";
 const char* apPassword = "haven1234";
 
@@ -46,6 +47,7 @@ WebServer server(80);
 // ── 3. SENSOR OBJECTS ───────────────────────────────────────
 OneWire oneWire(TEMP_PIN);
 DallasTemperature tempSensor(&oneWire);
+int ds18DeviceCount = 0;
 
 Adafruit_MPU6050 mpu;
 bool mpuReady = false;
@@ -74,6 +76,15 @@ float accelMagnitude = 0;
 float busVoltage = 0;
 float currentMA = 0;
 float powerMW = 0;
+
+// 100Hz 128-Sample Vibration Ring Buffer for FFT Spectral Analysis
+#define VIB_BUFFER_SIZE 128
+float vibBuffer[VIB_BUFFER_SIZE];
+int vibBufferIdx = 0;
+bool vibBufferFull = false;
+float windowPeakG = 0;
+float windowRmsG = 0;
+float windowCrestFactor = 0;
 
 // Loop Timers
 unsigned long lastRPM = 0;
@@ -188,7 +199,26 @@ void postTelemetryToHaven() {
     inaReady = ina219.begin(&Wire);
   }
 
-  bool ds18Plugged = (!isnan(temperature) && tempSensor.getDeviceCount() > 0);
+  bool ds18Plugged = (!isnan(temperature) && ds18DeviceCount > 0);
+
+  // Compute window Peak G, RMS G, and Crest Factor across the 100Hz ring buffer
+  int sampleCount = vibBufferFull ? VIB_BUFFER_SIZE : vibBufferIdx;
+  if (mpuReady && sampleCount > 0) {
+    double sumSq = 0;
+    float maxG = 0;
+    for (int i = 0; i < sampleCount; i++) {
+      float v = vibBuffer[i];
+      if (v > maxG) maxG = v;
+      sumSq += (double)v * (double)v;
+    }
+    windowPeakG = maxG;
+    windowRmsG  = sqrt(sumSq / sampleCount);
+    windowCrestFactor = (windowRmsG > 0.001f) ? (windowPeakG / windowRmsG) : 0.0f;
+  } else {
+    windowPeakG = accelMagnitude;
+    windowRmsG  = accelMagnitude * 0.707f;
+    windowCrestFactor = 1.414f;
+  }
 
   HTTPClient http;
   http.begin(havenServerUrl);
@@ -197,13 +227,13 @@ void postTelemetryToHaven() {
   http.addHeader("Accept", "application/json");
   http.addHeader("X-Haven-Device-Key", havenDeviceKey);
 
-  StaticJsonDocument<2048> doc;
+  StaticJsonDocument<4096> doc;
   doc["vehicle_id"]     = vehicleId;
   doc["device_id"]      = "ESP32-5SENSOR-NODE";
   doc["device_key"]     = havenDeviceKey;
   doc["save_session"]   = false; // Hardware checkup only: does NOT create database sessions
   doc["auto_analyze"]   = false;
-  doc["sample_rate_hz"] = 50;
+  doc["sample_rate_hz"] = 100;
 
   // Component Health Flags (Tells website if hardware is plugged in)
   JsonObject health = doc.createNestedObject("health");
@@ -230,7 +260,15 @@ void postTelemetryToHaven() {
   }
   
   if (mpuReady) {
-    doc["peak_g"] = round(accelMagnitude * 100.0) / 100.0;
+    doc["peak_g"]       = round(windowPeakG * 100.0) / 100.0;
+    doc["rms_g"]        = round(windowRmsG * 1000.0) / 1000.0;
+    doc["crest_factor"] = round(windowCrestFactor * 100.0) / 100.0;
+    JsonArray samplesArr = doc.createNestedArray("samples");
+    int countToSend = (sampleCount > 64) ? 64 : sampleCount;
+    for (int i = 0; i < countToSend; i++) {
+      int idx = (vibBufferIdx - countToSend + i + VIB_BUFFER_SIZE) % VIB_BUFFER_SIZE;
+      samplesArr.add(round(vibBuffer[idx] * 1000.0) / 1000.0);
+    }
   } else {
     doc["peak_g"] = nullptr;
   }
@@ -324,6 +362,51 @@ void handleData() {
 }
 
 // ============================================================
+// CAPTIVE PORTAL & WEB PROVISIONING (http://192.168.4.1/config)
+// ============================================================
+void handleConfig() {
+  String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>";
+  html += "<title>HAVEN AI — ESP32 DAQ Provisioning</title>";
+  html += "<style>body{font-family:system-ui,-apple-system,sans-serif;background:#090d16;color:#e2e8f0;padding:1.5rem;max-width:480px;margin:auto}";
+  html += "h1{color:#38bdf8;font-size:1.25rem;margin-bottom:0.25rem}";
+  html += ".sub{color:#94a3b8;font-size:0.8rem;margin-bottom:1.5rem}";
+  html += "label{display:block;font-size:0.75rem;font-weight:700;color:#94a3b8;margin:0.75rem 0 0.25rem;text-transform:uppercase;letter-spacing:0.05em}";
+  html += "input{width:100%;padding:0.7rem;background:#131c2e;border:1px solid #1e293b;border-radius:8px;color:#fff;font-size:0.9rem;box-sizing:border-box}";
+  html += "button{width:100%;margin-top:1.5rem;padding:0.8rem;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.95rem;cursor:pointer}";
+  html += ".card{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:1.25rem}";
+  html += "</style></head><body>";
+  html += "<h1>HAVEN AI Node Setup</h1><div class='sub'>ISO/SAE 21434 IoT Provisioning Portal</div>";
+  html += "<form class='card' method='POST' action='/save'>";
+  html += "<label>Wi-Fi SSID</label><input name='ssid' value='" + String(wifiSSID) + "' required>";
+  html += "<label>Wi-Fi Password</label><input name='pass' type='password' value='" + String(wifiPassword) + "'>";
+  html += "<label>Haven Server URL</label><input name='server' value='" + String(havenServerUrl) + "' required>";
+  html += "<label>Device Key</label><input name='key' value='" + String(havenDeviceKey) + "' required>";
+  html += "<button type='submit'>Save & Reconnect</button>";
+  html += "</form></body></html>";
+  server.send(200, "text/html", html);
+}
+
+void handleSave() {
+  if (server.hasArg("ssid")) strncpy(wifiSSID, server.arg("ssid").c_str(), sizeof(wifiSSID));
+  if (server.hasArg("pass")) strncpy(wifiPassword, server.arg("pass").c_str(), sizeof(wifiPassword));
+  if (server.hasArg("server")) strncpy(havenServerUrl, server.arg("server").c_str(), sizeof(havenServerUrl));
+  if (server.hasArg("key")) strncpy(havenDeviceKey, server.arg("key").c_str(), sizeof(havenDeviceKey));
+
+  prefs.begin("haven", false);
+  prefs.putString("ssid", wifiSSID);
+  prefs.putString("pass", wifiPassword);
+  prefs.putString("server", havenServerUrl);
+  prefs.putString("key", havenDeviceKey);
+  prefs.end();
+
+  String html = "<!DOCTYPE html><html><body style='background:#090d16;color:#4ade80;font-family:sans-serif;padding:2rem;text-align:center;'>";
+  html += "<h2>Credentials Saved!</h2><p style='color:#94a3b8;'>Rebooting ESP32 and connecting to " + String(wifiSSID) + "...</p></body></html>";
+  server.send(200, "text/html", html);
+  delay(1000);
+  ESP.restart();
+}
+
+// ============================================================
 // SETUP
 // ============================================================
 void setup() {
@@ -333,14 +416,29 @@ void setup() {
   Serial.println("  HAVEN AI — 5-Sensor Automotive Node v2.5");
   Serial.println("=============================================");
 
+  // Load custom Wi-Fi & Haven configurations from NVS if provisioned
+  prefs.begin("haven", true);
+  if (prefs.isKey("ssid")) {
+    prefs.getString("ssid", wifiSSID, sizeof(wifiSSID));
+    prefs.getString("pass", wifiPassword, sizeof(wifiPassword));
+    prefs.getString("server", havenServerUrl, sizeof(havenServerUrl));
+    prefs.getString("key", havenDeviceKey, sizeof(havenDeviceKey));
+    Serial.println("[PREFS] Loaded custom Wi-Fi & Haven endpoint credentials from NVS!");
+  }
+  prefs.end();
+
   // Hall RPM Pin
   pinMode(HALL_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(HALL_PIN), countPulse, FALLING);
 
-  // DS18B20 Temp Sensor
+  // DS18B20 Temp Sensor (Async non-blocking conversion mode)
   tempSensor.begin();
   tempSensor.setResolution(10);
   tempSensor.setWaitForConversion(false);
+  ds18DeviceCount = tempSensor.getDeviceCount();
+  if (ds18DeviceCount > 0) {
+    tempSensor.requestTemperatures();
+  }
   tempSensor.requestTemperatures();
 
   // I2C: MPU6050 & INA219
@@ -395,7 +493,10 @@ void setup() {
     Serial.println("\n[STA] [WARN] Could not connect to Wi-Fi. Check SSID/Password.");
   }
 
-  // Local Web Server endpoints
+  // Local Web Server endpoints & Captive Provisioning Portal
+  server.on("/", handleConfig);
+  server.on("/config", handleConfig);
+  server.on("/save", HTTP_POST, handleSave);
   server.on("/data", handleData);
   server.begin();
 
@@ -409,9 +510,10 @@ void loop() {
   server.handleClient();
   unsigned long now = millis();
 
-  // 1. Read DS18B20 (Every 1000ms with device count check)
+  // 1. Read DS18B20 (Non-blocking, cached device count)
   if (now - lastTemp >= 1000) {
-    if (tempSensor.getDeviceCount() == 0) {
+    if (ds18DeviceCount == 0) {
+      ds18DeviceCount = tempSensor.getDeviceCount();
       temperature = NAN;
     } else {
       float reading = tempSensor.getTempCByIndex(0);
@@ -419,9 +521,12 @@ void loop() {
         temperature = reading;
       } else {
         temperature = NAN;
+        if (reading == DEVICE_DISCONNECTED_C) {
+          ds18DeviceCount = 0;
+        }
       }
+      tempSensor.requestTemperatures(); // non-blocking conversion
     }
-    tempSensor.requestTemperatures();
     lastTemp = now;
   }
 
@@ -437,26 +542,25 @@ void loop() {
     lastRPM = now;
   }
 
-  // 3. Read MPU6050 (Every 100ms with dynamic I2C bus detection)
-  if (now - lastMPU >= 100) {
-    if (probeI2C(0x68)) {
-      if (!mpuReady) {
-        mpuReady = mpu.begin(0x68, &Wire);
-      }
-      if (mpuReady) {
-        sensors_event_t a, g, t;
-        mpu.getEvent(&a, &g, &t);
-        accelX = a.acceleration.x;
-        accelY = a.acceleration.y;
-        accelZ = a.acceleration.z;
-        accelMagnitude = sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ);
-      }
-    } else {
-      mpuReady = false;
-      accelMagnitude = 0;
-      accelX = 0; accelY = 0; accelZ = 0;
-    }
+  // 3. Read MPU6050 (Strict 100Hz non-blocking sampling loop: 10ms interval)
+  if (now - lastMPU >= 10) {
     lastMPU = now;
+    if (mpuReady) {
+      sensors_event_t a, g, t;
+      mpu.getEvent(&a, &g, &t);
+      accelX = a.acceleration.x / 9.80665f;
+      accelY = a.acceleration.y / 9.80665f;
+      accelZ = a.acceleration.z / 9.80665f;
+      accelMagnitude = sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ);
+
+      vibBuffer[vibBufferIdx] = accelMagnitude;
+      vibBufferIdx = (vibBufferIdx + 1) % VIB_BUFFER_SIZE;
+      if (vibBufferIdx == 0) {
+        vibBufferFull = true;
+      }
+    } else if (now % 1000 < 10 && probeI2C(0x68)) {
+      mpuReady = mpu.begin(0x68, &Wire);
+    }
   }
 
   // 4. Read INA219 (Every 1000ms with dynamic I2C bus detection)

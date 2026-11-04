@@ -2,7 +2,7 @@
 
     {{-- Breadcrumb --}}
     <div class="h-breadcrumb">
-        <a href="{{ route('dashboard') }}" class="h-breadcrumb-link">Dashboard</a>
+        <a href="{{ auth()->check() ? route('dashboard') : url('/') }}" class="h-breadcrumb-link">{{ auth()->check() ? 'Dashboard' : 'Home' }}</a>
         <span class="h-breadcrumb-sep">/</span>
         <span class="h-breadcrumb-current">Learning Modules</span>
     </div>
@@ -56,20 +56,23 @@
             <div style="display:flex;align-items:center;gap:0.45rem;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--h-green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                 <span style="font-size:0.76rem;color:var(--h-text2);">Completed:</span>
-                <span id="lrn-completed-count" style="font-size:0.76rem;font-weight:700;color:var(--h-green);">0</span>
+                <span id="lrn-completed-count" style="font-size:0.76rem;font-weight:700;color:var(--h-green);">{{ $learningStats['completed_count'] ?? 0 }}</span>
             </div>
             <div style="display:flex;align-items:center;gap:0.45rem;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--h-amber)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                 <span style="font-size:0.76rem;color:var(--h-text2);">Quiz Best:</span>
-                <span id="lrn-quiz-score" style="font-size:0.76rem;font-weight:700;color:var(--h-amber);">—</span>
+                <span id="lrn-quiz-score" style="font-size:0.76rem;font-weight:700;color:var(--h-amber);">{{ isset($learningStats) && $learningStats['quiz_attempts'] > 0 ? $learningStats['quiz_best_score'] . ' / ' . $learningStats['quiz_total'] . ' (' . $learningStats['quiz_percentage'] . '%)' : '—' }}</span>
             </div>
+            @php
+                $userProgressPct = $totalCount > 0 ? round((($learningStats['completed_count'] ?? 0) / $totalCount) * 100) : 0;
+            @endphp
             <div style="flex:1;min-width:140px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.68rem;color:var(--h-text3);margin-bottom:0.25rem;">
                     <span>Learning Progress</span>
-                    <span id="lrn-progress-label">0%</span>
+                    <span id="lrn-progress-label">{{ $userProgressPct }}%</span>
                 </div>
                 <div style="height:4px;background:var(--h-border);border-radius:999px;overflow:hidden;">
-                    <div id="lrn-progress-bar" style="height:100%;background:var(--h-teal);border-radius:999px;width:0%;transition:width 0.4s ease;"></div>
+                    <div id="lrn-progress-bar" style="height:100%;background:var(--h-teal);border-radius:999px;width:{{ $userProgressPct }}%;transition:width 0.4s ease;"></div>
                 </div>
             </div>
         </div>

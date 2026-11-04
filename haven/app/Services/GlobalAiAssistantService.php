@@ -32,7 +32,7 @@ class GlobalAiAssistantService
     }
 
     /**
-     * Gather garage and diagnostic context for the current user.
+     * Gather garage and diagnostic context for the current user (excluding device keys and PII).
      */
     protected function buildUserContext(?int $userId): array
     {
@@ -44,15 +44,37 @@ class GlobalAiAssistantService
             ];
         }
 
-        $vehicles = Vehicle::where('user_id', $userId)->get();
-        $latest = Diagnostic::where('user_id', $userId)->with('vehicle')->latest()->first();
+        $vehicles = Vehicle::where('user_id', $userId)
+            ->select(['id', 'year', 'make', 'model', 'engine_type', 'transmission', 'mileage_km'])
+            ->get();
+
+        $latest = Diagnostic::where('user_id', $userId)
+            ->select(['id', 'vehicle_id', 'status', 'ml_condition', 'ml_confidence', 'vibration_peak_g', 'created_at'])
+            ->with(['vehicle:id,year,make,model'])
+            ->latest()
+            ->first();
 
         return [
             'has_user' => true,
-            'user_id' => $userId,
             'vehicles' => $vehicles,
             'latest_diagnostic' => $latest,
         ];
+    }
+
+    /**
+     * Strip device keys, credentials, VINs, and PII before sending prompts to third-party LLMs.
+     */
+    public static function sanitizePromptText(string $text): string
+    {
+        $patterns = [
+            '/\bhvn_dev_[a-f0-9]+\b/i' => '[REDACTED_DEVICE_KEY]',
+            '/\b(?:sk-[a-zA-Z0-9_-]{16,}|AIza[0-9A-Za-z_-]{20,}|gsk_[a-zA-Z0-9_-]{16,})\b/' => '[REDACTED_API_KEY]',
+            '/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/' => '[REDACTED_EMAIL]',
+            '/\b(?:\+?\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3,4}[\s.-]?\d{4}\b/' => '[REDACTED_PHONE]',
+            '/\b[A-HJ-NPR-Z0-9]{17}\b/i' => '[REDACTED_VIN]',
+        ];
+
+        return preg_replace(array_keys($patterns), array_values($patterns), $text) ?? $text;
     }
 
     /**
@@ -60,9 +82,9 @@ class GlobalAiAssistantService
      */
     protected function callLlmApi(string $question, array $context): ?string
     {
-        $geminiKey = config('services.gemini.key') ?: env('GEMINI_API_KEY');
-        $openAiKey = config('services.openai.key') ?: env('OPENAI_API_KEY');
-        $groqKey   = config('services.groq.key') ?: env('GROQ_API_KEY');
+        $geminiKey = config('services.gemini.key');
+        $openAiKey = config('services.openai.key');
+        $groqKey   = config('services.groq.key');
 
         // Check if any key is available
         if (!$geminiKey && !$openAiKey && !$groqKey) {
@@ -93,6 +115,9 @@ class GlobalAiAssistantService
                 $systemPrompt .= "\nUser's Latest Test Session: Status {$ld->status}, ML Condition: {$cond}, Peak G: {$peak}g.";
             }
         }
+
+        $systemPrompt = self::sanitizePromptText($systemPrompt);
+        $question = self::sanitizePromptText($question);
 
         // 1. Try Groq First (Ultra-fast LLM Inference)
         if ($groqKey) {
@@ -205,7 +230,7 @@ class GlobalAiAssistantService
                     $list = $vehicles->map(function ($v) {
                         $engine = $v->engine_type ?: 'Standard Powertrain';
                         $mileage = $v->mileage_km ? number_format($v->mileage_km) . ' km' : 'mileage unrecorded';
-                        return "• **{$v->year} {$v->make} {$v->model}** ({$engine}, {$mileage}) — *Key: `{$v->device_key}`*";
+                        return "• **{$v->year} {$v->make} {$v->model}** ({$engine}, {$mileage})";
                     })->implode("\n");
                     return "🚗 **Your Registered Garage:**\n\n{$list}\n\nSelect any vehicle from the **Diagnostics** menu to record engine audio or stream ESP32 vibration data.";
                 }
@@ -633,8 +658,9 @@ class GlobalAiAssistantService
         // -------------------------------------------------------------
         // 18. Structured ASE Master Mechanic Protocol (Intelligent Fallback)
         // -------------------------------------------------------------
+        $safeQuestion = e(self::sanitizePromptText($question));
         return "🧠 **HAVEN Master Technician Analysis:**\n\n"
-            . "To diagnose *\"{$question}\"*, automotive diagnostics evaluates four fundamental powertrain systems:\n\n"
+            . "To diagnose *\"{$safeQuestion}\"*, automotive diagnostics evaluates four fundamental powertrain systems:\n\n"
             . "1. **Airflow & Metering:** Check for vacuum leaks, contaminated MAF/MAP sensor wires, or a gummed throttle body.\n"
             . "2. **Fuel Delivery:** Verify fuel pressure, filter condition, and injector spray pattern across cylinders.\n"
             . "3. **Ignition & Spark:** Inspect spark plug electrode wear/gap, ignition coil insulation, and timing sensor signals (CKP/CMP).\n"

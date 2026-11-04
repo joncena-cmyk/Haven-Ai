@@ -16,11 +16,18 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
+        $vehicles = $request->user()->vehicles()->get();
+        foreach ($vehicles as $veh) {
+            if (empty($veh->device_key)) {
+                $veh->update(['device_key' => \App\Models\Vehicle::generateDeviceKey()]);
+            }
+        }
+
         return view('profile.edit', [
             'user'            => $request->user(),
             'auditLogs'       => $request->user()->auditLogs()->latest()->take(10)->get(),
-            'vehicles'        => $request->user()->vehicles()->get(),
-            'latestTelemetry' => \Illuminate\Support\Facades\Cache::get('telemetry:live:latest'),
+            'vehicles'        => $vehicles,
+            'latestTelemetry' => \Illuminate\Support\Facades\Cache::get('telemetry:live:user:' . $request->user()->id),
         ]);
     }
 
@@ -37,6 +44,10 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
+        \App\Services\AuditLogger::log('profile.updated', [
+            'email' => $request->user()->email,
+        ]);
+
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 
@@ -50,6 +61,10 @@ class ProfileController extends Controller
         ]);
 
         $user = $request->user();
+
+        \App\Services\AuditLogger::log('profile.deleted', [
+            'email' => $user->email,
+        ], $user->id);
 
         Auth::logout();
 

@@ -22,26 +22,26 @@ class TelemetryIngestController extends Controller
      */
     public function ingest(Request $request): JsonResponse
     {
-        // 1. Validate request payload
+        // 1. Validate request payload (with strict size limits to prevent disk exhaustion)
         $validated = $request->validate([
-            'vehicle_id'     => 'required|exists:vehicles,id',
+            'vehicle_id'     => 'required|integer|exists:vehicles,id',
             'device_id'      => 'nullable|string|max:100',
             'device_key'     => 'nullable|string|max:100',
-            'samples'        => 'nullable|array',
-            'csv_data'       => 'nullable|string',
-            'audio_base64'   => 'nullable|string',
+            'samples'        => 'nullable|array|max:5000',
+            'csv_data'       => 'nullable|string|max:512000',
+            'audio_base64'   => 'nullable|string|max:7000000',
             'audio_mime'     => 'nullable|string|in:audio/webm,audio/wav,audio/ogg,audio/mpeg',
             'peak_g'         => 'nullable|numeric',
             'rms_g'          => 'nullable|numeric',
             'crest_factor'   => 'nullable|numeric',
-            'sample_rate_hz' => 'nullable|integer',
+            'sample_rate_hz' => 'nullable|integer|min:1|max:48000',
             'temperature_c'  => 'nullable|numeric',
             'temp_c'         => 'nullable|numeric',
             'rpm'            => 'nullable|numeric',
             'voltage_v'      => 'nullable|numeric',
             'battery_v'      => 'nullable|numeric',
             'current_ma'     => 'nullable|numeric',
-            'sensor_data'    => 'nullable|array',
+            'sensor_data'    => 'nullable|array|max:32',
             'auto_analyze'   => 'nullable|boolean',
         ]);
 
@@ -50,13 +50,15 @@ class TelemetryIngestController extends Controller
 
         // 2. Hardware Device Authentication (ISO/SAE 21434 §9)
         $providedKey = $request->header('X-Haven-Device-Key') ?? ($validated['device_key'] ?? null);
-        $isAuthenticated = $request->user() !== null;
-        $isValidDeviceKey = $providedKey && (
-            $providedKey === $vehicle->device_key ||
-            $providedKey === env('HAVEN_DEVICE_KEY', 'hvn_dev_test')
-        );
+        $isAuthenticatedOwner = $request->user() !== null
+            && (int) $request->user()->id === (int) $vehicle->user_id;
+        $isValidDeviceKey = is_string($providedKey)
+            && $providedKey !== ''
+            && is_string($vehicle->device_key)
+            && $vehicle->device_key !== ''
+            && hash_equals($vehicle->device_key, $providedKey);
 
-        if (! $isAuthenticated && ! $isValidDeviceKey) {
+        if (! $isAuthenticatedOwner && ! $isValidDeviceKey) {
             AuditLogger::log('iot.auth_failed', [
                 'vehicle_id' => $vehicle->id,
                 'device_id'  => $validated['device_id'] ?? 'unknown',
@@ -71,14 +73,14 @@ class TelemetryIngestController extends Controller
             ], 401);
         }
 
-        // 3. Process Vibration Telemetry (MPU6050: D21/D22)
+        // 3. Process Vibration Telemetry (MPU6050: D21/D22) — stored on private disk
         $vibrationPath = null;
         $mags = [];
         $sampleCount = 0;
 
         if (!empty($validated['csv_data'])) {
             $filename = 'vibration/' . Str::uuid() . '.csv';
-            Storage::disk('public')->put($filename, $validated['csv_data']);
+            Storage::disk('local')->put($filename, $validated['csv_data']);
             $vibrationPath = $filename;
 
             $lines = array_filter(array_map('trim', explode("\n", $validated['csv_data'])));
@@ -87,7 +89,7 @@ class TelemetryIngestController extends Controller
                 foreach ($lines as $line) {
                     $cols = str_getcsv($line);
                     if (count($cols) >= 4) {
-                        $mags[] = sqrt(($cols[1] ** 2) + ($cols[2] ** 2) + ($cols[3] ** 2));
+                        $mags[] = sqrt(((float) $cols[1] ** 2) + ((float) $cols[2] ** 2) + ((float) $cols[3] ** 2));
                     } elseif (count($cols) >= 2) {
                         $mags[] = abs((float) $cols[1]);
                     }
@@ -95,13 +97,13 @@ class TelemetryIngestController extends Controller
             }
         } elseif (!empty($validated['samples']) && is_array($validated['samples'])) {
             $filename = 'vibration/' . Str::uuid() . '.json';
-            Storage::disk('public')->put($filename, json_encode($validated['samples'], JSON_PRETTY_PRINT));
+            Storage::disk('local')->put($filename, json_encode($validated['samples'], JSON_PRETTY_PRINT));
             $vibrationPath = $filename;
 
             foreach ($validated['samples'] as $sample) {
                 if (is_array($sample)) {
                     if (isset($sample['x'], $sample['y'], $sample['z'])) {
-                        $mags[] = sqrt(($sample['x'] ** 2) + ($sample['y'] ** 2) + ($sample['z'] ** 2));
+                        $mags[] = sqrt(((float) $sample['x'] ** 2) + ((float) $sample['y'] ** 2) + ((float) $sample['z'] ** 2));
                     } elseif (isset($sample['magnitude'])) {
                         $mags[] = abs((float) $sample['magnitude']);
                     }
@@ -115,14 +117,24 @@ class TelemetryIngestController extends Controller
         $peakG = $validated['peak_g'] ?? (!empty($mags) ? round(max($mags), 4) : null);
         $rmsG = $validated['rms_g'] ?? (!empty($mags) ? round(sqrt(array_sum(array_map(fn($v) => $v ** 2, $mags)) / $sampleCount), 4) : null);
 
-        // 4. Process Audio (INMP441 I2S MEMS Mic: D18/D19/D5)
+        // 4. Process Audio (INMP441 I2S MEMS Mic: D18/D19/D5) — stored on private disk
         $audioPath = null;
         if (!empty($validated['audio_base64'])) {
-            $rawAudio = base64_decode($validated['audio_base64']);
-            if ($rawAudio !== false) {
+            $base64Payload = $validated['audio_base64'];
+            if (str_contains($base64Payload, ',')) {
+                $base64Payload = substr($base64Payload, strpos($base64Payload, ',') + 1);
+            }
+            $rawAudio = base64_decode($base64Payload, true);
+            if ($rawAudio === false || strlen($rawAudio) > 5 * 1024 * 1024) {
+                return response()->json([
+                    'success' => false,
+                    'error'   => 'Invalid or oversized audio_base64 payload (maximum 5 MB decoded).',
+                ], 422);
+            }
+            if (strlen($rawAudio) > 0) {
                 $ext = str_contains($validated['audio_mime'] ?? '', 'wav') ? 'wav' : 'webm';
                 $audioFilename = 'audio/' . Str::uuid() . '.' . $ext;
-                Storage::disk('public')->put($audioFilename, $rawAudio);
+                Storage::disk('local')->put($audioFilename, $rawAudio);
                 $audioPath = $audioFilename;
             }
         }
@@ -218,8 +230,27 @@ class TelemetryIngestController extends Controller
             'timestamp'         => now()->toIso8601String(),
         ];
 
-        \Illuminate\Support\Facades\Cache::put('telemetry:live:latest', $livePayload, 15);
         \Illuminate\Support\Facades\Cache::put('telemetry:live:' . $vehicle->id, $livePayload, 15);
+        if ($vehicle->user_id) {
+            \Illuminate\Support\Facades\Cache::put('telemetry:live:user:' . $vehicle->user_id, $livePayload, 15);
+        }
+
+        // Rolling 30-packet history buffer for live oscilloscope chart
+        $historyKey = 'telemetry:history:' . $vehicle->id;
+        $history = \Illuminate\Support\Facades\Cache::get($historyKey, []);
+        $history[] = [
+            'time' => now()->format('H:i:s'),
+            'rpm'  => $rpm ? (int)$rpm : 0,
+            'temp' => $tempC ? (float)$tempC : null,
+            'peak' => $peakG ? (float)$peakG : null,
+        ];
+        if (count($history) > 30) {
+            $history = array_slice($history, -30);
+        }
+        \Illuminate\Support\Facades\Cache::put($historyKey, $history, 60);
+        if ($vehicle->user_id) {
+            \Illuminate\Support\Facades\Cache::put('telemetry:history:user:' . $vehicle->user_id, $history, 60);
+        }
 
         // 8. Session Persistence Decision:
         // Do NOT create diagnostic database sessions for periodic 5-second hardware checkups!
@@ -331,11 +362,33 @@ class TelemetryIngestController extends Controller
 
     /**
      * Get the latest live telemetry reading for real-time frontend dashboard polling.
+     * Scoped strictly to the authenticated user's vehicles.
      * GET /api/v1/telemetry/latest
      */
     public function latest(Request $request): JsonResponse
     {
-        $cached = \Illuminate\Support\Facades\Cache::get('telemetry:live:latest');
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        $vehicleId = $request->query('vehicle_id');
+        if ($vehicleId !== null && $vehicleId !== '') {
+            $vehicle = Vehicle::where('user_id', $user->id)->find($vehicleId);
+            if (! $vehicle) {
+                return response()->json([
+                    'online'  => false,
+                    'status'  => 'forbidden',
+                    'message' => 'Unauthorized vehicle access.',
+                ], 403);
+            }
+            $cached = \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id);
+        } else {
+            $vehicle = Vehicle::where('user_id', $user->id)->first();
+            $cached = \Illuminate\Support\Facades\Cache::get('telemetry:live:user:' . $user->id)
+                ?? ($vehicle ? \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id) : null);
+        }
+
         if ($cached) {
             // Revalidate freshness from stored timestamp: ESP32 sends every 5s; 10s = timeout
             $ts = $cached['timestamp'] ?? null;
@@ -358,20 +411,21 @@ class TelemetryIngestController extends Controller
                 $cached['rpm'] = 0;
             }
 
+            $historyKey = $vehicle ? ('telemetry:history:' . $vehicle->id) : ('telemetry:history:user:' . $user->id);
+            $cached['history'] = \Illuminate\Support\Facades\Cache::get($historyKey, []);
+
             return response()->json($cached);
         }
 
-        $vehicleId = $request->query('vehicle_id');
-        $vehicle = $vehicleId ? Vehicle::find($vehicleId) : Vehicle::first();
-
         // Hardware is currently offline / not sending
+        $historyKey = $vehicle ? ('telemetry:history:' . $vehicle->id) : ('telemetry:history:user:' . $user->id);
         return response()->json([
             'online'            => false,
             'diff_seconds'      => 999,
             'last_seen_human'   => 'Offline / Standby',
             'device_id'         => 'ESP32-5SENSOR-NODE',
             'vehicle_name'      => $vehicle?->display_name ?? 'Vehicle',
-            'vehicle_id'        => $vehicle?->id ?? 1,
+            'vehicle_id'        => $vehicle?->id,
             'temperature_c'     => null,
             'rpm'               => 0,
             'voltage_v'         => null,
@@ -387,72 +441,206 @@ class TelemetryIngestController extends Controller
             'mode'              => 'standby',
             'status'            => 'standby',
             'timestamp'         => null,
+            'history'           => \Illuminate\Support\Facades\Cache::get($historyKey, []),
+        ]);
+    }
+
+    /**
+     * Server-Sent Events (SSE) stream for live ESP32 telemetry & rolling waveform.
+     * GET /api/v1/telemetry/stream
+     */
+    public function stream(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            abort(401, 'Unauthenticated.');
+        }
+
+        $vehicleId = $request->query('vehicle_id');
+        $vehicle = $vehicleId ? Vehicle::where('user_id', $user->id)->find($vehicleId) : Vehicle::where('user_id', $user->id)->first();
+
+        return response()->stream(function () use ($user, $vehicle) {
+            // Send initial ping event
+            echo ": connected\n\n";
+            if (ob_get_level() > 0) ob_flush();
+            flush();
+
+            // Stream up to 25 bursts (or until client closes) to prevent infinite loop worker freeze
+            for ($i = 0; $i < 20; $i++) {
+                if (connection_aborted()) {
+                    break;
+                }
+
+                $cached = $vehicle
+                    ? \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id)
+                    : \Illuminate\Support\Facades\Cache::get('telemetry:live:user:' . $user->id);
+
+                $historyKey = $vehicle ? ('telemetry:history:' . $vehicle->id) : ('telemetry:history:user:' . $user->id);
+                $history = \Illuminate\Support\Facades\Cache::get($historyKey, []);
+
+                $payload = $cached ?: [
+                    'online'          => false,
+                    'last_seen_human' => 'Standby',
+                    'vehicle_name'    => $vehicle?->display_name ?? 'Vehicle',
+                    'temperature_c'   => null,
+                    'rpm'             => 0,
+                    'voltage_v'       => null,
+                    'peak_g'          => null,
+                ];
+                $payload['history'] = $history;
+
+                echo "event: telemetry\n";
+                echo "data: " . json_encode($payload) . "\n\n";
+
+                if (ob_get_level() > 0) ob_flush();
+                flush();
+
+                sleep(2);
+            }
+        }, 200, [
+            'Content-Type'      => 'text/event-stream',
+            'Cache-Control'     => 'no-cache, no-transform',
+            'Connection'        => 'keep-alive',
+            'X-Accel-Buffering' => 'no',
         ]);
     }
 
     /**
      * Return ready-to-flash Arduino C++ firmware sketch for ESP32.
+     * Scoped strictly to the authenticated user's vehicles.
      * GET /api/v1/telemetry/sketch
      */
     public function sketch(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
         $vehicleId = $request->query('vehicle_id');
-        $vehicle = $vehicleId ? Vehicle::find($vehicleId) : Vehicle::first();
-        $deviceKey = $vehicle?->device_key ?? 'YOUR_VEHICLE_DEVICE_KEY';
-        $vId = $vehicle?->id ?? 1;
+        if ($vehicleId !== null && $vehicleId !== '') {
+            $vehicle = Vehicle::where('user_id', $user->id)->find($vehicleId);
+            if (! $vehicle) {
+                return response()->json(['message' => 'Unauthorized vehicle access.'], 403);
+            }
+        } else {
+            $vehicle = Vehicle::where('user_id', $user->id)->first();
+            if (! $vehicle) {
+                return response()->json(['message' => 'No vehicle registered for your account.'], 404);
+            }
+        }
+
+        if (empty($vehicle->device_key)) {
+            $vehicle->update(['device_key' => 'hvn_dev_' . bin2hex(random_bytes(16))]);
+        }
+
+        $deviceKey = $vehicle->device_key;
+        $vId = $vehicle->id;
 
         $code = <<<CPP
 #include <WiFi.h>
+#include <WebServer.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
-const char* ssid      = "YOUR_WIFI_SSID";
-const char* password  = "YOUR_WIFI_PASSWORD";
-const char* serverUrl = "http://YOUR_SERVER_IP:8000/api/v1/telemetry/ingest";
-const char* deviceKey = "{$deviceKey}";
+Preferences prefs;
+WebServer server(80);
 
-// Hardware ADXL345 / MPU6050 I2C pins
+char ssid[64]      = "YOUR_WIFI_SSID";
+char password[64]  = "YOUR_WIFI_PASSWORD";
+char serverUrl[128]= "http://YOUR_SERVER_IP:8000/api/v1/telemetry/ingest";
+char deviceKey[64] = "{$deviceKey}";
+
+// Hardware ADXL345 / MPU6050 I2C & DS18B20 OneWire pins
 #define SENSOR_SDA 21
 #define SENSOR_SCL 22
+#define TEMP_PIN   4
+#define VIB_BUFFER_SIZE 128
+
+OneWire oneWire(TEMP_PIN);
+DallasTemperature tempSensor(&oneWire);
+float vibBuffer[VIB_BUFFER_SIZE];
+int vibIdx = 0;
+unsigned long lastSampleMs = 0;
+unsigned long lastUploadMs = 0;
 
 void setup() {
   Serial.begin(115200);
-  WiFi.begin(ssid, password);
-  Serial.print("Connecting to Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  prefs.begin("haven", true);
+  if (prefs.isKey("ssid")) {
+    prefs.getString("ssid", ssid, sizeof(ssid));
+    prefs.getString("pass", password, sizeof(password));
+    prefs.getString("server", serverUrl, sizeof(serverUrl));
   }
-  Serial.println("\\nHAVEN Wi-Fi Connected!");
+  prefs.end();
+
+  // Async non-blocking temperature conversion (eliminates 750ms 1-Wire stall)
+  tempSensor.begin();
+  tempSensor.setResolution(10);
+  tempSensor.setWaitForConversion(false);
+  tempSensor.requestTemperatures();
+
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAP("HAVEN_AI_LOCAL", "haven1234");
+  WiFi.begin(ssid, password);
+  int tries = 0;
+  while (WiFi.status() != WL_CONNECTED && tries++ < 20) {
+    delay(400);
+  }
+
+  server.on("/config", []() {
+    server.send(200, "text/html", "<form method='POST' action='/save'>SSID:<input name='ssid'><br>Pass:<input name='pass' type='password'><br>Server:<input name='server'><br><button>Save</button></form>");
+  });
+  server.on("/save", HTTP_POST, []() {
+    prefs.begin("haven", false);
+    prefs.putString("ssid", server.arg("ssid"));
+    prefs.putString("pass", server.arg("pass"));
+    prefs.putString("server", server.arg("server"));
+    prefs.end();
+    server.send(200, "text/plain", "Saved! Rebooting...");
+    delay(500);
+    ESP.restart();
+  });
+  server.begin();
 }
 
 void loop() {
-  if (WiFi.status() == WL_CONNECTED) {
+  server.handleClient();
+  unsigned long now = millis();
+
+  // Strict 100Hz non-blocking vibration sampling loop (10ms interval)
+  if (now - lastSampleMs >= 10) {
+    lastSampleMs = now;
+    vibBuffer[vibIdx] = 1.0 + (sin(vibIdx * 0.2) * 0.35);
+    vibIdx = (vibIdx + 1) % VIB_BUFFER_SIZE;
+  }
+
+  if (now - lastUploadMs >= 5000 && WiFi.status() == WL_CONNECTED) {
+    lastUploadMs = now;
     HTTPClient http;
     http.begin(serverUrl);
     http.addHeader("Content-Type", "application/json");
-    // ISO/SAE 21434 Automotive Device Key Authentication Header
     http.addHeader("X-Haven-Device-Key", deviceKey);
 
-    StaticJsonDocument<2048> doc;
+    StaticJsonDocument<4096> doc;
     doc["vehicle_id"]     = {$vId};
     doc["device_id"]      = "ESP32-HAVEN-NODE-01";
-    doc["sample_rate_hz"] = 50;
+    doc["sample_rate_hz"] = 100;
     doc["auto_analyze"]   = true;
 
     JsonArray samples = doc.createNestedArray("samples");
-    for (int i = 0; i < 50; i++) {
-      float z = 1.0 + (sin(i * 0.2) * 0.35); // Sensor reading
-      samples.add(z);
+    for (int i = 0; i < 64; i++) {
+      samples.add(vibBuffer[i]);
     }
 
     String requestBody;
     serializeJson(doc, requestBody);
-    int httpResponseCode = http.POST(requestBody);
-    Serial.printf("Response Code: %d\\n", httpResponseCode);
+    http.POST(requestBody);
     http.end();
   }
-  delay(10000); // 10-second sampling cycle
 }
 CPP;
 
@@ -460,7 +648,7 @@ CPP;
             'language'   => 'cpp',
             'platform'   => 'ESP32 / Arduino',
             'filename'   => 'Haven_ESP32_Telemetry.ino',
-            'device_key' => $deviceKey,
+            'vehicle_id' => $vId,
             'sketch'     => $code,
         ]);
     }

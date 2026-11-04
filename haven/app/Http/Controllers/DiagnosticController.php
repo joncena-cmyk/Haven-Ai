@@ -113,7 +113,7 @@ class DiagnosticController extends Controller
         $audioFile = $request->file('audio_blob') ?? $request->file('audio_file');
         if ($audioFile) {
             $dir  = "diagnostics/{$vehicle->id}/audio";
-            $path = $audioFile->store($dir, 'public');
+            $path = $audioFile->store($dir, 'local');
             $data['audio_path']          = $path;
             $data['audio_original_name'] = $audioFile->getClientOriginalName();
             // Estimate duration (bytes / 16kbps) — actual duration set by JS via hidden input
@@ -126,7 +126,7 @@ class DiagnosticController extends Controller
         if ($request->hasFile('vibration_file')) {
             $vib  = $request->file('vibration_file');
             $dir  = "diagnostics/{$vehicle->id}/vibration";
-            $path = $vib->store($dir, 'public');
+            $path = $vib->store($dir, 'local');
             $data['vibration_path'] = $path;
 
             // Parse sample count and peak/RMS from CSV if provided
@@ -167,7 +167,62 @@ class DiagnosticController extends Controller
             ? $aiService->generateRecommendations($diagnostic)
             : null;
 
-        return view('diagnostics.show', compact('diagnostic', 'aiRecommendations', 'recentDiagnostics'));
+        // Resolve vehicle reference baseline (prefer 'normal' session or prior completed session)
+        $baseline = Diagnostic::where('vehicle_id', $diagnostic->vehicle_id)
+            ->where('status', 'completed')
+            ->where('id', '!=', $diagnostic->id)
+            ->orderByRaw("CASE WHEN ml_condition = 'normal' THEN 0 ELSE 1 END")
+            ->latest('id')
+            ->first();
+
+        $comparison = null;
+        if ($baseline && $diagnostic->status === 'completed') {
+            $curCrest = ($diagnostic->vibration_rms_g > 0 && $diagnostic->vibration_peak_g > 0)
+                ? ($diagnostic->vibration_peak_g / $diagnostic->vibration_rms_g) : null;
+            $baseCrest = ($baseline->vibration_rms_g > 0 && $baseline->vibration_peak_g > 0)
+                ? ($baseline->vibration_peak_g / $baseline->vibration_rms_g) : null;
+
+            $comparison = [
+                'baseline_id'        => $baseline->id,
+                'baseline_date'      => $baseline->created_at->format('M j, Y'),
+                'baseline_condition' => $baseline->ml_condition,
+                'peak_g' => [
+                    'current'  => $diagnostic->vibration_peak_g,
+                    'baseline' => $baseline->vibration_peak_g,
+                    'delta'    => ($diagnostic->vibration_peak_g !== null && $baseline->vibration_peak_g !== null)
+                        ? round($diagnostic->vibration_peak_g - $baseline->vibration_peak_g, 3) : null,
+                    'pct'      => ($baseline->vibration_peak_g > 0 && $diagnostic->vibration_peak_g !== null)
+                        ? round((($diagnostic->vibration_peak_g - $baseline->vibration_peak_g) / $baseline->vibration_peak_g) * 100, 1) : null,
+                ],
+                'rms_g' => [
+                    'current'  => $diagnostic->vibration_rms_g,
+                    'baseline' => $baseline->vibration_rms_g,
+                    'delta'    => ($diagnostic->vibration_rms_g !== null && $baseline->vibration_rms_g !== null)
+                        ? round($diagnostic->vibration_rms_g - $baseline->vibration_rms_g, 3) : null,
+                    'pct'      => ($baseline->vibration_rms_g > 0 && $diagnostic->vibration_rms_g !== null)
+                        ? round((($diagnostic->vibration_rms_g - $baseline->vibration_rms_g) / $baseline->vibration_rms_g) * 100, 1) : null,
+                ],
+                'crest_factor' => [
+                    'current'  => $curCrest ? round($curCrest, 2) : null,
+                    'baseline' => $baseCrest ? round($baseCrest, 2) : null,
+                    'delta'    => ($curCrest !== null && $baseCrest !== null) ? round($curCrest - $baseCrest, 2) : null,
+                ],
+                'temperature_c' => [
+                    'current'  => $diagnostic->temperature_c,
+                    'baseline' => $baseline->temperature_c,
+                    'delta'    => ($diagnostic->temperature_c !== null && $baseline->temperature_c !== null)
+                        ? round($diagnostic->temperature_c - $baseline->temperature_c, 1) : null,
+                ],
+                'rpm' => [
+                    'current'  => $diagnostic->rpm,
+                    'baseline' => $baseline->rpm,
+                    'delta'    => ($diagnostic->rpm !== null && $baseline->rpm !== null)
+                        ? ($diagnostic->rpm - $baseline->rpm) : null,
+                ],
+            ];
+        }
+
+        return view('diagnostics.show', compact('diagnostic', 'aiRecommendations', 'recentDiagnostics', 'baseline', 'comparison'));
     }
 
     /* ─────────────────────────────────────────────
@@ -291,17 +346,64 @@ class DiagnosticController extends Controller
             'vehicle_id'    => $diagnostic->vehicle_id,
         ]);
 
-        // Clean up stored files
+        // Clean up stored files across private and legacy public disks
         if ($diagnostic->audio_path) {
+            Storage::disk('local')->delete($diagnostic->audio_path);
             Storage::disk('public')->delete($diagnostic->audio_path);
         }
         if ($diagnostic->vibration_path) {
+            Storage::disk('local')->delete($diagnostic->vibration_path);
             Storage::disk('public')->delete($diagnostic->vibration_path);
         }
 
         $diagnostic->delete();
 
         return redirect()->route('diagnostics.index')->with('success', 'Diagnostic session deleted.');
+    }
+
+    /* ─────────────────────────────────────────────
+       STREAM AUDIO  GET /diagnostics/{diagnostic}/audio
+       Owner-checked private audio stream.
+    ───────────────────────────────────────────── */
+    public function streamAudio(Diagnostic $diagnostic): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorizeOwner($diagnostic);
+
+        abort_if(empty($diagnostic->audio_path), 404, 'No audio recording found.');
+
+        $disk = $this->resolveFileDisk($diagnostic->audio_path);
+        abort_if($disk === null, 404, 'Audio recording file not found.');
+
+        return Storage::disk($disk)->response($diagnostic->audio_path);
+    }
+
+    /* ─────────────────────────────────────────────
+       STREAM VIBRATION  GET /diagnostics/{diagnostic}/vibration
+       Owner-checked private vibration file download.
+    ───────────────────────────────────────────── */
+    public function streamVibration(Diagnostic $diagnostic): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $this->authorizeOwner($diagnostic);
+
+        abort_if(empty($diagnostic->vibration_path), 404, 'No vibration file found.');
+
+        $disk = $this->resolveFileDisk($diagnostic->vibration_path);
+        abort_if($disk === null, 404, 'Vibration telemetry file not found.');
+
+        return Storage::disk($disk)->download(
+            $diagnostic->vibration_path,
+            basename($diagnostic->vibration_path)
+        );
+    }
+
+    private function resolveFileDisk(string $relativePath): ?string
+    {
+        foreach (['local', 'private', 'public'] as $disk) {
+            if (Storage::disk($disk)->exists($relativePath)) {
+                return $disk;
+            }
+        }
+        return null;
     }
 
     /* ─────────────────────────────────────────────

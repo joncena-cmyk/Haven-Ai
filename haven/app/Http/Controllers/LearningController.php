@@ -970,6 +970,7 @@ class LearningController extends Controller
             'modules'         => $allModules,
             'categories'      => collect($allModules)->pluck('category')->unique()->values()->all(),
             'activeCategory'  => 'all',
+            'learningStats'   => auth()->check() ? auth()->user()->getLearningStats() : null,
         ]);
     }
 
@@ -986,11 +987,12 @@ class LearningController extends Controller
         $otherTopics = collect($allTopics)->where('slug', '!==', $slug)->all();
 
         return view('learning.topic', [
-            'topic'       => $topic,
-            'modules'     => $topic['modules'],
-            'otherTopics' => $otherTopics,
-            'allTopics'   => $allTopics,
-            'dtcCount'    => count($this->getDtcList()),
+            'topic'         => $topic,
+            'modules'       => $topic['modules'],
+            'otherTopics'   => $otherTopics,
+            'allTopics'     => $allTopics,
+            'dtcCount'      => count($this->getDtcList()),
+            'learningStats' => auth()->check() ? auth()->user()->getLearningStats() : null,
         ]);
     }
 
@@ -1005,6 +1007,25 @@ class LearningController extends Controller
 
         $module = $modules[$slug];
         $topics = $this->getTopics();
+
+        // Auto-mark module as completed for authenticated user
+        if (auth()->check()) {
+            $user = auth()->user();
+            $progress = \App\Models\LearningProgress::firstOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'completed_modules' => [],
+                    'quiz_best_score'   => 0,
+                    'quiz_total'        => 10,
+                    'quiz_attempts'     => 0,
+                ]
+            );
+            $completed = is_array($progress->completed_modules) ? $progress->completed_modules : [];
+            if (!in_array($slug, $completed, true)) {
+                $completed[] = $slug;
+                $progress->update(['completed_modules' => $completed]);
+            }
+        }
 
         // Find parent topic
         $parentTopic = null;
@@ -1034,9 +1055,10 @@ class LearningController extends Controller
         }
 
         return view('learning.show', [
-            'module'      => $module,
-            'parentTopic' => $parentTopic,
-            'related'     => $related,
+            'module'        => $module,
+            'parentTopic'   => $parentTopic,
+            'related'       => $related,
+            'learningStats' => auth()->check() ? auth()->user()->getLearningStats() : null,
         ]);
     }
 
@@ -1191,8 +1213,105 @@ class LearningController extends Controller
             ],
         ];
 
+        $learningStats = auth()->check() ? auth()->user()->getLearningStats() : null;
+
         return view('learning.quiz', [
-            'questions' => $questions,
+            'questions'     => $questions,
+            'learningStats' => $learningStats,
+        ]);
+    }
+
+    /**
+     * Submit and persist diagnostic quiz results.
+     */
+    public function submitQuiz(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'score' => 'required|integer|min:0|max:50',
+            'total' => 'required|integer|min:1|max:50',
+        ]);
+
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        $progress = \App\Models\LearningProgress::firstOrCreate(
+            ['user_id' => $user->id],
+            [
+                'completed_modules' => [],
+                'quiz_best_score'   => 0,
+                'quiz_total'        => $validated['total'],
+                'quiz_attempts'     => 0,
+            ]
+        );
+
+        $score = $validated['score'];
+        $total = $validated['total'];
+        $pct = (int) round(($score / $total) * 100);
+
+        $newBest = max((int) $progress->quiz_best_score, $score);
+        $attempts = ((int) $progress->quiz_attempts) + 1;
+
+        $progress->update([
+            'quiz_best_score' => $newBest,
+            'quiz_total'      => $total,
+            'quiz_attempts'   => $attempts,
+            'last_quiz_at'    => now(),
+        ]);
+
+        $tier = match(true) {
+            $pct === 100 => 'Master Diagnostician',
+            $pct >= 80   => 'Senior Diagnostic Specialist',
+            $pct >= 60   => 'Field Technician',
+            default      => 'Diagnostic Apprentice',
+        };
+
+        return response()->json([
+            'success'       => true,
+            'score'         => $score,
+            'total'         => $total,
+            'percentage'    => $pct,
+            'best_score'    => $newBest,
+            'attempts'      => $attempts,
+            'tier'          => $tier,
+            'message'       => 'Quiz performance saved to your vehicle engineer profile.',
+        ]);
+    }
+
+    /**
+     * Explicitly mark a learning module as completed.
+     */
+    public function markCompleted(Request $request, string $slug): \Illuminate\Http\JsonResponse
+    {
+        $modules = $this->getModules();
+        abort_unless(isset($modules[$slug]), 404, 'Module not found');
+
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        $progress = \App\Models\LearningProgress::firstOrCreate(
+            ['user_id' => $user->id],
+            [
+                'completed_modules' => [],
+                'quiz_best_score'   => 0,
+                'quiz_total'        => 10,
+                'quiz_attempts'     => 0,
+            ]
+        );
+
+        $completed = is_array($progress->completed_modules) ? $progress->completed_modules : [];
+        if (!in_array($slug, $completed, true)) {
+            $completed[] = $slug;
+            $progress->update(['completed_modules' => $completed]);
+        }
+
+        return response()->json([
+            'success'         => true,
+            'completed_count' => count($completed),
+            'completed'       => true,
         ]);
     }
 }

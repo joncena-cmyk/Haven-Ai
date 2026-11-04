@@ -7,7 +7,7 @@
 
     {{-- Breadcrumb --}}
     <div class="h-breadcrumb">
-        <a href="{{ route('dashboard') }}" class="h-breadcrumb-link">Dashboard</a>
+        <a href="{{ auth()->check() ? route('dashboard') : url('/') }}" class="h-breadcrumb-link">{{ auth()->check() ? 'Dashboard' : 'Home' }}</a>
         <span class="h-breadcrumb-sep">/</span>
         <a href="{{ route('learning.index') }}" class="h-breadcrumb-link">Learning Modules</a>
         <span class="h-breadcrumb-sep">/</span>
@@ -293,7 +293,7 @@
             document.getElementById('lrn-read-progress-bar').style.width = pct + '%';
         });
 
-        // Mark as complete
+        // Mark as complete (persisted to DB for authenticated users + localStorage fallback)
         function toggleComplete(slug) {
             let completed = JSON.parse(localStorage.getItem('haven_lrn_completed') || '[]');
             const idx = completed.indexOf(slug);
@@ -302,25 +302,34 @@
 
             if (idx === -1) {
                 completed.push(slug);
-                btn.style.background = 'var(--h-green-bg)';
-                btn.style.borderColor = 'rgba(34,197,94,0.4)';
-                btn.style.color = 'var(--h-green)';
-                label.textContent = 'Completed ✓';
-            } else {
-                completed.splice(idx, 1);
-                btn.style.background = 'var(--h-surface2)';
-                btn.style.borderColor = 'var(--h-border)';
-                btn.style.color = 'var(--h-text2)';
-                label.textContent = 'Mark as Complete';
             }
+            btn.style.background = 'var(--h-green-bg)';
+            btn.style.borderColor = 'rgba(34,197,94,0.4)';
+            btn.style.color = 'var(--h-green)';
+            label.textContent = 'Completed ✓';
             localStorage.setItem('haven_lrn_completed', JSON.stringify(completed));
+
+            @auth
+            fetch('{{ route('learning.complete', $module['slug']) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                }
+            }).catch(() => {});
+            @endauth
         }
 
-        // Init complete state
+        // Init complete state from DB ($learningStats) + localStorage
         document.addEventListener('DOMContentLoaded', function () {
             const slug = '{{ $module['slug'] }}';
-            const completed = JSON.parse(localStorage.getItem('haven_lrn_completed') || '[]');
-            if (completed.includes(slug)) {
+            const serverCompleted = @json($learningStats['completed_modules'] ?? []);
+            const localCompleted = JSON.parse(localStorage.getItem('haven_lrn_completed') || '[]');
+            const merged = Array.from(new Set([...serverCompleted, ...localCompleted]));
+            localStorage.setItem('haven_lrn_completed', JSON.stringify(merged));
+
+            if (merged.includes(slug)) {
                 const btn = document.getElementById('lrn-complete-btn');
                 const label = document.getElementById('lrn-complete-label');
                 btn.style.background = 'var(--h-green-bg)';

@@ -6,6 +6,7 @@ use App\Models\Vehicle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class VehicleController extends Controller
 {
@@ -14,7 +15,12 @@ class VehicleController extends Controller
      */
     public function index()
     {
-        $vehicles = Auth::user()->vehicles()->latest()->get();
+        $vehicles = Auth::user()
+            ->vehicles()
+            ->withCount('diagnostics')
+            ->with(['diagnostics' => fn ($q) => $q->latest()->limit(1)])
+            ->latest()
+            ->get();
 
         return view('vehicles.index', compact('vehicles'));
     }
@@ -36,14 +42,21 @@ class VehicleController extends Controller
             'nickname'     => 'nullable|string|max:60',
             'make'         => 'required|string|max:60',
             'model'        => 'required|string|max:60',
+            'body_type'    => 'nullable|string|in:sedan,suv,hatchback,coupe,pickup',
             'year'         => 'required|integer|min:1900|max:' . (date('Y') + 1),
             'plate_number' => 'nullable|string|max:20',
             'color'        => 'nullable|string|max:40',
+            'photo'        => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
             'engine_type'  => 'nullable|string|max:80',
             'transmission' => 'nullable|in:Manual,Automatic,CVT,Other',
             'mileage_km'   => 'nullable|integer|min:0',
             'notes'        => 'nullable|string|max:1000',
         ]);
+
+        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+            $validated['image_path'] = $request->file('photo')->store('vehicles', 'public');
+        }
+        unset($validated['photo']);
 
         $validated['user_id'] = Auth::id();
 
@@ -54,7 +67,7 @@ class VehicleController extends Controller
             'make'       => $vehicle->make,
             'model'      => $vehicle->model,
             'year'       => $vehicle->year,
-            'device_key' => $vehicle->device_key,
+            'device_key' => substr((string) $vehicle->device_key, 0, 12) . '...',
         ]);
 
         $successMsg = $vehicle->isScopeCompliant()
@@ -71,6 +84,10 @@ class VehicleController extends Controller
     public function show(Vehicle $vehicle)
     {
         $this->authorizeOwner($vehicle);
+
+        if (empty($vehicle->device_key)) {
+            $vehicle->update(['device_key' => Vehicle::generateDeviceKey()]);
+        }
 
         return view('vehicles.show', compact('vehicle'));
     }
@@ -96,14 +113,30 @@ class VehicleController extends Controller
             'nickname'     => 'nullable|string|max:60',
             'make'         => 'required|string|max:60',
             'model'        => 'required|string|max:60',
+            'body_type'    => 'nullable|string|in:sedan,suv,hatchback,coupe,pickup',
             'year'         => 'required|integer|min:1900|max:' . (date('Y') + 1),
             'plate_number' => 'nullable|string|max:20',
             'color'        => 'nullable|string|max:40',
+            'photo'        => 'nullable|image|mimes:jpeg,png,jpg,webp|max:4096',
+            'remove_photo' => 'nullable|boolean',
             'engine_type'  => 'nullable|string|max:80',
             'transmission' => 'nullable|in:Manual,Automatic,CVT,Other',
             'mileage_km'   => 'nullable|integer|min:0',
             'notes'        => 'nullable|string|max:1000',
         ]);
+
+        if ($request->boolean('remove_photo')) {
+            if (! empty($vehicle->image_path)) {
+                Storage::disk('public')->delete($vehicle->image_path);
+            }
+            $validated['image_path'] = null;
+        } elseif ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+            if (! empty($vehicle->image_path)) {
+                Storage::disk('public')->delete($vehicle->image_path);
+            }
+            $validated['image_path'] = $request->file('photo')->store('vehicles', 'public');
+        }
+        unset($validated['photo'], $validated['remove_photo']);
 
         $vehicle->update($validated);
 
@@ -123,6 +156,10 @@ class VehicleController extends Controller
     public function destroy(Vehicle $vehicle)
     {
         $this->authorizeOwner($vehicle);
+
+        if (! empty($vehicle->image_path)) {
+            Storage::disk('public')->delete($vehicle->image_path);
+        }
 
         \App\Services\AuditLogger::log('vehicle.deleted', [
             'vehicle_id' => $vehicle->id,
@@ -157,8 +194,9 @@ class VehicleController extends Controller
 
         $vehicle->update(['device_key' => $newKey]);
 
-        // Clear live telemetry cache — old key is now invalid
-        Cache::forget('telemetry:live:latest');
+        // Clear live telemetry cache for this vehicle and user — old key is now invalid
+        Cache::forget('telemetry:live:' . $vehicle->id);
+        Cache::forget('telemetry:live:user:' . $vehicle->user_id);
 
         \App\Services\AuditLogger::log('vehicle.key_regenerated', [
             'vehicle_id' => $vehicle->id,
@@ -189,6 +227,11 @@ class VehicleController extends Controller
         $thresholds = array_filter($validated, fn($v) => $v !== null && $v !== '');
 
         $vehicle->update(['alert_thresholds' => empty($thresholds) ? null : $thresholds]);
+
+        \App\Services\AuditLogger::log('vehicle.thresholds_updated', [
+            'vehicle_id' => $vehicle->id,
+            'thresholds' => $thresholds,
+        ]);
 
         return redirect()->route('profile.edit')
             ->with('thresholds_saved', "Alert thresholds updated for {$vehicle->display_name}.");

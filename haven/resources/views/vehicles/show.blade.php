@@ -126,14 +126,31 @@
                 <span class="h-badge h-badge-teal" style="font-size:0.6rem;">ISO/SAE 21434</span>
             </div>
             <div style="padding:0.75rem 1rem;">
+                @php
+                    $rawKey = (string) ($vehicle->device_key ?? '');
+                    $maskedKey = strlen($rawKey) > 12
+                        ? substr($rawKey, 0, 12) . str_repeat('•', 16)
+                        : ($rawKey ?: 'Generating...');
+                @endphp
                 <p style="font-size:0.75rem;color:var(--h-text3);margin:0 0 0.5rem;line-height:1.5;">
                     Flash this key into <code style="color:var(--h-teal);font-size:0.7rem;">HAVEN_ESP32_FIRMWARE.ino</code> or include as <code style="color:var(--h-teal);font-size:0.7rem;">X-Haven-Device-Key</code> in telemetry requests.
                 </p>
                 <div style="display:flex;align-items:center;gap:0.5rem;background:var(--h-surface2);padding:0.4rem 0.6rem;border-radius:var(--h-radius);border:1px solid var(--h-border);">
-                    <code style="font-size:0.74rem;color:var(--h-teal);word-break:break-all;flex:1;font-family:monospace;">
-                        {{ $vehicle->device_key ?? 'Generating...' }}
-                    </code>
-                    <button type="button" onclick="navigator.clipboard.writeText('{{ $vehicle->device_key }}');this.innerText='Copied!';" class="haven-action-btn haven-action-btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.5rem;flex-shrink:0;">
+                    <code id="veh-device-key"
+                          data-raw="{{ $rawKey }}"
+                          data-masked="{{ $maskedKey }}"
+                          data-visible="false"
+                          style="font-size:0.74rem;color:var(--h-teal);word-break:break-all;flex:1;font-family:monospace;">{{ $maskedKey }}</code>
+                    <button type="button"
+                            onclick="const el=document.getElementById('veh-device-key');const vis=el.dataset.visible==='true';el.textContent=vis?el.dataset.masked:el.dataset.raw;el.dataset.visible=vis?'false':'true';this.textContent=vis?'Show':'Hide';"
+                            class="haven-action-btn haven-action-btn-secondary"
+                            style="font-size:0.7rem;padding:0.2rem 0.5rem;flex-shrink:0;">
+                        Show
+                    </button>
+                    <button type="button"
+                            onclick="navigator.clipboard.writeText(document.getElementById('veh-device-key').dataset.raw);const b=this;b.innerText='Copied!';setTimeout(()=>b.innerText='Copy Key',2000);"
+                            class="haven-action-btn haven-action-btn-secondary"
+                            style="font-size:0.7rem;padding:0.2rem 0.5rem;flex-shrink:0;">
                         Copy Key
                     </button>
                 </div>
@@ -147,6 +164,133 @@
                     Notes
                 </div>
                 <p style="padding:0.875rem 1rem;font-size:0.82rem;color:var(--h-text2);line-height:1.65;margin:0;">{{ $vehicle->notes }}</p>
+            </div>
+        @endif
+
+        {{-- ── Vehicle Health & Telemetry Trend Chart (Last 10 Sessions) ── --}}
+        @php
+            $trendSessions = $vehicle->diagnostics()
+                ->where('status', 'completed')
+                ->latest('id')
+                ->take(10)
+                ->get()
+                ->reverse()
+                ->values();
+        @endphp
+
+        @if($trendSessions->count() >= 2)
+            <div class="haven-detail-card" style="grid-column:1/-1;padding:1.25rem 1.45rem;">
+                <div class="haven-detail-card-title" style="justify-content:space-between;margin-bottom:0.75rem;padding:0;border:none;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--h-teal)" stroke-width="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        <span>Health &amp; Telemetry Trend</span>
+                        <span class="h-badge h-badge-teal" style="font-size:0.62rem;">Last {{ $trendSessions->count() }} Sessions</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.72rem;color:var(--h-text3);">
+                        <span style="display:flex;align-items:center;gap:0.3rem;"><strong style="color:#0284c7;">●</strong> Vibration Peak (g)</span>
+                        <span style="display:flex;align-items:center;gap:0.3rem;"><strong style="color:#16a34a;">●</strong> Health Score (%)</span>
+                    </div>
+                </div>
+
+                {{-- Trend Chart SVG --}}
+                @php
+                    $pointsCount = $trendSessions->count();
+                    $width = 720;
+                    $height = 140;
+                    $padX = 35;
+                    $padY = 20;
+                    $chartW = $width - ($padX * 2);
+                    $chartH = $height - ($padY * 2);
+
+                    $vibPoints = [];
+                    $healthPoints = [];
+                    $maxVib = max(3.5, (float)($trendSessions->max('vibration_peak_g') ?: 2.0));
+
+                    foreach ($trendSessions as $idx => $ts) {
+                        $x = $padX + ($idx * ($chartW / max(1, $pointsCount - 1)));
+                        // Peak G scale [0 .. maxVib]
+                        $vVal = (float)($ts->vibration_peak_g ?: 0.8);
+                        $yVib = ($height - $padY) - min($chartH, ($vVal / $maxVib) * $chartH);
+                        $vibPoints[] = ['x' => $x, 'y' => $yVib, 'val' => $vVal, 'id' => $ts->id, 'cond' => $ts->ml_condition];
+
+                        // Health score: 100% if normal, 65% if loose/misfire, 40% if valve
+                        $hPct = match($ts->ml_condition) {
+                            'normal' => 96,
+                            'misfire' => 64,
+                            'loose_component' => 58,
+                            'valve_clearance' => 38,
+                            default => 80,
+                        };
+                        $yHealth = ($height - $padY) - (($hPct / 100.0) * $chartH);
+                        $healthPoints[] = ['x' => $x, 'y' => $yHealth, 'pct' => $hPct, 'date' => $ts->created_at->format('M j')];
+                    }
+
+                    $polyVib = implode(' ', array_map(fn($p) => "{$p['x']},{$p['y']}", $vibPoints));
+                    $polyHealth = implode(' ', array_map(fn($p) => "{$p['x']},{$p['y']}", $healthPoints));
+                    $areaVib = "{$vibPoints[0]['x']}," . ($height - $padY) . " {$polyVib} " . end($vibPoints)['x'] . "," . ($height - $padY);
+                @endphp
+
+                <div style="width:100%;overflow-x:auto;">
+                    <svg viewBox="0 0 {{ $width }} {{ $height }}" style="width:100%;height:auto;display:block;overflow:visible;" preserveAspectRatio="none">
+                        <defs>
+                            <linearGradient id="vibTrendGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#0284c7" stop-opacity="0.28"/>
+                                <stop offset="100%" stop-color="#0284c7" stop-opacity="0.0"/>
+                            </linearGradient>
+                        </defs>
+
+                        {{-- Horizontal reference grids --}}
+                        <line x1="{{ $padX }}" y1="{{ $padY }}" x2="{{ $width - $padX }}" y2="{{ $padY }}" stroke="var(--h-border)" stroke-dasharray="3 3"/>
+                        <line x1="{{ $padX }}" y1="{{ $padY + ($chartH/2) }}" x2="{{ $width - $padX }}" y2="{{ $padY + ($chartH/2) }}" stroke="var(--h-border)" stroke-dasharray="3 3"/>
+                        <line x1="{{ $padX }}" y1="{{ $height - $padY }}" x2="{{ $width - $padX }}" y2="{{ $height - $padY }}" stroke="var(--h-border)"/>
+
+                        {{-- Shaded Vibration Area --}}
+                        <polygon points="{{ $areaVib }}" fill="url(#vibTrendGrad)"/>
+
+                        {{-- Vibration Polyline --}}
+                        <polyline points="{{ $polyVib }}" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+                        {{-- Health Score Polyline --}}
+                        <polyline points="{{ $polyHealth }}" fill="none" stroke="#16a34a" stroke-width="2" stroke-dasharray="4 3" stroke-linecap="round"/>
+
+                        {{-- Session Marker Points --}}
+                        @foreach($vibPoints as $idx => $p)
+                            @php
+                                $dotColor = match($p['cond']) {
+                                    'normal'          => '#16a34a',
+                                    'misfire'         => '#f59e0b',
+                                    'loose_component' => '#ea580c',
+                                    'valve_clearance' => '#ef4444',
+                                    default           => '#0284c7',
+                                };
+                            @endphp
+                            <circle cx="{{ $p['x'] }}" cy="{{ $p['y'] }}" r="4.5" fill="{{ $dotColor }}" stroke="#ffffff" stroke-width="2">
+                                <title>Session #{{ $p['id'] }}: {{ $p['val'] }}g ({{ ucwords(str_replace('_',' ',$p['cond'] ?? 'Unknown')) }})</title>
+                            </circle>
+                            {{-- Date label --}}
+                            <text x="{{ $p['x'] }}" y="{{ $height - 4 }}" font-size="9" font-family="sans-serif" fill="var(--h-text3)" text-anchor="middle">
+                                {{ $healthPoints[$idx]['date'] }}
+                            </text>
+                        @endforeach
+                    </svg>
+                </div>
+
+                {{-- Trend Summary Footer --}}
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--h-border);font-size:0.75rem;color:var(--h-text2);flex-wrap:wrap;gap:0.5rem;">
+                    <div>
+                        Latest Condition: 
+                        <strong style="color:var(--h-text);text-transform:capitalize;">
+                            {{ str_replace('_', ' ', $trendSessions->last()->ml_condition ?? 'Healthy') }}
+                        </strong>
+                        ({{ round(($trendSessions->last()->ml_confidence ?? 0.85) * 100) }}% confidence)
+                    </div>
+                    <div>
+                        Average Peak Vibration: 
+                        <strong class="h-mono" style="color:var(--h-teal);">
+                            {{ round($trendSessions->avg('vibration_peak_g'), 2) }}g
+                        </strong>
+                    </div>
+                </div>
             </div>
         @endif
 

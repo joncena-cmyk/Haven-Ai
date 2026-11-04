@@ -2,7 +2,7 @@
 
     {{-- Breadcrumb --}}
     <div class="h-breadcrumb">
-        <a href="{{ route('dashboard') }}" class="h-breadcrumb-link">Dashboard</a>
+        <a href="{{ auth()->check() ? route('dashboard') : url('/') }}" class="h-breadcrumb-link">{{ auth()->check() ? 'Dashboard' : 'Home' }}</a>
         <span class="h-breadcrumb-sep">/</span>
         <a href="{{ route('learning.index') }}" class="h-breadcrumb-link">Learning Modules</a>
         <span class="h-breadcrumb-sep">/</span>

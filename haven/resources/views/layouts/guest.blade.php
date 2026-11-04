@@ -21,6 +21,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
+<div id="haven-top-laser" class="haven-top-laser"></div>
 
 <div class="haven-auth-shell">
 
@@ -30,11 +31,13 @@
 
         <div class="haven-auth-panel-content">
 
-            <div class="haven-brand-icon">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
-                </svg>
-            </div>
+            <a href="{{ url('/') }}" title="Return to HAVEN Homepage" style="text-decoration:none;display:inline-block;">
+                <div class="haven-brand-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+                    </svg>
+                </div>
+            </a>
 
             <h1 class="haven-auth-tagline">
                 HAVEN<br><span>Diagnostic System</span>
@@ -45,21 +48,32 @@
             </p>
 
             {{-- Instrument-style info panel --}}
-            <div class="haven-instr-panel">
+            <div class="haven-instr-panel" style="position:relative;overflow:hidden;">
                 <div>
-                    <div class="haven-instr-value" style="color:#0284c7;">Audio</div>
+                    <div class="haven-instr-value" style="color:var(--h-telemetry-cyan);">Audio</div>
                     <div class="haven-instr-label">Signal Analysis</div>
                 </div>
                 <div class="haven-instr-divider"></div>
                 <div>
-                    <div class="haven-instr-value" style="color:#f59e0b;">Vibration</div>
+                    <div class="haven-instr-value" style="color:var(--h-status-warn);">Vibration</div>
                     <div class="haven-instr-label">Sensor Data</div>
                 </div>
                 <div class="haven-instr-divider"></div>
                 <div>
-                    <div class="haven-instr-value" style="color:#22c55e;">ML</div>
+                    <div class="haven-instr-value" style="color:var(--h-status-ok);">ML</div>
                     <div class="haven-instr-label">Classification</div>
                 </div>
+            </div>
+
+            {{-- Live Acoustic Waveform Decorative Strip --}}
+            <div style="margin-top:1rem;padding:0.65rem 1rem;background:var(--h-surface2);border:1px solid var(--h-border);border-radius:var(--h-radius-lg);display:flex;align-items:center;justify-content:space-between;gap:0.75rem;">
+                <div style="display:flex;align-items:center;gap:0.45rem;font-size:0.7rem;font-weight:600;color:var(--h-teal);text-transform:uppercase;letter-spacing:0.06em;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:var(--h-status-ok);box-shadow:0 0 8px var(--h-status-ok);"></span>
+                    <span>DSP Pipeline Ready</span>
+                </div>
+                <svg width="120" height="24" viewBox="0 0 120 24" fill="none" aria-hidden="true">
+                    <path d="M2 12 L18 12 L24 4 L30 20 L36 2 L42 22 L48 7 L54 17 L60 9 L66 15 L72 5 L78 19 L84 12 L118 12" stroke="var(--h-teal)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
             </div>
 
             {{-- Features --}}
@@ -107,12 +121,14 @@
 
             {{-- Mobile logo --}}
             <div class="haven-auth-logo-mobile">
-                <div class="haven-logo-mark">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--h-teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
-                    </svg>
-                </div>
-                <span class="haven-logo-text">HA<span>VEN</span></span>
+                <a href="{{ url('/') }}" style="display:flex;align-items:center;gap:0.5rem;text-decoration:none;color:inherit;">
+                    <div class="haven-logo-mark">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--h-teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+                        </svg>
+                    </div>
+                    <span class="haven-logo-text">HA<span>VEN</span></span>
+                </a>
             </div>
 
             {{ $slot }}

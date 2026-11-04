@@ -29,7 +29,6 @@
                                     data-plate="{{ $v->plate_number ?: 'NO PLATE' }}"
                                     data-engine="{{ $v->engine_type ?: 'Gasoline ICE' }}"
                                     data-year="{{ $v->year }}"
-                                    data-key="{{ $v->device_key }}"
                                     data-scope-label="{{ $v->scope_meta['label'] }}"
                                     data-scope-compliant="{{ $v->isScopeCompliant() ? '1' : '0' }}"
                                     {{ $v->id == ($selectedVehicle?->id) ? 'selected' : '' }}>
@@ -2883,13 +2882,16 @@
         return d.innerHTML;
     }
     function formatAiResponse(text) {
-        return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+        return escapeHtml(text || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
     }
     window.resetStudio = function() { window.location.reload(); };
 
     // 10. Live Polling for ESP32 Hardware Status
     function checkLiveDaq() {
-        fetch('/api/v1/telemetry/latest?vehicle_id={{ $selectedVehicle?->id ?? 1 }}')
+        const sel = document.getElementById('vehicle-switcher');
+        const vid = (sel && sel.value) ? sel.value : '{{ $selectedVehicle?->id ?? '' }}';
+        if (!vid) return;
+        fetch('/api/v1/telemetry/latest?vehicle_id=' + encodeURIComponent(vid), { headers: { 'Accept': 'application/json' } })
             .then(res => res.json())
             .then(data => {
                 if (data.online) {

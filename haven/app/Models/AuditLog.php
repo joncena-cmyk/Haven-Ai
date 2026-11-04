@@ -14,6 +14,7 @@ class AuditLog extends Model
 
     protected $fillable = [
         'user_id',
+        'admin_id',
         'event',
         'status',
         'ip_address',
@@ -30,5 +31,36 @@ class AuditLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function admin(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class);
+    }
+
+    /** Human-readable actor name (admin, driver, or guest/system). */
+    public function getActorNameAttribute(): ?string
+    {
+        if ($this->admin) {
+            return $this->admin->name;
+        }
+
+        return $this->user?->name;
+    }
+
+    /** Actor email, or null when unauthenticated/system. */
+    public function getActorEmailAttribute(): ?string
+    {
+        return $this->admin?->email ?? $this->user?->email;
+    }
+
+    /** "admin" | "user" | "guest" */
+    public function getActorTypeAttribute(): string
+    {
+        if ($this->admin_id) {
+            return 'admin';
+        }
+
+        return $this->user_id ? 'user' : 'guest';
     }
 }

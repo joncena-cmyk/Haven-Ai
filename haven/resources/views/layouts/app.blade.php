@@ -21,6 +21,8 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
+    {{-- High-Tech Top Progress Laser Beam (Instant Visual Feedback on Page Moves) --}}
+    <div id="haven-top-laser" class="haven-top-laser"></div>
 
     {{-- Modern Topbar Navigation --}}
     @include('layouts.navigation')
@@ -49,6 +51,15 @@
                 </div>
                 <span style="color:var(--h-border);">|</span>
                 <span>&copy; {{ date('Y') }} Haven AI Technologies. Intelligent Powertrain Diagnostics.</span>
+            </div>
+
+            {{-- Legal & Policy Links --}}
+            <div style="display:flex;align-items:center;gap:1.25rem;font-size:0.75rem;">
+                <a href="{{ route('terms') }}" style="color:var(--h-text3);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--h-text)'" onmouseout="this.style.color='var(--h-text3)'">Terms & Conditions</a>
+                <span style="color:var(--h-border);">·</span>
+                <a href="{{ route('privacy') }}" style="color:var(--h-text3);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--h-text)'" onmouseout="this.style.color='var(--h-text3)'">Privacy Policy</a>
+                <span style="color:var(--h-border);">·</span>
+                <a href="{{ route('learning.index') }}" style="color:var(--h-text3);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--h-text)'" onmouseout="this.style.color='var(--h-text3)'">Knowledge Hub</a>
             </div>
         </div>
     </footer>
@@ -139,8 +150,57 @@
         });
     </script>
 
-    {{-- Floating Siri / Gigi Assistant Orb for the Website --}}
-    <x-ai-orb />
+    {{-- Automatic Inactivity Timeout (5 Minutes Idle Auto-Logout) --}}
+    @auth
+    <script>
+        (function() {
+            const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+            let idleTimer = null;
+
+            function triggerAutoLogout() {
+                // If a logout form is present on page, submit it cleanly
+                const logoutForm = document.querySelector('form[action="{{ route('logout') }}"]');
+                if (logoutForm) {
+                    logoutForm.submit();
+                } else {
+                    // Fallback: POST directly with CSRF header
+                    fetch('{{ route('logout') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                        }
+                    }).finally(() => {
+                        window.location.href = '/';
+                    });
+                }
+            }
+
+            function resetIdleTimer() {
+                if (idleTimer) clearTimeout(idleTimer);
+                idleTimer = setTimeout(triggerAutoLogout, INACTIVITY_LIMIT_MS);
+            }
+
+            // User activity events: mousemove, keydown, click, scroll, touch
+            const activityEvents = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+            activityEvents.forEach(evt => {
+                window.addEventListener(evt, resetIdleTimer, { passive: true });
+            });
+
+            // Start timer immediately upon page load
+            resetIdleTimer();
+        })();
+    </script>
+    @endauth
+
+    {{-- Floating Siri / Gigi Assistant Orb for the Website (Authenticated Users) --}}
+    @auth
+        <x-ai-orb />
+    @endauth
+
+    @guest
+        <x-auth-modal />
+    @endguest
 
 </body>
 </html>

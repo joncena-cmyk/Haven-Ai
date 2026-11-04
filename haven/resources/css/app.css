@@ -58,15 +58,23 @@
     --h-red-bg:      rgba(239, 68, 68, 0.12);
     --h-green:       #16a34a;
     --h-green-bg:    rgba(22, 163, 74, 0.1);
+    --h-purple:      #818cf8;
+    --h-purple-bg:   rgba(99, 102, 241, 0.12);
+    --h-purple-ring: rgba(99, 102, 241, 0.3);
 
     --h-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(30, 41, 59, 0.8);
     --h-overlay-bg:  rgba(0, 0, 0, 0.85);
 
+    --h-telemetry-cyan: #38bdf8;
+    --h-status-ok:      #4ade80;
+    --h-status-warn:    #fb923c;
+    --h-status-err:     #f87171;
+
     --h-sidebar:     240px;
-    --h-topbar:      60px;
-    --h-radius:      0px;  /* Sharp Precision 0px Edges */
-    --h-radius-lg:   0px;
-    --h-radius-xl:   0px;
+    --h-topbar:      64px;
+    --h-radius:      8px;
+    --h-radius-lg:   12px;
+    --h-radius-xl:   14px;
 
     /* Monospace font for telemetry readouts */
     --h-mono: 'JetBrains Mono', monospace;
@@ -94,16 +102,6 @@
     --h-bg:          var(--bg-primary);
     --h-surface:     var(--bg-secondary);
     --h-surface2:    var(--bg-tertiary);
-
-    --accent-primary:   #bb0a30;
-    --accent-secondary: #8e0724;
-    --accent-bg:        rgba(187, 10, 48, 0.08);
-    --accent-border:    rgba(187, 10, 48, 0.35);
-
-    /* Mapped Haven design tokens (Light) */
-    --h-bg:          var(--bg-primary);
-    --h-surface:     var(--bg-secondary);
-    --h-surface2:    var(--bg-tertiary);
     --h-surface3:    var(--bg-elevated);
     --h-border:      var(--border-primary);
     --h-border2:     var(--border-secondary);
@@ -112,21 +110,29 @@
     --h-text2:       var(--text-secondary);
     --h-text3:       var(--text-tertiary);
 
-    --h-teal:        var(--accent-primary);
-    --h-teal-d:      var(--accent-secondary);
-    --h-teal-bg:     var(--accent-bg);
-    --h-teal-ring:   var(--accent-border);
+    --h-teal:        #0284c7;
+    --h-teal-d:      #0369a1;
+    --h-teal-bg:     rgba(2, 132, 199, 0.08);
+    --h-teal-ring:   rgba(2, 132, 199, 0.28);
     --h-btn-text:    #ffffff;
 
     --h-amber:       #c2410c;
-    --h-amber-bg:    rgba(194, 65, 12, 0.08);
+    --h-amber-bg:    rgba(194, 65, 12, 0.1);
     --h-red:         #b91c1c;
-    --h-red-bg:      rgba(185, 28, 28, 0.08);
+    --h-red-bg:      rgba(185, 28, 28, 0.1);
     --h-green:       #15803d;
-    --h-green-bg:    rgba(21, 128, 61, 0.08);
+    --h-green-bg:    rgba(21, 128, 61, 0.1);
+    --h-purple:      #4f46e5;
+    --h-purple-bg:   rgba(99, 102, 241, 0.1);
+    --h-purple-ring: rgba(99, 102, 241, 0.28);
 
-    --h-card-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
-    --h-overlay-bg:  rgba(13, 27, 46, 0.45);
+    --h-telemetry-cyan: #0284c7;
+    --h-status-ok:      #15803d;
+    --h-status-warn:    #c2410c;
+    --h-status-err:     #b91c1c;
+
+    --h-card-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.04);
+    --h-overlay-bg:  rgba(15, 23, 42, 0.5);
 }
 
 /* Smooth transitions for theme switching */
@@ -391,8 +397,8 @@ body {
     outline: none;
 }
 .haven-input:focus {
-    border-color: var(--h-teal-ring);
-    box-shadow: 0 0 0 2px rgba(187, 10, 48, 0.25);
+    border-color: var(--h-teal);
+    box-shadow: 0 0 0 3px var(--h-teal-ring);
 }
 .haven-input::placeholder { color: var(--h-text3); }
 .haven-input-error { border-color: var(--h-red) !important; }
@@ -403,23 +409,28 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.4rem;
+    gap: 0.45rem;
     width: 100%;
     padding: 0.65rem 1.25rem;
-    background: var(--h-teal);
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
     color: var(--h-btn-text);
     font-weight: 600;
     font-size: 0.875rem;
     font-family: inherit;
-    border: none;
+    border: 1px solid rgba(56, 189, 248, 0.35);
     border-radius: var(--h-radius);
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
     text-decoration: none;
     letter-spacing: -0.01em;
 }
-.haven-btn-primary:hover { background: var(--h-teal-d); }
-.haven-btn-primary:active { transform: scale(0.99); }
+.haven-btn-primary:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(2, 132, 199, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.haven-btn-primary:active { transform: translateY(0) scale(0.99); }
 
 .haven-btn-secondary {
     display: inline-flex;
@@ -551,7 +562,7 @@ body {
 }
 
 /* ============================================================
-   MODERN TOPBAR NAVIGATION — OEM Industrial V3.0
+   MODERN TOPBAR NAVIGATION — Precision High-Tech Automotive Blue
    ============================================================ */
 
 .haven-navbar {
@@ -559,154 +570,197 @@ body {
     top: 0;
     z-index: 50;
     width: 100%;
-    background: var(--h-surface);
-    border-bottom: 2px solid var(--h-border);
-    transition: background-color 0.25s ease, border-color 0.25s ease;
+    height: 60px;
+    background: #0d213a !important;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.22) !important;
+    box-shadow: 0 4px 16px rgba(5, 15, 30, 0.25) !important;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+[data-theme="light"] .haven-navbar {
+    background: #0f274a !important;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.28) !important;
+    box-shadow: 0 4px 14px rgba(7, 20, 38, 0.2) !important;
 }
 
 .haven-navbar-inner {
     max-width: 1360px;
     margin: 0 auto;
-    padding: 0 1.5rem;
-    height: 64px;
+    padding: 0 1.25rem;
+    height: 60px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1.25rem;
+    gap: 1rem;
 }
 
-/* Brand area */
-.haven-brand {
+/* Brand */
+.haven-navbar .haven-brand {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.6rem;
     text-decoration: none;
     flex-shrink: 0;
 }
 
-.haven-brand-mark {
-    width: 32px;
-    height: 32px;
-    background: var(--h-teal-bg);
-    border: 1px solid var(--h-teal-ring);
-    border-radius: var(--h-radius);
+.haven-navbar .haven-brand-mark {
+    width: 30px;
+    height: 30px;
+    background: rgba(56, 189, 248, 0.14) !important;
+    border: 1px solid rgba(56, 189, 248, 0.3) !important;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--h-teal);
+    color: #38bdf8 !important;
     flex-shrink: 0;
 }
+.haven-navbar .haven-brand-mark svg {
+    stroke: #38bdf8 !important;
+}
 
-.haven-brand-title {
+.haven-navbar .haven-brand-title {
     font-weight: 800;
-    font-size: 1.05rem;
-    color: var(--h-text);
-    letter-spacing: 0.05em;
+    font-size: 1rem;
+    color: #ffffff !important;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
+    white-space: nowrap;
 }
-.haven-brand-title span { color: var(--h-teal); }
-
-.haven-brand-chip {
-    font-size: 0.62rem;
-    font-weight: 700;
-    padding: 0.12rem 0.4rem;
-    border-radius: 2px;
-    background: var(--h-teal-bg);
-    border: 1px solid var(--h-teal-ring);
-    color: var(--h-teal);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-family: var(--h-mono, monospace);
+.haven-navbar .haven-brand-title span {
+    color: #38bdf8 !important;
 }
 
-/* Navigation Links (Desktop) */
+/* Nav links desktop */
 .haven-nav-links {
     display: none;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.25rem;
+    white-space: nowrap !important;
 }
 @media (min-width: 1024px) {
     .haven-nav-links { display: flex; }
 }
 
-.haven-nav-link {
+.haven-navbar .haven-nav-link {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.45rem 0.85rem;
-    color: var(--h-text2);
-    font-size: 0.84rem;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    color: #cbd5e1 !important;
+    font-size: 0.82rem;
     font-weight: 500;
     text-decoration: none;
-    border-radius: var(--h-radius);
+    border-radius: 6px;
+    border: 1px solid transparent;
     transition: all 0.15s ease;
-    position: relative;
+    white-space: nowrap !important;
+    line-height: 1;
+}
+.haven-navbar .haven-nav-link svg {
+    stroke: #94a3b8;
+    flex-shrink: 0;
+    transition: stroke 0.15s ease;
 }
 
-.haven-nav-link:hover {
-    color: var(--h-text);
-    background: var(--h-surface2);
+.haven-navbar .haven-nav-link:hover {
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+.haven-navbar .haven-nav-link:hover svg {
+    stroke: #ffffff;
 }
 
-.haven-nav-link.active {
-    color: var(--h-teal);
-    background: var(--h-teal-bg);
+.haven-navbar .haven-nav-link.active {
+    color: #ffffff !important;
+    background: rgba(56, 189, 248, 0.14) !important;
+    border: 1px solid rgba(56, 189, 248, 0.32) !important;
     font-weight: 600;
 }
-
-.haven-nav-link-chip {
-    font-size: 0.62rem;
-    font-weight: 700;
-    padding: 0.1rem 0.4rem;
-    border-radius: var(--h-radius-sm, 3px);
-    background: var(--h-teal-bg);
-    border: 1px solid var(--h-teal-ring);
-    color: var(--h-teal);
+.haven-navbar .haven-nav-link.active svg {
+    stroke: #38bdf8 !important;
 }
 
 /* Right utility zone */
 .haven-nav-actions {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
+    gap: 0.55rem;
     flex-shrink: 0;
 }
 
-.haven-stat-pill {
+/* Stat pill: only show on wide screens (>= 1240px) to prevent cramping */
+.haven-navbar .haven-stat-pill {
     display: none;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.35rem;
     padding: 0.35rem 0.75rem;
-    background: var(--h-surface2);
-    border: 1px solid var(--h-border);
-    border-radius: var(--h-radius, 6px);
+    background: rgba(255, 255, 255, 0.07) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 999px;
     font-size: 0.72rem;
-    color: var(--h-text3);
+    color: #94a3b8 !important;
+    white-space: nowrap;
 }
-@media (min-width: 1200px) {
-    .haven-stat-pill { display: inline-flex; }
+.haven-navbar .haven-stat-pill .haven-stat-pill-num {
+    color: #f1f5f9 !important;
+    font-weight: 700 !important;
+}
+@media (min-width: 1240px) {
+    .haven-navbar .haven-stat-pill { display: inline-flex; }
 }
 
-/* New Diagnostic Button */
-.haven-nav-cta {
+/* New Session CTA button: Integrated Cyan / Blue Tactile Button */
+.haven-navbar .haven-nav-cta {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0.45rem 0.85rem;
-    background: var(--h-teal);
-    color: var(--h-btn-text);
-    font-weight: 600;
-    font-size: 0.8rem;
-    border-radius: var(--h-radius);
+    padding: 0.42rem 0.85rem;
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 0.78rem;
+    border-radius: 6px;
+    border: 1px solid rgba(56, 189, 248, 0.45) !important;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3) !important;
     text-decoration: none;
-    transition: background 0.15s, transform 0.1s;
-    letter-spacing: -0.01em;
+    transition: all 0.15s ease;
+    white-space: nowrap;
 }
-.haven-nav-cta:hover {
-    background: var(--h-teal-d);
+.haven-navbar .haven-nav-cta svg {
+    stroke: #ffffff !important;
+    stroke-width: 2.4 !important;
+    flex-shrink: 0;
+}
+.haven-navbar .haven-nav-cta:hover {
+    filter: brightness(1.12);
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.45) !important;
+    transform: translateY(-1px);
 }
 
-/* User account chip & dropdown */
+/* Theme toggle */
+.haven-navbar .haven-nav-theme-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.07) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #cbd5e1 !important;
+    transition: all 0.15s ease;
+}
+.haven-navbar .haven-nav-theme-btn:hover {
+    background: rgba(255, 255, 255, 0.14) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+}
+.haven-navbar .haven-nav-theme-btn svg {
+    stroke: currentColor !important;
+}
+
+/* User account chip */
 .haven-user-menu {
     position: relative;
     display: none;
@@ -717,43 +771,43 @@ body {
     }
 }
 
-
-.haven-user-btn {
+.haven-navbar .haven-user-btn {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.5rem 0.25rem 0.25rem;
-    background: var(--h-surface2);
-    border: 1px solid var(--h-border);
-    border-radius: var(--h-radius, 6px);
+    gap: 0.45rem;
+    padding: 0.2rem 0.5rem 0.2rem 0.25rem;
+    background: rgba(255, 255, 255, 0.07) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 6px;
     cursor: pointer;
     font-family: inherit;
-    transition: all 0.15s;
+    transition: all 0.15s ease;
     text-decoration: none;
 }
-.haven-user-btn:hover {
-    background: var(--h-surface3);
-    border-color: var(--h-border2);
+.haven-navbar .haven-user-btn:hover {
+    background: rgba(255, 255, 255, 0.14) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
 }
 
-.haven-user-avatar {
-    width: 28px;
-    height: 28px;
+.haven-navbar .haven-user-avatar {
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
-    background: var(--h-teal-bg);
-    border: 1px solid var(--h-teal-ring);
+    background: #0284c7 !important;
+    border: 1px solid rgba(56, 189, 248, 0.4) !important;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 0.75rem;
-    color: var(--h-teal);
+    font-size: 0.72rem;
+    color: #ffffff !important;
+    flex-shrink: 0;
 }
 
-.haven-user-btn-name {
+.haven-navbar .haven-user-btn-name {
     font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--h-text);
+    font-weight: 500;
+    color: #f1f5f9 !important;
     max-width: 110px;
     white-space: nowrap;
     overflow: hidden;
@@ -761,19 +815,24 @@ body {
     display: none;
 }
 @media (min-width: 768px) {
-    .haven-user-btn-name { display: block; }
+    .haven-navbar .haven-user-btn-name { display: block; }
 }
 
-/* User Dropdown */
+.haven-navbar .haven-user-btn svg {
+    stroke: #94a3b8 !important;
+    flex-shrink: 0;
+}
+
+/* User Dropdown Menu Popup (card theme) */
 .haven-user-dropdown {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
     width: 220px;
-    background: var(--h-surface);
-    border: 1px solid var(--h-border2);
+    background: var(--h-surface) !important;
+    border: 1px solid var(--h-border2) !important;
     border-radius: var(--h-radius-lg);
-    box-shadow: var(--h-card-shadow);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4) !important;
     padding: 0.5rem;
     display: none;
     z-index: 100;
@@ -827,28 +886,41 @@ body {
     color: var(--h-red);
 }
 
-/* Mobile Toggle Hamburger */
-.haven-menu-toggle {
+/* Mobile Toggle Hamburger — ONLY visible below 1024px! */
+.haven-navbar .haven-menu-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
-    background: var(--h-surface2);
-    border: 1px solid var(--h-border);
-    border-radius: var(--h-radius);
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    border-radius: 6px;
     cursor: pointer;
-    color: var(--h-text2);
+    color: #ffffff !important;
     transition: all 0.15s;
     flex-shrink: 0;
 }
-
-.haven-menu-toggle:hover {
-    background: var(--h-surface3);
-    color: var(--h-text);
+.haven-navbar .haven-menu-toggle:hover {
+    background: rgba(255, 255, 255, 0.16) !important;
 }
 @media (min-width: 1024px) {
-    .haven-menu-toggle { display: none; }
+    .haven-navbar .haven-menu-toggle {
+        display: none !important;
+    }
+}
+
+/* Guest signin button in navbar */
+.haven-navbar .haven-nav-signin-btn {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+    font-weight: 500;
+    transition: all 0.15s ease;
+}
+.haven-navbar .haven-nav-signin-btn:hover {
+    background: rgba(255, 255, 255, 0.16) !important;
+    color: #ffffff !important;
 }
 
 /* Mobile Navigation Backdrop */
@@ -904,7 +976,21 @@ body {
     min-height: calc(100vh - 64px);
     display: flex;
     flex-direction: column;
-    background: var(--h-bg);
+    background-color: var(--h-bg);
+    background-image:
+        radial-gradient(ellipse 80% 45% at 50% -10%, rgba(2, 132, 199, 0.12), transparent 70%),
+        radial-gradient(circle at 85% 20%, rgba(16, 185, 129, 0.05), transparent 45%),
+        linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+}
+[data-theme="light"] .haven-main-canvas {
+    background-image:
+        radial-gradient(ellipse 80% 45% at 50% -10%, rgba(2, 132, 199, 0.07), transparent 70%),
+        radial-gradient(circle at 85% 20%, rgba(16, 185, 129, 0.04), transparent 45%),
+        linear-gradient(rgba(15, 23, 42, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.025) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
 }
 
 .haven-content-container {
@@ -992,9 +1078,9 @@ body {
     letter-spacing: 0.08em;
 }
 .h-badge-teal { background: var(--h-teal-bg); color: var(--h-teal); border: 1px solid var(--h-teal-ring); }
-.h-badge-amber { background: var(--h-amber-bg); color: var(--h-amber); border: 1px solid rgba(245,158,11,0.2); }
-.h-badge-red { background: var(--h-red-bg); color: var(--h-red); border: 1px solid rgba(239,68,68,0.2); }
-.h-badge-green { background: var(--h-green-bg); color: var(--h-green); border: 1px solid rgba(34,197,94,0.2); }
+.h-badge-amber { background: var(--h-amber-bg); color: var(--h-amber); border: 1px solid var(--h-amber); }
+.h-badge-red { background: var(--h-red-bg); color: var(--h-red); border: 1px solid var(--h-red); }
+.h-badge-green { background: var(--h-green-bg); color: var(--h-green); border: 1px solid var(--h-green); }
 .h-badge-gray { background: var(--h-surface3); color: var(--h-text3); border: 1px solid var(--h-border); }
 
 /* Card */
@@ -1002,6 +1088,7 @@ body {
     background: var(--h-surface);
     border: 1px solid var(--h-border);
     border-radius: var(--h-radius-xl);
+    box-shadow: var(--h-card-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 /* Flash / Alert */
@@ -1014,9 +1101,9 @@ body {
     font-size: 0.82rem;
     margin-bottom: 1.25rem;
 }
-.h-flash-success { background: var(--h-green-bg); border: 1px solid rgba(34,197,94,0.2); color: var(--h-green); }
-.h-flash-warn { background: var(--h-amber-bg); border: 1px solid rgba(245,158,11,0.2); color: var(--h-amber); }
-.h-flash-error { background: var(--h-red-bg); border: 1px solid rgba(239,68,68,0.2); color: var(--h-red); }
+.h-flash-success { background: var(--h-green-bg); border: 1px solid var(--h-green); color: var(--h-green); }
+.h-flash-warn { background: var(--h-amber-bg); border: 1px solid var(--h-amber); color: var(--h-amber); }
+.h-flash-error { background: var(--h-red-bg); border: 1px solid var(--h-red); color: var(--h-red); }
 
 /* Info notice */
 .h-notice {
@@ -1143,42 +1230,352 @@ body {
 /* Stats row */
 .h-stat-row {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 1px;
-    background: var(--h-border);
-    border: 1px solid var(--h-border);
-    border-radius: var(--h-radius-xl);
-    overflow: hidden;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 1rem;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
     margin-bottom: 1.5rem;
 }
 .h-stat-cell {
-    background: var(--h-surface);
-    padding: 1.25rem 1.25rem;
-    transition: background 0.1s;
+    background: linear-gradient(180deg, var(--h-surface) 0%, var(--h-surface2) 100%);
+    border: 1px solid var(--h-border);
+    border-radius: var(--h-radius-xl);
+    padding: 1.25rem 1.35rem;
+    box-shadow: var(--h-card-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    position: relative;
+    overflow: hidden;
 }
-.h-stat-cell:hover { background: var(--h-surface2); }
-.h-stat-value { font-size: 1.5rem; font-weight: 700; color: var(--h-text); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1; margin-bottom: 0.3rem; }
-.h-stat-label { font-size: 0.72rem; font-weight: 500; color: var(--h-text3); text-transform: uppercase; letter-spacing: 0.07em; }
-.h-stat-sub { font-size: 0.75rem; color: var(--h-text3); margin-top: 0.3rem; display: flex; align-items: center; gap: 0.3rem; }
-.h-stat-sub-ok { color: var(--h-green); }
-.h-stat-sub-warn { color: var(--h-amber); }
+.h-stat-cell:hover {
+    transform: translateY(-2px);
+    border-color: var(--h-teal-ring);
+}
+.h-stat-value { font-size: 1.65rem; font-weight: 800; color: var(--h-text); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.1; margin-bottom: 0.3rem; }
+.h-stat-label { font-size: 0.72rem; font-weight: 600; color: var(--h-text3); text-transform: uppercase; letter-spacing: 0.07em; }
+.h-stat-sub { font-size: 0.75rem; color: var(--h-text2); margin-top: 0.35rem; display: flex; align-items: center; gap: 0.3rem; }
+.h-stat-sub-ok { color: var(--h-status-ok); }
+.h-stat-sub-warn { color: var(--h-status-warn); }
+
+/* ============================================================
+   COLOR-THEMED STAT CARDS (VIBRANT & HIGH-CONTRAST IN BOTH LIGHT & DARK)
+   ============================================================ */
+
+.h-stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+.h-stat-cell:hover .h-stat-icon {
+    transform: scale(1.08);
+}
+
+/* ── 1. BLUE STAT CARD (Vehicles) ── */
+.h-stat-cell-blue {
+    border-top: 4px solid #38bdf8 !important;
+    border-color: rgba(56, 189, 248, 0.32) !important;
+    background: linear-gradient(150deg, rgba(2, 132, 199, 0.16) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+    box-shadow: 0 4px 20px -2px rgba(2, 132, 199, 0.2), var(--h-card-shadow) !important;
+}
+.h-stat-cell-blue:hover {
+    border-color: rgba(56, 189, 248, 0.6) !important;
+    box-shadow: 0 10px 28px -4px rgba(2, 132, 199, 0.35), var(--h-card-shadow) !important;
+}
+.h-stat-cell-blue .h-stat-value { color: #38bdf8 !important; }
+.h-stat-cell-blue .h-stat-label { color: #bae6fd !important; }
+.h-stat-cell-blue .h-stat-sub { color: #7dd3fc !important; }
+.h-stat-cell-blue .h-stat-icon {
+    background: rgba(2, 132, 199, 0.2) !important;
+    border: 1px solid rgba(56, 189, 248, 0.4) !important;
+    color: #38bdf8 !important;
+}
+
+/* Light Mode Override — High contrast sky blue card */
+[data-theme="light"] .h-stat-cell-blue {
+    background: linear-gradient(150deg, #e0f2fe 0%, #bae6fd 40%, #f0f9ff 100%) !important;
+    border: 1.5px solid #38bdf8 !important;
+    border-top: 4px solid #0284c7 !important;
+    box-shadow: 0 6px 18px -2px rgba(2, 132, 199, 0.22), 0 2px 6px rgba(15, 23, 42, 0.06) !important;
+}
+[data-theme="light"] .h-stat-cell-blue:hover {
+    border-color: #0284c7 !important;
+    box-shadow: 0 12px 28px -4px rgba(2, 132, 199, 0.35) !important;
+}
+[data-theme="light"] .h-stat-cell-blue .h-stat-value { color: #0369a1 !important; }
+[data-theme="light"] .h-stat-cell-blue .h-stat-label { color: #075985 !important; font-weight: 700 !important; }
+[data-theme="light"] .h-stat-cell-blue .h-stat-sub { color: #0284c7 !important; font-weight: 600 !important; }
+[data-theme="light"] .h-stat-cell-blue .h-stat-icon {
+    background: #ffffff !important;
+    border: 1.5px solid #38bdf8 !important;
+    color: #0284c7 !important;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25) !important;
+}
+
+/* ── 2. GREEN STAT CARD (Diagnostics Run) ── */
+.h-stat-cell-green {
+    border-top: 4px solid #4ade80 !important;
+    border-color: rgba(74, 222, 128, 0.32) !important;
+    background: linear-gradient(150deg, rgba(22, 163, 74, 0.16) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+    box-shadow: 0 4px 20px -2px rgba(22, 163, 74, 0.2), var(--h-card-shadow) !important;
+}
+.h-stat-cell-green:hover {
+    border-color: rgba(74, 222, 128, 0.6) !important;
+    box-shadow: 0 10px 28px -4px rgba(22, 163, 74, 0.35), var(--h-card-shadow) !important;
+}
+.h-stat-cell-green .h-stat-value { color: #4ade80 !important; }
+.h-stat-cell-green .h-stat-label { color: #bbf7d0 !important; }
+.h-stat-cell-green .h-stat-sub { color: #86efac !important; }
+.h-stat-cell-green .h-stat-icon {
+    background: rgba(22, 163, 74, 0.2) !important;
+    border: 1px solid rgba(74, 222, 128, 0.4) !important;
+    color: #4ade80 !important;
+}
+
+/* Light Mode Override — High contrast emerald green card */
+[data-theme="light"] .h-stat-cell-green {
+    background: linear-gradient(150deg, #dcfce7 0%, #bbf7d0 40%, #f0fdf4 100%) !important;
+    border: 1.5px solid #4ade80 !important;
+    border-top: 4px solid #16a34a !important;
+    box-shadow: 0 6px 18px -2px rgba(22, 163, 74, 0.22), 0 2px 6px rgba(15, 23, 42, 0.06) !important;
+}
+[data-theme="light"] .h-stat-cell-green:hover {
+    border-color: #16a34a !important;
+    box-shadow: 0 12px 28px -4px rgba(22, 163, 74, 0.35) !important;
+}
+[data-theme="light"] .h-stat-cell-green .h-stat-value { color: #15803d !important; }
+[data-theme="light"] .h-stat-cell-green .h-stat-label { color: #166534 !important; font-weight: 700 !important; }
+[data-theme="light"] .h-stat-cell-green .h-stat-sub { color: #15803d !important; font-weight: 600 !important; }
+[data-theme="light"] .h-stat-cell-green .h-stat-icon {
+    background: #ffffff !important;
+    border: 1.5px solid #4ade80 !important;
+    color: #16a34a !important;
+    box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25) !important;
+}
+
+/* ── 3. AMBER STAT CARD (Last ML Result) ── */
+.h-stat-cell-amber {
+    border-top: 4px solid #fb923c !important;
+    border-color: rgba(251, 146, 60, 0.32) !important;
+    background: linear-gradient(150deg, rgba(234, 88, 12, 0.16) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+    box-shadow: 0 4px 20px -2px rgba(234, 88, 12, 0.2), var(--h-card-shadow) !important;
+}
+.h-stat-cell-amber:hover {
+    border-color: rgba(251, 146, 60, 0.6) !important;
+    box-shadow: 0 10px 28px -4px rgba(234, 88, 12, 0.35), var(--h-card-shadow) !important;
+}
+.h-stat-cell-amber .h-stat-value { color: #fb923c !important; }
+.h-stat-cell-amber .h-stat-label { color: #fed7aa !important; }
+.h-stat-cell-amber .h-stat-sub { color: #fdba74 !important; }
+.h-stat-cell-amber .h-stat-icon {
+    background: rgba(234, 88, 12, 0.2) !important;
+    border: 1px solid rgba(251, 146, 60, 0.4) !important;
+    color: #fb923c !important;
+}
+
+/* Light Mode Override — High contrast warm amber card */
+[data-theme="light"] .h-stat-cell-amber {
+    background: linear-gradient(150deg, #fef3c7 0%, #fde68a 40%, #fffbeb 100%) !important;
+    border: 1.5px solid #fbbf24 !important;
+    border-top: 4px solid #d97706 !important;
+    box-shadow: 0 6px 18px -2px rgba(217, 119, 6, 0.22), 0 2px 6px rgba(15, 23, 42, 0.06) !important;
+}
+[data-theme="light"] .h-stat-cell-amber:hover {
+    border-color: #d97706 !important;
+    box-shadow: 0 12px 28px -4px rgba(217, 119, 6, 0.35) !important;
+}
+[data-theme="light"] .h-stat-cell-amber .h-stat-value { color: #b45309 !important; }
+[data-theme="light"] .h-stat-cell-amber .h-stat-label { color: #92400e !important; font-weight: 700 !important; }
+[data-theme="light"] .h-stat-cell-amber .h-stat-sub { color: #92400e !important; font-weight: 600 !important; }
+[data-theme="light"] .h-stat-cell-amber .h-stat-icon {
+    background: #ffffff !important;
+    border: 1.5px solid #fbbf24 !important;
+    color: #d97706 !important;
+    box-shadow: 0 2px 8px rgba(217, 119, 6, 0.25) !important;
+}
+
+/* ── 4. PURPLE STAT CARD (Learning Modules) ── */
+.h-stat-cell-purple {
+    border-top: 4px solid #818cf8 !important;
+    border-color: rgba(165, 180, 252, 0.32) !important;
+    background: linear-gradient(150deg, rgba(99, 102, 241, 0.16) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+    box-shadow: 0 4px 20px -2px rgba(99, 102, 241, 0.2), var(--h-card-shadow) !important;
+}
+.h-stat-cell-purple:hover {
+    border-color: rgba(165, 180, 252, 0.6) !important;
+    box-shadow: 0 10px 28px -4px rgba(99, 102, 241, 0.35), var(--h-card-shadow) !important;
+}
+.h-stat-cell-purple .h-stat-value { color: #818cf8 !important; }
+.h-stat-cell-purple .h-stat-label { color: #e0e7ff !important; }
+.h-stat-cell-purple .h-stat-sub { color: #a5b4fc !important; }
+.h-stat-cell-purple .h-stat-icon {
+    background: rgba(99, 102, 241, 0.2) !important;
+    border: 1px solid rgba(165, 180, 252, 0.4) !important;
+    color: #818cf8 !important;
+}
+
+/* Light Mode Override — High contrast indigo purple card */
+[data-theme="light"] .h-stat-cell-purple {
+    background: linear-gradient(150deg, #ede9fe 0%, #ddd6fe 40%, #f5f3ff 100%) !important;
+    border: 1.5px solid #a78bfa !important;
+    border-top: 4px solid #6366f1 !important;
+    box-shadow: 0 6px 18px -2px rgba(99, 102, 241, 0.22), 0 2px 6px rgba(15, 23, 42, 0.06) !important;
+}
+[data-theme="light"] .h-stat-cell-purple:hover {
+    border-color: #6366f1 !important;
+    box-shadow: 0 12px 28px -4px rgba(99, 102, 241, 0.35) !important;
+}
+[data-theme="light"] .h-stat-cell-purple .h-stat-value { color: #4338ca !important; }
+[data-theme="light"] .h-stat-cell-purple .h-stat-label { color: #3730a3 !important; font-weight: 700 !important; }
+[data-theme="light"] .h-stat-cell-purple .h-stat-sub { color: #4f46e5 !important; font-weight: 600 !important; }
+[data-theme="light"] .h-stat-cell-purple .h-stat-icon {
+    background: #ffffff !important;
+    border: 1.5px solid #a78bfa !important;
+    color: #6366f1 !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25) !important;
+}
+
+/* ============================================================
+   ESP32 DAQ NODE HOLDER — Deep Tech Blue Theme
+   Matches the Top Bar aesthetic with Sapphire / Navy depth
+   ============================================================ */
+
+.h-live-telemetry-panel {
+    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, #091a30 0%, #0c2445 50%, #071529 100%) !important;
+    border: 1px solid rgba(56, 189, 248, 0.28) !important;
+    border-top: 3px solid #0284c7 !important;
+    border-radius: var(--h-radius-lg) !important;
+    padding: 1.15rem 1.25rem;
+    position: relative;
+    box-shadow: 0 8px 24px -4px rgba(4, 14, 28, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+[data-theme="light"] .h-live-telemetry-panel {
+    background: linear-gradient(135deg, #f0f7ff 0%, #e1effe 50%, #f6faff 100%) !important;
+    border: 1px solid rgba(2, 132, 199, 0.26) !important;
+    border-top: 3px solid #0284c7 !important;
+    box-shadow: 0 4px 18px rgba(2, 132, 199, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+
+.h-telemetry-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.18);
+}
+[data-theme="light"] .h-telemetry-header {
+    border-bottom: 1px solid rgba(2, 132, 199, 0.16);
+}
+
+.h-meter-card {
+    background: rgba(7, 16, 29, 0.6) !important;
+    border: 1px solid rgba(56, 189, 248, 0.16) !important;
+    border-radius: var(--h-radius) !important;
+    padding: 0.8rem 0.95rem;
+    backdrop-filter: blur(8px);
+    transition: border-color 0.25s ease, background 0.25s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.h-meter-card:hover {
+    border-color: rgba(56, 189, 248, 0.35) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+}
+[data-theme="light"] .h-meter-card {
+    background: #ffffff !important;
+    border: 1px solid rgba(2, 132, 199, 0.18) !important;
+    box-shadow: 0 1px 4px rgba(2, 132, 199, 0.06);
+}
+[data-theme="light"] .h-meter-card:hover {
+    border-color: rgba(2, 132, 199, 0.4) !important;
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.12);
+}
+
+.h-telemetry-info-btn {
+    font-size: 0.72rem;
+    padding: 0.3rem 0.65rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    background: rgba(56, 189, 248, 0.1) !important;
+    border: 1px solid rgba(56, 189, 248, 0.25) !important;
+    border-radius: var(--h-radius);
+    color: #38bdf8 !important;
+    font-family: inherit;
+    transition: all 0.15s ease;
+}
+.h-telemetry-info-btn:hover {
+    background: rgba(56, 189, 248, 0.2) !important;
+    border-color: rgba(56, 189, 248, 0.45) !important;
+    color: #ffffff !important;
+}
+[data-theme="light"] .h-telemetry-info-btn {
+    background: #ffffff !important;
+    border: 1px solid rgba(2, 132, 199, 0.25) !important;
+    color: #0284c7 !important;
+}
+[data-theme="light"] .h-telemetry-info-btn:hover {
+    background: #f0f7ff !important;
+    border-color: #0284c7 !important;
+    color: #0369a1 !important;
+}
+
+.h-telemetry-vehicle-badge {
+    background: rgba(56, 189, 248, 0.1) !important;
+    color: #cbd5e1 !important;
+    border: 1px solid rgba(56, 189, 248, 0.2) !important;
+    font-size: 0.68rem;
+    padding: 0.18rem 0.5rem;
+}
+[data-theme="light"] .h-telemetry-vehicle-badge {
+    background: #ffffff !important;
+    color: #334155 !important;
+    border: 1px solid rgba(2, 132, 199, 0.22) !important;
+}
+
+.h-live-telemetry-panel .h-detail-card {
+    background: rgba(7, 16, 29, 0.55) !important;
+    border: 1px solid rgba(56, 189, 248, 0.15) !important;
+    border-radius: var(--h-radius) !important;
+    padding: 0.65rem 0.8rem;
+    transition: all 0.2s ease;
+}
+[data-theme="light"] .h-live-telemetry-panel .h-detail-card {
+    background: #ffffff !important;
+    border: 1px solid rgba(2, 132, 199, 0.15) !important;
+}
 
 /* Action panel */
 .h-action-panel {
-    background: var(--h-surface);
-    border: 1px solid var(--h-border);
+    background: linear-gradient(135deg, var(--h-surface) 0%, var(--h-surface2) 100%);
+    border: 1px solid var(--h-teal-ring);
+    border-left: 4px solid var(--h-teal);
     border-radius: var(--h-radius-xl);
-    padding: 1.25rem;
+    padding: 1.35rem 1.5rem;
     margin-bottom: 1.5rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 1.25rem;
     flex-wrap: wrap;
+    box-shadow: var(--h-card-shadow);
+    position: relative;
+    overflow: hidden;
 }
-.h-action-panel-info { flex: 1; min-width: 200px; }
-.h-action-panel-title { font-size: 0.9rem; font-weight: 600; color: var(--h-text); margin: 0 0 0.25rem; }
-.h-action-panel-desc { font-size: 0.8rem; color: var(--h-text2); margin: 0; line-height: 1.5; }
+.h-action-panel-info { flex: 1; min-width: 200px; position: relative; z-index: 1; }
+.h-action-panel-title { font-size: 1rem; font-weight: 700; color: var(--h-text); margin: 0 0 0.25rem; letter-spacing: -0.01em; }
+.h-action-panel-desc { font-size: 0.82rem; color: var(--h-text2); margin: 0; line-height: 1.5; }
 
 /* Content grid */
 .h-content-grid {
@@ -1193,13 +1590,15 @@ body {
     background: var(--h-surface);
     border: 1px solid var(--h-border);
     border-radius: var(--h-radius-xl);
+    box-shadow: var(--h-card-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
     overflow: hidden;
 }
 .h-list-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.875rem 1.25rem;
+    padding: 0.95rem 1.25rem;
+    background: var(--h-surface2);
     border-bottom: 1px solid var(--h-border);
 }
 .h-list-title { font-size: 0.85rem; font-weight: 600; color: var(--h-text); }
@@ -1441,8 +1840,8 @@ body {
 .haven-input::placeholder { color: var(--h-text3); }
 .haven-input-error { border-color: var(--h-red) !important; }
 .haven-error-msg { color: var(--h-red); font-size: 0.78rem; margin-top: 0.25rem; }
-.haven-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; width: 100%; padding: 0.65rem 1.25rem; background: var(--h-teal); color: var(--h-btn-text); font-weight: 600; font-size: 0.875rem; font-family: inherit; border: none; border-radius: var(--h-radius); cursor: pointer; transition: background 0.15s; text-decoration: none; }
-.haven-btn-primary:hover { background: var(--h-teal-d); }
+.haven-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; width: 100%; padding: 0.65rem 1.25rem; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: var(--h-btn-text); font-weight: 600; font-size: 0.875rem; font-family: inherit; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: var(--h-radius); box-shadow: 0 4px 14px rgba(2, 132, 199, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2); cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; text-decoration: none; }
+.haven-btn-primary:hover { filter: brightness(1.06); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(2, 132, 199, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
 .haven-link { color: var(--h-teal); text-decoration: none; font-weight: 500; }
 .haven-link:hover { opacity: 0.8; text-decoration: underline; }
 .haven-checkbox { width: 15px; height: 15px; accent-color: var(--h-teal); cursor: pointer; }
@@ -1472,7 +1871,7 @@ body {
 .haven-form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--h-border); flex-wrap: wrap; }
 .haven-action-btn { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.75rem; border-radius: var(--h-radius); font-size: 0.78rem; font-weight: 500; font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: background 0.1s; text-decoration: none; }
 .haven-action-btn-primary { background: var(--h-teal-bg); border-color: var(--h-teal-ring); color: var(--h-teal); }
-.haven-action-btn-primary:hover { background: rgba(187,10,48,0.18); }
+.haven-action-btn-primary:hover { background: rgba(2, 132, 199, 0.18); }
 .haven-action-btn-secondary { background: var(--h-surface3); border-color: var(--h-border); color: var(--h-text2); }
 .haven-action-btn-secondary:hover { border-color: var(--h-border2); color: var(--h-text); }
 .haven-action-btn-danger { background: var(--h-red-bg); border-color: rgba(239,68,68,0.2); color: var(--h-red); }
@@ -1484,11 +1883,11 @@ body {
 .haven-empty-icon { width: 48px; height: 48px; background: var(--h-surface2); border: 1px solid var(--h-border); border-radius: var(--h-radius-lg); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: var(--h-text3); }
 .haven-empty-title { font-size: 0.9rem; font-weight: 600; color: var(--h-text); margin: 0 0 0.35rem; }
 .haven-empty-desc { font-size: 0.8rem; color: var(--h-text2); max-width: 320px; margin: 0 auto 1.25rem; line-height: 1.6; }
-.haven-vehicle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1px; background: var(--h-border); border: 1px solid var(--h-border); border-radius: var(--h-radius-xl); overflow: hidden; }
-.haven-vehicle-card { background: var(--h-surface); padding: 1.25rem; display: flex; flex-direction: column; gap: 0.875rem; transition: background 0.1s; }
-.haven-vehicle-card:hover { background: var(--h-surface2); }
-.haven-vehicle-card-header { display: flex; align-items: flex-start; gap: 0.75rem; }
-.haven-vehicle-icon { width: 34px; height: 34px; background: var(--h-surface3); border: 1px solid var(--h-border); border-radius: var(--h-radius); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--h-text3); }
+.haven-vehicle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 1.25rem; background: transparent; border: none; border-radius: 0; overflow: visible; }
+.haven-vehicle-card { background: linear-gradient(180deg, var(--h-surface) 0%, var(--h-surface2) 100%); border: 1px solid var(--h-border); border-radius: var(--h-radius-xl); padding: 1.35rem; display: flex; flex-direction: column; justify-content: space-between; gap: 1rem; box-shadow: var(--h-card-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04); transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease; position: relative; overflow: hidden; }
+.haven-vehicle-card:hover { transform: translateY(-3px); border-color: var(--h-teal-ring); }
+.haven-vehicle-card-header { display: flex; align-items: flex-start; gap: 0.85rem; }
+.haven-vehicle-icon { width: 40px; height: 40px; background: var(--h-teal-bg); border: 1px solid var(--h-teal-ring); border-radius: var(--h-radius-lg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--h-teal); }
 .haven-vehicle-name { font-weight: 700; font-size: 1rem; color: var(--h-text); margin-bottom: 0.15rem; line-height: 1.3; }
 .haven-vehicle-details { display: flex; flex-direction: column; gap: 0.3rem; padding-top: 0.75rem; border-top: 1px solid var(--h-border); }
 .haven-vehicle-detail-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; }
@@ -2564,5 +2963,926 @@ html, body {
 
     .lrn-study-card {
         padding: 1.25rem 1rem;
+    }
+}
+
+/* ============================================================
+   ADMIN CONSOLE � sub-navigation tabs & form inputs
+   ============================================================ */
+.h-admin-tabs {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--h-border);
+}
+.h-admin-tab {
+    padding: 0.55rem 1rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--h-text3);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+.h-admin-tab:hover { color: var(--h-text); }
+.h-admin-tab.active { color: #0284c7; border-bottom-color: #0284c7; }
+
+.h-input {
+    background: var(--h-surface2);
+    border: 1px solid var(--h-border);
+    border-radius: var(--h-radius);
+    color: var(--h-text);
+    padding: 0.45rem 0.75rem;
+    font-size: 0.8rem;
+    font-family: inherit;
+}
+.h-input:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 3px rgba(2,132,199,0.18); }
+
+/* ============================================================
+   CLEAN LUXURY AUTOMOTIVE SHOWROOM
+   Matches Studio Reference (All Cars / Dark Seamless Aesthetic)
+   ============================================================ */
+
+/* ── Top Showroom Bar ── */
+.h-showroom-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+[data-theme="light"] .h-showroom-header-bar {
+    border-bottom: 1px solid rgba(2, 132, 199, 0.12);
+}
+
+.h-showroom-title-clean {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+[data-theme="light"] .h-showroom-title-clean {
+    color: #0f172a;
+}
+
+.h-showroom-count-pill {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+[data-theme="light"] .h-showroom-count-pill {
+    background: rgba(2, 132, 199, 0.1);
+    color: #0284c7;
+    border-color: rgba(2, 132, 199, 0.2);
+}
+
+/* Quick Filter Pills */
+.h-showroom-quick-filters {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.h-clean-pill {
+    padding: 0.38rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.h-clean-pill:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+.h-clean-pill.active {
+    background: #0284c7;
+    color: #ffffff;
+    border-color: #38bdf8;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+}
+[data-theme="light"] .h-clean-pill {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #475569;
+}
+[data-theme="light"] .h-clean-pill:hover {
+    color: #0f172a;
+    background: #e2e8f0;
+}
+[data-theme="light"] .h-clean-pill.active {
+    background: #0284c7;
+    color: #ffffff;
+    border-color: #0284c7;
+}
+
+/* Search Box */
+.h-showroom-search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.h-showroom-search-wrap svg {
+    position: absolute;
+    left: 0.75rem;
+    stroke: #64748b;
+    pointer-events: none;
+}
+.h-showroom-search-wrap input {
+    background: #12141a;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 0.4rem 0.8rem 0.4rem 2.1rem;
+    font-size: 0.78rem;
+    color: #ffffff;
+    font-family: inherit;
+    width: 170px;
+    transition: all 0.15s ease;
+}
+.h-showroom-search-wrap input:focus {
+    outline: none;
+    border-color: #0284c7;
+    width: 210px;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
+}
+[data-theme="light"] .h-showroom-search-wrap input {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
+/* Sort Dropdown (Styled like "Short by" in reference) */
+.h-sort-wrapper {
+    position: relative;
+}
+.h-clean-sort-select {
+    background: #1a1c23;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #cbd5e1;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.h-clean-sort-select:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+[data-theme="light"] .h-clean-sort-select {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #334155;
+}
+
+/* Add Vehicle Top Button */
+.h-add-vehicle-top-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.42rem 0.9rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #ffffff !important;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.h-add-vehicle-top-btn:hover {
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.45);
+}
+
+/* ── Showroom Grid (Auto-fill matching user reference layout) ── */
+.h-clean-showroom-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 1.25rem;
+}
+
+/* ── Clean Car Card (Matching Reference Screenshot) ── */
+.h-clean-car-card {
+    background: #141519;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 16px;
+    padding: 1rem 1.1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+[data-theme="light"] .h-clean-car-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+.h-clean-car-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(56, 189, 248, 0.25);
+}
+[data-theme="light"] .h-clean-car-card:hover {
+    border-color: #0284c7;
+    box-shadow: 0 12px 28px rgba(2, 132, 199, 0.15);
+}
+
+/* Card Header: Badge on left, discreet edit/delete icons on right */
+.h-card-header-clean {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.35rem;
+    min-height: 24px;
+}
+.h-clean-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+    display: inline-flex;
+    align-items: center;
+}
+.h-badge-new {
+    background: #ea580c;
+    color: #ffffff;
+}
+.h-badge-live {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+.h-badge-scope {
+    background: rgba(2, 132, 199, 0.18);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+.h-badge-warn {
+    background: rgba(245, 158, 11, 0.16);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.h-badge-3d {
+    background: rgba(168, 85, 247, 0.16);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.h-card-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
+}
+.h-clean-car-card:hover .h-card-top-actions {
+    opacity: 1;
+}
+.h-subtle-icon-link {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    cursor: pointer;
+    text-decoration: none;
+    padding: 0;
+    transition: all 0.15s ease;
+}
+.h-subtle-icon-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+.h-subtle-icon-danger:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+/* ── Seamless Car Stage (Directly on Card Canvas - NO inner framed box, NO glowing orb) ── */
+.h-clean-stage {
+    height: 145px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    margin: 0.25rem 0 0.5rem;
+    overflow: hidden;
+}
+.h-clean-car-img {
+    max-height: 135px;
+    max-width: 95%;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 14px 14px rgba(0, 0, 0, 0.65));
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.h-clean-car-card:hover .h-clean-car-img {
+    transform: scale(1.05);
+}
+
+/* ── Vehicle Title & Subtitle ── */
+.h-clean-body {
+    margin-bottom: 0.65rem;
+}
+.h-clean-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+[data-theme="light"] .h-clean-title {
+    color: #0f172a;
+}
+.h-clean-subtitle {
+    font-size: 0.74rem;
+    color: #71717a;
+    margin-top: 0.2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Specs Row (Clean Horizontal Flow with Subtle Icons — No Bordered Box) ── */
+.h-clean-specs-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.85rem;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+[data-theme="light"] .h-clean-specs-row {
+    border-bottom: 1px solid #f1f5f9;
+}
+.h-clean-spec-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.74rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.h-clean-spec-item svg {
+    stroke: #71717a;
+    flex-shrink: 0;
+}
+[data-theme="light"] .h-clean-spec-item {
+    color: #64748b;
+}
+
+/* ── Footer: Gold Star / Rating + Sleek Diagnose CTA ── */
+.h-clean-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    min-height: 32px;
+}
+.h-clean-rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.h-gold-star {
+    color: #f59e0b;
+    font-size: 0.95rem;
+    line-height: 1;
+}
+.h-status-text-optimal {
+    color: #34d399;
+}
+.h-status-text-warn {
+    color: #fbbf24;
+}
+.h-status-text-neutral {
+    color: #94a3b8;
+}
+.h-status-text-empty {
+    color: #71717a;
+    font-weight: 500;
+}
+
+/* Sleek High-Contrast Pill CTA */
+.h-clean-diagnose-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.8rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    border-radius: 999px;
+    background: #0284c7;
+    color: #ffffff !important;
+    text-decoration: none;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+.h-clean-diagnose-btn:hover {
+    background: #0369a1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.5);
+}
+
+/* Empty Showroom Banner */
+.h-empty-showroom {
+    text-align: center;
+    padding: 4rem 1.5rem;
+    background: #141519;
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    max-width: 520px;
+    margin: 2rem auto;
+}
+.h-empty-showroom-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(2, 132, 199, 0.12);
+    color: #38bdf8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+}
+
+/* Body Style Selector Mini 3D Render Thumbnails */
+.h-body-thumbnail-wrap {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.4rem;
+    overflow: hidden;
+}
+.h-body-thumbnail-img {
+    max-height: 48px;
+    max-width: 90%;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+}
+
+/* ============================================================
+   SPLIT CONFIGURATOR (Left Steps + Right Sticky Preview)
+   ============================================================ */
+
+.h-configurator-wrapper {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    align-items: flex-start;
+}
+@media (min-width: 1024px) {
+    .h-configurator-wrapper {
+        grid-template-columns: 1.25fr 0.85fr;
+    }
+}
+
+.h-configurator-card {
+    background: var(--h-surface);
+    border: 1px solid var(--h-border);
+    border-radius: var(--h-radius-xl);
+    padding: 1.75rem 2rem;
+    box-shadow: var(--h-card-shadow);
+}
+@media (max-width: 640px) {
+    .h-configurator-card {
+        padding: 1.25rem 1rem;
+    }
+}
+
+.h-configurator-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--h-border);
+}
+.h-configurator-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: rgba(2, 132, 199, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.h-configurator-title {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--h-text);
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+.h-configurator-sub {
+    font-size: 0.82rem;
+    color: var(--h-text3);
+    margin: 0.25rem 0 0;
+    line-height: 1.5;
+}
+
+/* Section Step Headers */
+.h-cfg-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--h-text);
+    margin-bottom: 0.35rem;
+}
+.h-cfg-step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #0284c7;
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.h-cfg-section-desc {
+    font-size: 0.78rem;
+    color: var(--h-text3);
+    margin: 0 0 1rem;
+    line-height: 1.45;
+}
+
+/* Body Type Selector Grid */
+.h-body-type-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+.h-body-type-card {
+    background: var(--h-surface2);
+    border: 1.5px solid var(--h-border);
+    border-radius: 10px;
+    padding: 0.75rem 0.6rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.h-body-type-card:hover {
+    border-color: rgba(56, 189, 248, 0.4);
+    background: rgba(2, 132, 199, 0.06);
+}
+.h-body-type-card.active {
+    border-color: #0284c7;
+    background: rgba(2, 132, 199, 0.12);
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
+}
+.h-body-silhouette-mini {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.4rem;
+}
+.h-body-card-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--h-text);
+}
+.h-body-card-sub {
+    font-size: 0.65rem;
+    color: var(--h-text3);
+    margin-top: 0.15rem;
+}
+
+/* Photo Upload Dropzone */
+.h-photo-dropzone {
+    border: 2px dashed rgba(56, 189, 248, 0.25);
+    background: var(--h-surface2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+.h-photo-dropzone:hover,
+.h-photo-dropzone.drag-over {
+    border-color: #0284c7;
+    background: rgba(2, 132, 199, 0.08);
+}
+.h-dropzone-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(2, 132, 199, 0.1);
+    color: #38bdf8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.65rem;
+}
+.h-dropzone-preview {
+    position: relative;
+    max-height: 220px;
+}
+.h-dropzone-preview img {
+    max-height: 180px;
+    max-width: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+}
+.h-preview-overlay {
+    margin-top: 0.6rem;
+}
+.h-preview-btn-remove {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #ef4444;
+    border-radius: 6px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.15s ease;
+}
+.h-preview-btn-remove:hover {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+/* Paint Color Swatches */
+.h-color-swatches {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+.h-swatch-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    padding: 0;
+}
+.h-swatch-dot:hover {
+    transform: scale(1.22);
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+}
+
+/* Plate number badge input wrap */
+.h-plate-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.h-plate-ph-ribbon {
+    position: absolute;
+    left: 0.6rem;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #38bdf8;
+    background: rgba(2, 132, 199, 0.16);
+    padding: 0.15rem 0.35rem;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+}
+.h-plate-input {
+    padding-left: 2.5rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    font-family: var(--h-mono);
+}
+
+/* Quick Chips (Engines & Brands) */
+.h-quick-chips {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+.h-quick-chip {
+    background: var(--h-surface2);
+    border: 1px solid var(--h-border);
+    border-radius: 6px;
+    color: var(--h-text2);
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s ease;
+}
+.h-quick-chip:hover {
+    background: rgba(2, 132, 199, 0.14);
+    border-color: rgba(56, 189, 248, 0.4);
+    color: #38bdf8;
+}
+
+/* Transmission Cards Grid */
+.h-trans-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.6rem;
+}
+.h-trans-card {
+    background: var(--h-surface2);
+    border: 1.5px solid var(--h-border);
+    border-radius: 8px;
+    padding: 0.65rem 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.h-trans-card:hover {
+    border-color: rgba(56, 189, 248, 0.4);
+    background: rgba(2, 132, 199, 0.06);
+}
+.h-trans-card.active {
+    border-color: #0284c7;
+    background: rgba(2, 132, 199, 0.14);
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
+}
+.h-trans-card-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--h-text);
+}
+.h-trans-card-sub {
+    font-size: 0.65rem;
+    color: var(--h-text3);
+    margin-top: 0.2rem;
+    line-height: 1.35;
+}
+
+/* Right Column: Sticky Preview */
+.h-configurator-preview-col {
+    position: relative;
+}
+.h-preview-sticky-wrap {
+    position: sticky;
+    top: 80px;
+}
+.h-preview-top-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--h-teal);
+    letter-spacing: 0.08em;
+    margin-bottom: 0.65rem;
+}
+.h-preview-card {
+    max-width: 380px;
+    margin: 0 auto;
+}
+.h-hardware-pairing-note {
+    max-width: 380px;
+    margin: 1.25rem auto 0;
+    padding: 0.85rem 1rem;
+    background: rgba(2, 132, 199, 0.06);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    border-radius: 10px;
+}
+
+/* ============================================================
+   SMOOTH NAVIGATION FEEDBACK & SILKY PAGE TRANSITIONS
+   Electric cyan top progress beam + zero-blink card reveals
+   ============================================================ */
+
+.haven-top-laser {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3.5px;
+    width: 0%;
+    background: linear-gradient(90deg, #0284c7 0%, #38bdf8 55%, #67e8f9 100%);
+    box-shadow: 0 0 16px rgba(56, 189, 248, 1), 0 0 5px rgba(2, 132, 199, 1);
+    z-index: 9999999;
+    pointer-events: none;
+    opacity: 0;
+    border-radius: 0 3px 3px 0;
+}
+.haven-top-laser.active {
+    opacity: 1;
+}
+
+/* Silky smooth content reveal on page load (starts from 0.75 opacity - NEVER blinks black!) */
+.haven-content-container,
+.haven-auth-shell {
+    animation: havenSoftReveal 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes havenSoftReveal {
+    from {
+        opacity: 0.75;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Subtle staggered card entrances for luxury showroom & dashboard */
+.h-stat-cell:nth-child(1) { animation: havenCardGlide 0.26s cubic-bezier(0.16, 1, 0.3, 1) 0.02s both; }
+.h-stat-cell:nth-child(2) { animation: havenCardGlide 0.26s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both; }
+.h-stat-cell:nth-child(3) { animation: havenCardGlide 0.26s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both; }
+.h-stat-cell:nth-child(4) { animation: havenCardGlide 0.26s cubic-bezier(0.16, 1, 0.3, 1) 0.11s both; }
+
+.h-clean-car-card:nth-child(1) { animation: havenCardGlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) 0.02s both; }
+.h-clean-car-card:nth-child(2) { animation: havenCardGlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both; }
+.h-clean-car-card:nth-child(3) { animation: havenCardGlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) 0.10s both; }
+.h-clean-car-card:nth-child(4) { animation: havenCardGlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) 0.14s both; }
+
+@keyframes havenCardGlide {
+    from {
+        opacity: 0.7;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Micro-interaction haptics for interactive controls */
+.haven-navbar .haven-nav-link {
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.haven-navbar .haven-nav-link:hover {
+    transform: translateY(-1px);
+}
+.haven-navbar .haven-nav-link:active,
+.haven-nav-cta:active,
+.haven-btn-primary:active,
+.h-add-vehicle-top-btn:active,
+.h-clean-diagnose-btn:active {
+    transform: scale(0.96);
+    transition: transform 0.08s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .haven-top-laser,
+    .haven-content-container,
+    .haven-auth-shell,
+    .h-stat-cell,
+    .h-clean-car-card {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
     }
 }

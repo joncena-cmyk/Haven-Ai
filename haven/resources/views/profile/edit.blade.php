@@ -45,13 +45,13 @@
 
                 {{-- Flash: key regenerated --}}
                 @if(session('key_regenerated'))
-                    <div style="background:rgba(2,132,199,0.1);border:1px solid rgba(2,132,199,0.35);border-radius:var(--h-radius);padding:0.65rem 1rem;margin-bottom:1rem;font-size:0.78rem;color:#38bdf8;display:flex;align-items:center;gap:0.5rem;">
+                    <div style="background:var(--h-teal-bg);border:1px solid var(--h-teal-ring);border-radius:var(--h-radius);padding:0.65rem 1rem;margin-bottom:1rem;font-size:0.78rem;color:var(--h-teal);display:flex;align-items:center;gap:0.5rem;">
                         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                         {{ session('key_regenerated') }}
                     </div>
                 @endif
                 @if(session('thresholds_saved'))
-                    <div style="background:rgba(22,163,74,0.1);border:1px solid rgba(22,163,74,0.3);border-radius:var(--h-radius);padding:0.65rem 1rem;margin-bottom:1rem;font-size:0.78rem;color:#4ade80;display:flex;align-items:center;gap:0.5rem;">
+                    <div style="background:var(--h-green-bg);border:1px solid var(--h-green);border-radius:var(--h-radius);padding:0.65rem 1rem;margin-bottom:1rem;font-size:0.78rem;color:var(--h-green);display:flex;align-items:center;gap:0.5rem;">
                         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                         {{ session('thresholds_saved') }}
                     </div>
@@ -83,16 +83,24 @@
                                     </div>
                                     {{-- Live ESP32 Status dot --}}
                                     @php
-                                        $isOnline = !empty($latestTelemetry['online']) && (($latestTelemetry['vehicle_id'] ?? null) == $veh->id);
+                                        $vehTelemetry = \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $veh->id)
+                                            ?? ((($latestTelemetry['vehicle_id'] ?? null) == $veh->id) ? $latestTelemetry : null);
+                                        $isOnline = !empty($vehTelemetry['online'])
+                                            && isset($vehTelemetry['received_at'])
+                                            && \Illuminate\Support\Carbon::parse($vehTelemetry['received_at'])->diffInSeconds(now()) <= 20;
+                                        $rawKey = (string) ($veh->device_key ?? '');
+                                        $maskedKey = strlen($rawKey) > 12
+                                            ? substr($rawKey, 0, 12) . str_repeat('•', 16)
+                                            : ($rawKey ?: '(none)');
                                     @endphp
                                     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.15rem;">
                                         <div style="display:flex;align-items:center;gap:0.4rem;">
-                                            <span class="vehicle-status-dot" style="width:8px;height:8px;border-radius:50%;background:{{ $isOnline ? '#16a34a' : '#64748b' }};box-shadow:{{ $isOnline ? '0 0 6px #16a34a' : 'none' }};display:inline-block;flex-shrink:0;transition:background 0.3s;"></span>
-                                            <span class="vehicle-status-label" style="font-size:0.7rem;color:{{ $isOnline ? '#4ade80' : 'var(--h-text3)' }};font-family:monospace;">{{ $isOnline ? 'Live (Streaming)' : ($latestTelemetry['last_seen_human'] ?? 'Standby / Offline') }}</span>
+                                            <span class="vehicle-status-dot" style="width:8px;height:8px;border-radius:50%;background:{{ $isOnline ? 'var(--h-green)' : 'var(--h-text3)' }};box-shadow:{{ $isOnline ? '0 0 6px var(--h-green)' : 'none' }};display:inline-block;flex-shrink:0;transition:background 0.3s;"></span>
+                                            <span class="vehicle-status-label" style="font-size:0.7rem;color:{{ $isOnline ? 'var(--h-green)' : 'var(--h-text3)' }};font-family:monospace;">{{ $isOnline ? 'Live (Streaming)' : ($vehTelemetry['last_seen_human'] ?? 'Standby / Offline') }}</span>
                                         </div>
-                                        @if($isOnline && !empty($latestTelemetry['device_id']))
+                                        @if($isOnline && !empty($vehTelemetry['device_id']))
                                             <div style="font-size:0.65rem;color:var(--h-text3);display:flex;align-items:center;gap:0.3rem;">
-                                                <span style="color:var(--h-teal);font-family:monospace;">{{ $latestTelemetry['device_id'] }}</span>
+                                                <span style="color:var(--h-teal);font-family:monospace;">{{ $vehTelemetry['device_id'] }}</span>
                                                 <span>•</span>
                                                 <span>5 Sensors Active</span>
                                             </div>
@@ -107,9 +115,19 @@
                                         <div style="font-size:0.7rem;color:var(--h-text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.35rem;font-weight:600;">ESP32 Device Key</div>
                                         <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
                                             <code id="dkey-{{ $veh->id }}"
-                                                  style="background:rgba(2,132,199,0.08);border:1px solid rgba(2,132,199,0.25);color:#38bdf8;padding:0.3rem 0.7rem;border-radius:4px;font-size:0.74rem;font-family:monospace;letter-spacing:0.03em;word-break:break-all;">{{ $veh->device_key ?? '(none)' }}</code>
+                                                  data-raw="{{ $rawKey }}"
+                                                  data-masked="{{ $maskedKey }}"
+                                                  data-visible="false"
+                                                  style="background:var(--h-teal-bg);border:1px solid var(--h-teal-ring);color:var(--h-teal);padding:0.3rem 0.7rem;border-radius:4px;font-size:0.74rem;font-family:monospace;letter-spacing:0.03em;word-break:break-all;">{{ $maskedKey }}</code>
                                             <button type="button"
-                                                    onclick="havenCopyKey('{{ $veh->id }}','{{ $veh->device_key }}')"
+                                                    onclick="havenToggleKey('{{ $veh->id }}')"
+                                                    id="toggle-btn-{{ $veh->id }}"
+                                                    class="haven-action-btn haven-action-btn-secondary"
+                                                    style="font-size:0.72rem;padding:0.28rem 0.65rem;cursor:pointer;display:flex;align-items:center;gap:0.3rem;">
+                                                Show
+                                            </button>
+                                            <button type="button"
+                                                    onclick="havenCopyKey('{{ $veh->id }}')"
                                                     id="copy-btn-{{ $veh->id }}"
                                                     class="haven-action-btn haven-action-btn-secondary"
                                                     style="font-size:0.72rem;padding:0.28rem 0.65rem;cursor:pointer;display:flex;align-items:center;gap:0.3rem;">
@@ -188,7 +206,7 @@
 
             {{-- ════ ISO/IEC 27001 Security Audit Log ════ --}}
             <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg" style="background:var(--h-surface);border:1px solid var(--h-border);border-radius:var(--h-radius-lg);">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem;">
                     <div>
                         <div style="display:flex;align-items:center;gap:0.45rem;">
                             <h3 style="font-size:0.95rem;font-weight:700;color:var(--h-text);margin:0;">Security & Activity Audit Trail</h3>
@@ -252,7 +270,7 @@
                 <span style="font-size:0.9rem;font-weight:700;color:var(--h-text);">Regenerate Device Key?</span>
             </div>
             <p id="haven-regen-msg" style="font-size:0.8rem;color:var(--h-text3);line-height:1.5;margin-bottom:1rem;"></p>
-            <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:var(--h-radius-sm);padding:0.5rem 0.75rem;font-size:0.74rem;color:#fca5a5;margin-bottom:1.1rem;">
+            <div style="background:var(--h-red-bg);border:1px solid var(--h-red);border-radius:var(--h-radius-sm);padding:0.5rem 0.75rem;font-size:0.74rem;color:var(--h-red);margin-bottom:1.1rem;">
                 ⚠ Your ESP32 will immediately lose connection. You must flash the new key into the firmware before it can reconnect.
             </div>
             <div style="display:flex;gap:0.6rem;justify-content:flex-end;">
@@ -263,8 +281,22 @@
     </div>
 
     <script>
+    // ── Toggle device key visibility ─────────────────────────────────────────
+    function havenToggleKey(vid) {
+        const el  = document.getElementById('dkey-' + vid);
+        const btn = document.getElementById('toggle-btn-' + vid);
+        if (!el || !btn) return;
+        const vis = el.dataset.visible === 'true';
+        el.textContent    = vis ? el.dataset.masked : el.dataset.raw;
+        el.dataset.visible = vis ? 'false' : 'true';
+        btn.textContent   = vis ? 'Show' : 'Hide';
+    }
+
     // ── Copy device key to clipboard ──────────────────────────────────────────
-    function havenCopyKey(vid, key) {
+    function havenCopyKey(vid) {
+        const el  = document.getElementById('dkey-' + vid);
+        const key = el ? el.dataset.raw : '';
+        if (!key) return;
         navigator.clipboard.writeText(key).then(() => {
             const btn = document.getElementById('copy-btn-' + vid);
             if (btn) {
@@ -300,16 +332,16 @@
         const vid   = card.dataset.vehicleId;
         const dot   = card.querySelector('.vehicle-status-dot');
         const label = card.querySelector('.vehicle-status-label');
-        fetch('/api/v1/telemetry/latest', { cache: 'no-store' })
+        fetch('/api/v1/telemetry/latest?vehicle_id=' + encodeURIComponent(vid), { cache: 'no-store' })
             .then(r => r.json())
             .then(data => {
                 if (data.online) {
-                    dot.style.background  = '#16a34a';
-                    dot.style.boxShadow   = '0 0 6px #16a34a';
-                    label.style.color     = '#4ade80';
+                    dot.style.background  = 'var(--h-green)';
+                    dot.style.boxShadow   = '0 0 6px var(--h-green)';
+                    label.style.color     = 'var(--h-green)';
                     label.textContent     = 'Live (Streaming)';
                 } else {
-                    dot.style.background  = '#64748b';
+                    dot.style.background  = 'var(--h-text3)';
                     dot.style.boxShadow   = 'none';
                     label.style.color     = 'var(--h-text3)';
                     label.textContent     = data.last_seen_human ?? 'Standby / Offline';

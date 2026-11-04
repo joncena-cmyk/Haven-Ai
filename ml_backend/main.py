@@ -129,7 +129,12 @@ async def analyze(
             tmp_path = tmp.name
         try:
             vib_raw = tmp_path
-            vibration_features = extract_vibration_features(tmp_path, suffix.lstrip("."))
+            vibration_features = extract_vibration_features(
+                tmp_path,
+                suffix.lstrip("."),
+                sample_rate_hz=100.0,
+                rpm=hardware_features.get("rpm")
+            )
             logger.info(f"Vibration features extracted from {vibration_file.filename}")
         except Exception as e:
             errors.append(f"Vibration extraction warning: {str(e)}")
@@ -148,6 +153,7 @@ async def analyze(
         "confidence": result["confidence"],
         "confidence_pct": f"{result['confidence']*100:.1f}%",
         "top_classes": result.get("top_classes", []),
+        "feature_contributions": result.get("feature_contributions", []),
         "features_used": list(all_features.keys()),
         "audio_features": audio_features,
         "vibration_features": vibration_features,
@@ -156,6 +162,37 @@ async def analyze(
         "warnings": errors,
         "processed_at": datetime.now(timezone.utc).isoformat(),
     })
+
+
+@app.post("/train")
+async def retrain_model(payload: dict = None):
+    """
+    Retrain the Random Forest model using real diagnostic records
+    and/or calibrated synthetic augmentation.
+    """
+    try:
+        from train import load_hybrid_dataset, train_and_export
+        payload = payload or {}
+        records = payload.get("records", [])
+        augment_synth = payload.get("augment_synthetic", True)
+        synth_per_class = int(payload.get("synthetic_per_class", 100))
+
+        X, y, real_c, synth_c = load_hybrid_dataset(
+            records,
+            augment_synthetic=augment_synth,
+            synthetic_per_class=synth_per_class
+        )
+        meta = train_and_export(X, y, real_count=real_c, synth_count=synth_c)
+        classifier.reload_model()
+
+        return JSONResponse({
+            "success": True,
+            "message": "Model retrained and reloaded successfully.",
+            "meta": meta,
+        })
+    except Exception as e:
+        logger.error(f"Retraining failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Retraining failed: {str(e)}")
 
 
 if __name__ == "__main__":

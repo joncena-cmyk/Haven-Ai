@@ -16,9 +16,11 @@ class Vehicle extends Model
         'nickname',
         'make',
         'model',
+        'body_type',
         'year',
         'plate_number',
         'color',
+        'image_path',
         'engine_type',
         'transmission',
         'mileage_km',
@@ -58,6 +60,88 @@ class Vehicle extends Model
     public function getDisplayNameAttribute(): string
     {
         return $this->nickname ?: "{$this->year} {$this->make} {$this->model}";
+    }
+
+    /**
+     * Resolve inferred or explicit body type (sedan, suv, coupe, hatchback, pickup).
+     */
+    public function getResolvedBodyTypeAttribute(): string
+    {
+        if (! empty($this->body_type)) {
+            return strtolower($this->body_type);
+        }
+
+        $combined = strtolower(($this->make ?? '') . ' ' . ($this->model ?? ''));
+        if (preg_match('/\b(suv|crossover|rav4|cr-v|tucson|sportage|cx-5|cx-9|x3|x5|q5|q7|urus|macan|cayenne|montero|fortuner|everest|terra|mu-x|explorer|highlander|trailblazer)\b/i', $combined)) {
+            return 'suv';
+        }
+        if (preg_match('/\b(coupe|mustang|supra|gt-r|911|cayman|boxster|miata|brz|gr86|corvette|camaro|challenger|ferrari|lamborghini|r8)\b/i', $combined)) {
+            return 'coupe';
+        }
+        if (preg_match('/\b(hatch|hatchback|yaris|fit|jazz|golf|polo|swift|fiesta|focus|wigo|brio)\b/i', $combined)) {
+            return 'hatchback';
+        }
+        if (preg_match('/\b(pickup|truck|hilux|ranger|d-max|navara|strada|f-150|silverado|tacoma|colorado)\b/i', $combined)) {
+            return 'pickup';
+        }
+
+        return 'sedan';
+    }
+
+    /**
+     * Resolve public URL for uploaded vehicle photograph or fallback to realistic 3D studio render.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (! empty($this->image_path)) {
+            return \Illuminate\Support\Facades\Storage::disk('public')->url($this->image_path);
+        }
+
+        $type = $this->resolved_body_type;
+        $defaultFile = "images/vehicles/{$type}.jpg";
+        if (file_exists(public_path($defaultFile))) {
+            return asset($defaultFile);
+        }
+
+        return null;
+    }
+
+    /**
+     * Body type formatted label.
+     */
+    public function getBodyTypeLabelAttribute(): string
+    {
+        return match (strtolower($this->body_type ?? 'sedan')) {
+            'suv'       => 'SUV / Crossover',
+            'hatchback' => 'Hatchback',
+            'coupe'     => 'Coupe / Sport',
+            'pickup'    => 'Pickup / Truck',
+            default     => 'Sedan',
+        };
+    }
+
+    /**
+     * Accent lighting color based on registered paint color or default cyan.
+     */
+    public function getAccentColorHexAttribute(): string
+    {
+        $c = strtolower(trim($this->color ?? ''));
+        if (empty($c)) {
+            return '#38bdf8'; // HAVEN Cyan
+        }
+        if (preg_match('/^#([a-f0-9]{3}|[a-f0-9]{6})$/i', $c)) {
+            return $c;
+        }
+        if (str_contains($c, 'red') || str_contains($c, 'crimson') || str_contains($c, 'maroon')) return '#ef4444';
+        if (str_contains($c, 'blue') || str_contains($c, 'navy') || str_contains($c, 'sapphire')) return '#38bdf8';
+        if (str_contains($c, 'yellow') || str_contains($c, 'gold')) return '#eab308';
+        if (str_contains($c, 'orange') || str_contains($c, 'bronze') || str_contains($c, 'copper')) return '#f97316';
+        if (str_contains($c, 'green') || str_contains($c, 'lime') || str_contains($c, 'emerald')) return '#10b981';
+        if (str_contains($c, 'black') || str_contains($c, 'dark') || str_contains($c, 'obsidian')) return '#64748b';
+        if (str_contains($c, 'white') || str_contains($c, 'pearl')) return '#e2e8f0';
+        if (str_contains($c, 'silver') || str_contains($c, 'gray') || str_contains($c, 'grey')) return '#94a3b8';
+        if (str_contains($c, 'purple') || str_contains($c, 'violet')) return '#a855f7';
+        return '#38bdf8';
     }
 
     /**

@@ -2,7 +2,7 @@
 
     {{-- Breadcrumb --}}
     <div class="h-breadcrumb">
-        <a href="{{ route('dashboard') }}" class="h-breadcrumb-link">Dashboard</a>
+        <a href="{{ auth()->check() ? route('dashboard') : url('/') }}" class="h-breadcrumb-link">{{ auth()->check() ? 'Dashboard' : 'Home' }}</a>
         <span class="h-breadcrumb-sep">/</span>
         <a href="{{ route('learning.index') }}" class="h-breadcrumb-link">Learning Modules</a>
         <span class="h-breadcrumb-sep">/</span>
@@ -22,6 +22,12 @@
                 <p style="font-size:0.875rem;color:var(--h-text2);margin:0;">
                     Test your understanding of ICE acoustic signal processing, crest factors, and vibration fault patterns.
                 </p>
+                @if(isset($learningStats) && $learningStats['quiz_attempts'] > 0)
+                    <div style="margin-top:0.6rem;display:inline-flex;align-items:center;gap:0.45rem;padding:0.25rem 0.65rem;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);border-radius:6px;font-size:0.75rem;color:#38bdf8;font-weight:600;">
+                        <span>⭐ Personal Best: {{ $learningStats['quiz_best_score'] }} / {{ $learningStats['quiz_total'] }} ({{ $learningStats['quiz_percentage'] }}%)</span>
+                        <span style="opacity:0.6;">&middot; {{ $learningStats['quiz_attempts'] }} {{ Str::plural('attempt', $learningStats['quiz_attempts']) }}</span>
+                    </div>
+                @endif
             </div>
 
             <div id="quiz-score-card" style="display:none;padding:0.75rem 1.25rem;background:var(--h-surface2);border:1px solid var(--h-border);border-radius:var(--h-radius);text-align:right;min-width:100px;">
@@ -89,7 +95,8 @@
             <div id="quiz-result-icon" style="font-size:2.5rem;margin-bottom:0.75rem;line-height:1;">🎯</div>
             <div style="font-size:0.72rem;font-weight:600;color:var(--h-teal);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.35rem;">Quiz Complete</div>
             <h2 style="font-size:1.5rem;font-weight:800;color:var(--h-text);margin:0 0 0.35rem;" id="quiz-result-score-txt">You scored 0 / {{ count($questions) }}</h2>
-            <div id="quiz-result-tier" style="font-size:0.9rem;color:var(--h-text2);margin-bottom:1.5rem;"></div>
+            <div id="quiz-result-tier" style="font-size:0.9rem;color:var(--h-text2);margin-bottom:0.75rem;"></div>
+            <div id="quiz-sync-status" style="display:none;margin-bottom:1.5rem;font-size:0.75rem;padding:0.35rem 0.85rem;border-radius:20px;background:rgba(22,163,74,0.12);border:1px solid rgba(74,222,128,0.3);color:var(--h-green);font-weight:600;"></div>
             <div class="lrn-quiz-action-row">
                 <button type="button" onclick="window.location.reload()" class="haven-btn-secondary">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.57"/></svg>
@@ -226,6 +233,30 @@
 
             document.getElementById('quiz-result-panel').style.display = 'block';
             document.getElementById('quiz-retake-row').style.display = 'none';
+
+            @auth
+            // Persist quiz performance to authenticated user profile
+            fetch('{{ route("learning.quiz.submit") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ score: score, total: total })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const badge = document.getElementById('quiz-sync-status');
+                    if (badge) {
+                        badge.style.display = 'inline-flex';
+                        badge.innerHTML = '✓ Saved to Engineer Profile &middot; Best Score: ' + data.best_score + ' / ' + data.total + ' (' + data.percentage + '%) &middot; ' + data.attempts + ' {{ Str::plural("attempt", 1) }}';
+                    }
+                }
+            })
+            .catch(err => console.error('Quiz sync error:', err));
+            @endauth
 
             // Scroll to result
             setTimeout(() => {

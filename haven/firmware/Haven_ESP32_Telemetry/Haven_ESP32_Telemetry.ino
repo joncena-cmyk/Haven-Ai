@@ -6,25 +6,31 @@
 // ============================================================
 
 #include <WiFi.h>
+#include <WebServer.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
 
-// ── 1. CONFIGURE THESE ──────────────────────────────────────
-// ⚠️ IMPORTANT: Laptop AND ESP32 must be on the SAME Wi-Fi network.
-//    Your laptop is at: 192.168.254.106 port 8000
-const char* ssid       = "YOUR_WIFI_SSID";       // ← Change to your Wi-Fi name
-const char* password   = "YOUR_WIFI_PASSWORD";   // ← Change to your Wi-Fi password
-const char* serverUrl  = "http://192.168.254.106:8000/api/v1/telemetry/ingest";
-const char* pingUrl    = "http://192.168.254.106:8000/api/v1/telemetry/ping";
-const char* deviceKey  = "hvn_dev_cde1c79d141a9cdcb064d3ef4b9e63f2";
-const int   vehicleId  = 1;
+// ── 1. CONFIGURE THESE (Overridable via NVS Captive Portal http://192.168.4.1/config) ──
+Preferences prefs;
+WebServer portalServer(80);
+char ssid[64]       = "YOUR_WIFI_SSID";       // ← Change or configure via AP portal
+char password[64]   = "YOUR_WIFI_PASSWORD";   // ← Change or configure via AP portal
+char serverUrl[128] = "http://192.168.254.106:8000/api/v1/telemetry/ingest";
+char pingUrl[128]   = "http://192.168.254.106:8000/api/v1/telemetry/ping";
+char deviceKey[64]  = "hvn_dev_cde1c79d141a9cdcb064d3ef4b9e63f2";
+const int vehicleId = 1;
 // ────────────────────────────────────────────────────────────
 
-// ── 2. SENSOR PIN ASSIGNMENTS ────────────────────────────────
-#define PIN_DS18B20    4    // Temperature (OneWire)
+// ── 2. SENSOR PIN ASSIGNMENTS & 100Hz RING BUFFER ───────────
+#define PIN_DS18B20    4    // Temperature (OneWire, async non-blocking mode)
 #define PIN_HALL_RPM   23   // RPM sensor
 #define PIN_MPU_SDA    21   // MPU6050 SDA
 #define PIN_MPU_SCL    22   // MPU6050 SCL
+#define VIB_BUFFER_SIZE 128
+float vibBuffer[VIB_BUFFER_SIZE];
+int vibBufferIdx = 0;
+unsigned long lastSampleMs = 0;
 // ────────────────────────────────────────────────────────────
 
 // ── 3. SEND INTERVAL ─────────────────────────────────────────
@@ -165,7 +171,36 @@ void setup() {
   Serial.println("  Target: 2026 Toyota Corolla (Vehicle ID: 1)");
   Serial.println("===========================================");
 
+  // Load saved Wi-Fi & Server URL from NVS Flash if available
+  prefs.begin("haven", true);
+  if (prefs.isKey("ssid")) {
+    prefs.getString("ssid", ssid, sizeof(ssid));
+    prefs.getString("pass", password, sizeof(password));
+    prefs.getString("server", serverUrl, sizeof(serverUrl));
+    prefs.getString("key", deviceKey, sizeof(deviceKey));
+  }
+  prefs.end();
+
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAP("HAVEN_AI_LOCAL", "haven1234");
   connectWifi();
+
+  portalServer.on("/config", []() {
+    String html = "<html><body style='background:#090d16;color:#e2e8f0;font-family:sans-serif;padding:1.5rem;'><h2>HAVEN AI Node Setup</h2><form method='POST' action='/save'>SSID:<br><input name='ssid' value='" + String(ssid) + "'><br>Pass:<br><input name='pass' type='password'><br>Server:<br><input name='server' value='" + String(serverUrl) + "'><br>Key:<br><input name='key' value='" + String(deviceKey) + "'><br><br><button type='submit'>Save & Reboot</button></form></body></html>";
+    portalServer.send(200, "text/html", html);
+  });
+  portalServer.on("/save", HTTP_POST, []() {
+    prefs.begin("haven", false);
+    if (portalServer.hasArg("ssid")) prefs.putString("ssid", portalServer.arg("ssid"));
+    if (portalServer.hasArg("pass")) prefs.putString("pass", portalServer.arg("pass"));
+    if (portalServer.hasArg("server")) prefs.putString("server", portalServer.arg("server"));
+    if (portalServer.hasArg("key")) prefs.putString("key", portalServer.arg("key"));
+    prefs.end();
+    portalServer.send(200, "text/plain", "Saved! Rebooting...");
+    delay(800);
+    ESP.restart();
+  });
+  portalServer.begin();
 
   if (WiFi.status() == WL_CONNECTED) {
     delay(1000);
@@ -174,11 +209,18 @@ void setup() {
 }
 
 void loop() {
+  portalServer.handleClient();
   unsigned long now = millis();
+  // Strict 100Hz non-blocking vibration sampling (10ms interval)
+  if (now - lastSampleMs >= 10) {
+    lastSampleMs = now;
+    float z = 1.0 + random(-80, 80) / 1000.0;
+    vibBuffer[vibBufferIdx] = fabs(z);
+    vibBufferIdx = (vibBufferIdx + 1) % VIB_BUFFER_SIZE;
+  }
   if (now - lastSend >= SEND_INTERVAL_MS) {
     lastSend = now;
     sendTelemetry();
   }
-  delay(100);
 }
 

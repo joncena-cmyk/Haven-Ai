@@ -198,9 +198,9 @@ class DiagnosticAiService
      */
     protected function callLlmApi(Diagnostic $diagnostic, string $question): ?string
     {
-        $geminiKey = config('services.gemini.key') ?: env('GEMINI_API_KEY');
-        $openAiKey = config('services.openai.key') ?: env('OPENAI_API_KEY');
-        $groqKey   = config('services.groq.key') ?: env('GROQ_API_KEY');
+        $geminiKey = config('services.gemini.key');
+        $openAiKey = config('services.openai.key');
+        $groqKey   = config('services.groq.key');
 
         if (!$geminiKey && !$openAiKey && !$groqKey) {
             return null;
@@ -225,6 +225,9 @@ class DiagnosticAiService
             . "- Crest Factor: {$crest}\n\n"
             . "Provide direct, technically accurate, safety-focused advice tailored specifically to this vehicle and test result. "
             . "Format cleanly in Markdown with bullet points, and keep responses under 250 words.";
+
+        $systemPrompt = GlobalAiAssistantService::sanitizePromptText($systemPrompt);
+        $question = GlobalAiAssistantService::sanitizePromptText($question);
 
         // 1. Try Groq First (Ultra-fast LLM Inference)
         if ($groqKey) {

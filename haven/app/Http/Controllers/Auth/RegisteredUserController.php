@@ -46,6 +46,11 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
+        \App\Services\AuditLogger::log('auth.registered', [
+            'email' => $user->email,
+            'role'  => 'user',
+        ], $user->id);
+
         return redirect(route('dashboard', absolute: false));
     }
 }

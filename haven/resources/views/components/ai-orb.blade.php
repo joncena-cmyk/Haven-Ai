@@ -1019,7 +1019,7 @@ html[data-theme="dark"] .haven-send-btn.active,
     }
 
     function formatInlineMd(str) {
-        return str
+        return escapeHtml(str || '')
             .replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight:600;">$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/`([^`]+)`/g, '<code>$1</code>');

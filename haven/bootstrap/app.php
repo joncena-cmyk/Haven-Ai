@@ -13,11 +13,29 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
-        $middleware->append(\App\Http\Middleware\SecurityHeadersMiddleware::class);
+        $middleware->statefulApi();
         $middleware->validateCsrfTokens(except: [
-            'ai/ask',
+            'logout',
+            'admin/logout',
         ]);
+        $middleware->append(\App\Http\Middleware\SecurityHeadersMiddleware::class);
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\EnsureAdminAuthenticated::class,
+        ]);
+        $middleware->appendToGroup('web', \App\Http\Middleware\EnsureAccountIsActive::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // When a session or CSRF token expires on logout, cleanly redirect to homepage
+        $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, \Illuminate\Http\Request $request) {
+            if ($request->is('logout') || $request->is('admin/logout')) {
+                \Illuminate\Support\Facades\Auth::guard('web')->logout();
+                \Illuminate\Support\Facades\Auth::guard('admin')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect('/');
+            }
+
+            return redirect()->route('login')->with('status', 'Your session has expired. Please sign in again.');
+        });
     })->create();

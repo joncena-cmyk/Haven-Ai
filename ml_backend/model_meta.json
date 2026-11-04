@@ -1,0 +1,182 @@
+{
+  "feature_order": [
+    "peak_g",
+    "rms_g",
+    "crest_factor",
+    "dominant_freq_hz",
+    "spectral_entropy",
+    "temperature_c",
+    "rpm",
+    "voltage_v",
+    "current_ma",
+    "rms_mean",
+    "zcr_mean",
+    "spectral_centroid_mean",
+    "spectral_rolloff_mean",
+    "mfcc_1_mean",
+    "mfcc_2_mean",
+    "mfcc_3_mean",
+    "mfcc_4_mean",
+    "mfcc_5_mean"
+  ],
+  "classes": [
+    "normal",
+    "misfire",
+    "loose_component",
+    "valve_clearance"
+  ],
+  "accuracy": 1.0,
+  "cv_accuracy": 1.0,
+  "cv_std": 0.0,
+  "f1_macro": 1.0,
+  "f1_weighted": 1.0,
+  "trained_on": "2026-11-04T17:52:25.218168+00:00",
+  "n_samples": 600,
+  "real_samples_count": 0,
+  "synthetic_samples_count": 600,
+  "algorithm": "RandomForestClassifier(n_estimators=120, max_depth=12)",
+  "confusion_matrix": [
+    [
+      30,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      30,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      30,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      30
+    ]
+  ],
+  "per_class_metrics": {
+    "normal": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "support": 30
+    },
+    "misfire": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "support": 30
+    },
+    "loose_component": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "support": 30
+    },
+    "valve_clearance": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "support": 30
+    }
+  },
+  "feature_importances": [
+    {
+      "feature": "peak_g",
+      "importance": 0.1613,
+      "importance_pct": 16.13
+    },
+    {
+      "feature": "spectral_centroid_mean",
+      "importance": 0.1404,
+      "importance_pct": 14.04
+    },
+    {
+      "feature": "zcr_mean",
+      "importance": 0.1301,
+      "importance_pct": 13.01
+    },
+    {
+      "feature": "spectral_entropy",
+      "importance": 0.1135,
+      "importance_pct": 11.35
+    },
+    {
+      "feature": "spectral_rolloff_mean",
+      "importance": 0.0926,
+      "importance_pct": 9.26
+    },
+    {
+      "feature": "rpm",
+      "importance": 0.0833,
+      "importance_pct": 8.33
+    },
+    {
+      "feature": "rms_g",
+      "importance": 0.0715,
+      "importance_pct": 7.15
+    },
+    {
+      "feature": "dominant_freq_hz",
+      "importance": 0.0677,
+      "importance_pct": 6.77
+    },
+    {
+      "feature": "mfcc_1_mean",
+      "importance": 0.0413,
+      "importance_pct": 4.13
+    },
+    {
+      "feature": "voltage_v",
+      "importance": 0.0397,
+      "importance_pct": 3.97
+    },
+    {
+      "feature": "rms_mean",
+      "importance": 0.0362,
+      "importance_pct": 3.62
+    },
+    {
+      "feature": "crest_factor",
+      "importance": 0.0173,
+      "importance_pct": 1.73
+    },
+    {
+      "feature": "current_ma",
+      "importance": 0.0042,
+      "importance_pct": 0.42
+    },
+    {
+      "feature": "temperature_c",
+      "importance": 0.0005,
+      "importance_pct": 0.05
+    },
+    {
+      "feature": "mfcc_2_mean",
+      "importance": 0.0002,
+      "importance_pct": 0.02
+    },
+    {
+      "feature": "mfcc_4_mean",
+      "importance": 0.0001,
+      "importance_pct": 0.01
+    },
+    {
+      "feature": "mfcc_5_mean",
+      "importance": 0.0,
+      "importance_pct": 0.0
+    },
+    {
+      "feature": "mfcc_3_mean",
+      "importance": 0.0,
+      "importance_pct": 0.0
+    }
+  ]
+}

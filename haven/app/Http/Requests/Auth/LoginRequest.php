@@ -45,8 +45,26 @@ class LoginRequest extends FormRequest
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
+            $existingUserId = \App\Models\User::where('email', (string) $this->input('email'))->value('id');
+            \App\Services\AuditLogger::log('auth.login_failed', [
+                'email' => (string) $this->input('email'),
+            ], $existingUserId, 'failure');
+
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
+            ]);
+        }
+
+        if (Auth::user()?->isSuspended()) {
+            $suspendedId = Auth::id();
+            Auth::logout();
+
+            \App\Services\AuditLogger::log('auth.login_blocked_suspended', [
+                'email' => (string) $this->input('email'),
+            ], $suspendedId, 'failure');
+
+            throw ValidationException::withMessages([
+                'email' => 'This account has been suspended. Contact an administrator.',
             ]);
         }
 

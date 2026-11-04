@@ -52,6 +52,11 @@
     </div>
     <div class="haven-form-group">
         <label class="haven-label" for="make_select">Make <span class="haven-required">*</span></label>
+        <div class="h-quick-chips" style="margin-bottom:0.45rem;">
+            @foreach(['Toyota', 'Honda', 'Mitsubishi', 'Nissan', 'Ford', 'Hyundai', 'Mazda', 'Suzuki'] as $b)
+                <button type="button" class="h-quick-chip" onclick="quickSelectMake('{{ $b }}')">{{ $b }}</button>
+            @endforeach
+        </div>
         <select id="make_select" class="haven-input haven-select @error('make') haven-input-error @enderror">
             <option value="">Loading catalog…</option>
         </select>
@@ -287,6 +292,22 @@
             if (preferred) modelInput.value = preferred;
         }
     }
+
+    window.quickSelectMake = function (brand) {
+        if (!makeSelect) return;
+        makeSelect.value = brand;
+        if (makeSelect.value !== brand) {
+            showCustom('make', true);
+            makeInput.value = brand;
+        } else {
+            showCustom('make', false);
+            makeInput.value = brand;
+        }
+        modelInput.value = '';
+        showCustom('model', false);
+        loadModels(brand, '');
+        makeSelect.dispatchEvent(new Event('change'));
+    };
 
     makeSelect.addEventListener('change', () => {
         syncFromSelect('make');

@@ -542,6 +542,149 @@
     </div>
 
     {{-- ═══════════════════════════════════════════════════════════════
+         3B. EXPLAINABLE AI (XAI) & BASELINE COMPARISON
+         ═══════════════════════════════════════════════════════════════ --}}
+    @php
+        $xaiList = $rawResult['feature_contributions'] ?? ($diagnostic->feature_contributions ?? []);
+    @endphp
+
+    @if(!empty($xaiList) || !empty($comparison))
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%, 420px),1fr));gap:1.25rem;margin-bottom:1.5rem;">
+            
+            {{-- Explainable AI (Feature Contributions) --}}
+            @if(!empty($xaiList))
+                <div class="h-card" style="padding:1.35rem 1.45rem;background:var(--h-surface);border:1px solid var(--h-border);border-radius:14px;box-shadow:var(--h-card-shadow);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+                        <div style="display:flex;align-items:center;gap:0.5rem;">
+                            <div style="width:32px;height:32px;border-radius:8px;background:rgba(2,132,199,0.12);border:1px solid rgba(2,132,199,0.25);display:flex;align-items:center;justify-content:center;color:var(--h-teal);flex-shrink:0;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                            </div>
+                            <div>
+                                <h3 style="font-size:0.95rem;font-weight:700;color:var(--h-text);margin:0;">Explainable AI (XAI)</h3>
+                                <p style="font-size:0.73rem;color:var(--h-text3);margin:0.15rem 0 0;">Top signal features driving model classification</p>
+                            </div>
+                        </div>
+                        <span class="h-badge h-badge-teal" style="font-size:0.62rem;">ISO Interpretability</span>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:0.75rem;margin-top:1rem;">
+                        @foreach($xaiList as $contrib)
+                            <div style="background:var(--h-surface2);border:1px solid var(--h-border);border-radius:10px;padding:0.75rem 0.85rem;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;gap:0.5rem;">
+                                    <span style="font-size:0.8rem;font-weight:700;color:var(--h-text);">{{ $contrib['label'] }}</span>
+                                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                                        <span class="h-mono" style="font-size:0.75rem;color:var(--h-text2);font-weight:600;">{{ $contrib['value'] }} {{ $contrib['unit'] }}</span>
+                                        <span class="h-badge h-badge-teal" style="font-size:0.65rem;font-weight:700;">+{{ $contrib['impact_pct'] }}%</span>
+                                    </div>
+                                </div>
+                                <div style="height:5px;background:var(--h-surface3, rgba(0,0,0,0.1));border-radius:999px;overflow:hidden;margin-bottom:0.45rem;">
+                                    <div style="height:100%;width:{{ min(100, $contrib['impact_pct'] * 1.8) }}%;background:linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);border-radius:999px;"></div>
+                                </div>
+                                <p style="font-size:0.73rem;color:var(--h-text2);margin:0;line-height:1.45;">{{ $contrib['explanation'] }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            {{-- Baseline vs. Current Session Comparison --}}
+            @if(!empty($comparison))
+                <div class="h-card" style="padding:1.35rem 1.45rem;background:var(--h-surface);border:1px solid var(--h-border);border-radius:14px;box-shadow:var(--h-card-shadow);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+                        <div style="display:flex;align-items:center;gap:0.5rem;">
+                            <div style="width:32px;height:32px;border-radius:8px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center;color:var(--h-green);flex-shrink:0;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                            </div>
+                            <div>
+                                <h3 style="font-size:0.95rem;font-weight:700;color:var(--h-text);margin:0;">Baseline vs. Current</h3>
+                                <p style="font-size:0.73rem;color:var(--h-text3);margin:0.15rem 0 0;">
+                                    Compared with Session #{{ $comparison['baseline_id'] }} ({{ $comparison['baseline_date'] }})
+                                </p>
+                            </div>
+                        </div>
+                        <a href="{{ route('diagnostics.show', $comparison['baseline_id']) }}" class="h-badge h-badge-gray" style="font-size:0.62rem;text-decoration:none;">
+                            View Baseline &rarr;
+                        </a>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.65rem;margin-top:1rem;">
+                        {{-- Peak G Delta --}}
+                        <div style="background:var(--h-surface2);border:1px solid var(--h-border);border-radius:10px;padding:0.7rem;">
+                            <div style="font-size:0.68rem;color:var(--h-text3);text-transform:uppercase;font-weight:600;">Peak Accel</div>
+                            <div class="h-mono" style="font-size:1.1rem;font-weight:800;color:var(--h-text);margin:0.2rem 0;">
+                                {{ $comparison['peak_g']['current'] ?? '--' }}g
+                            </div>
+                            @if($comparison['peak_g']['delta'] !== null)
+                                @php $isHigher = $comparison['peak_g']['delta'] > 0; @endphp
+                                <span class="h-badge {{ $isHigher ? 'h-badge-red' : 'h-badge-green' }}" style="font-size:0.62rem;">
+                                    {{ $isHigher ? '+' : '' }}{{ $comparison['peak_g']['pct'] }}% vs base
+                                </span>
+                            @endif
+                        </div>
+
+                        {{-- RMS G Delta --}}
+                        <div style="background:var(--h-surface2);border:1px solid var(--h-border);border-radius:10px;padding:0.7rem;">
+                            <div style="font-size:0.68rem;color:var(--h-text3);text-transform:uppercase;font-weight:600;">RMS Energy</div>
+                            <div class="h-mono" style="font-size:1.1rem;font-weight:800;color:var(--h-text);margin:0.2rem 0;">
+                                {{ $comparison['rms_g']['current'] ?? '--' }}g
+                            </div>
+                            @if($comparison['rms_g']['delta'] !== null)
+                                @php $isHigher = $comparison['rms_g']['delta'] > 0; @endphp
+                                <span class="h-badge {{ $isHigher ? 'h-badge-red' : 'h-badge-green' }}" style="font-size:0.62rem;">
+                                    {{ $isHigher ? '+' : '' }}{{ $comparison['rms_g']['pct'] }}% vs base
+                                </span>
+                            @endif
+                        </div>
+
+                        {{-- Crest Factor Delta --}}
+                        <div style="background:var(--h-surface2);border:1px solid var(--h-border);border-radius:10px;padding:0.7rem;">
+                            <div style="font-size:0.68rem;color:var(--h-text3);text-transform:uppercase;font-weight:600;">Crest Factor</div>
+                            <div class="h-mono" style="font-size:1.1rem;font-weight:800;color:var(--h-text);margin:0.2rem 0;">
+                                {{ $comparison['crest_factor']['current'] ?? '--' }}
+                            </div>
+                            @if($comparison['crest_factor']['delta'] !== null)
+                                <span class="h-badge {{ $comparison['crest_factor']['delta'] > 0.5 ? 'h-badge-amber' : 'h-badge-teal' }}" style="font-size:0.62rem;">
+                                    Δ {{ $comparison['crest_factor']['delta'] > 0 ? '+' : '' }}{{ $comparison['crest_factor']['delta'] }}
+                                </span>
+                            @endif
+                        </div>
+
+                        {{-- Coolant Temp Delta --}}
+                        <div style="background:var(--h-surface2);border:1px solid var(--h-border);border-radius:10px;padding:0.7rem;">
+                            <div style="font-size:0.68rem;color:var(--h-text3);text-transform:uppercase;font-weight:600;">Coolant Temp</div>
+                            <div class="h-mono" style="font-size:1.1rem;font-weight:800;color:var(--h-text);margin:0.2rem 0;">
+                                {{ $comparison['temperature_c']['current'] ?? '--' }}°C
+                            </div>
+                            @if($comparison['temperature_c']['delta'] !== null)
+                                <span class="h-badge {{ $comparison['temperature_c']['delta'] > 5 ? 'h-badge-amber' : 'h-badge-teal' }}" style="font-size:0.62rem;">
+                                    Δ {{ $comparison['temperature_c']['delta'] > 0 ? '+' : '' }}{{ $comparison['temperature_c']['delta'] }}°C
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Visual Envelope Comparison Bar --}}
+                    <div style="margin-top:1rem;background:var(--h-surface2);border:1px solid var(--h-border);border-radius:10px;padding:0.75rem 0.9rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.7rem;color:var(--h-text3);margin-bottom:0.4rem;">
+                            <span>Baseline Envelope Stability</span>
+                            <span>Target: &lt;1.5g Peak</span>
+                        </div>
+                        <div style="position:relative;height:14px;background:var(--h-surface3, #e2e8f0);border-radius:999px;overflow:hidden;">
+                            <div style="position:absolute;left:0;top:0;bottom:0;width:{{ min(100, ($comparison['peak_g']['baseline'] ?? 1.0) * 20) }}%;background:rgba(2,132,199,0.4);border-right:2px solid #0284c7;" title="Baseline"></div>
+                            <div style="position:absolute;left:0;top:3px;bottom:3px;width:{{ min(100, ($comparison['peak_g']['current'] ?? 1.0) * 20) }}%;background:{{ ($comparison['peak_g']['delta'] ?? 0) > 0.5 ? '#ef4444' : '#16a34a' }};border-radius:999px;" title="Current Session"></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--h-text3);margin-top:0.35rem;">
+                            <span><strong style="color:var(--h-teal);">■</strong> Baseline (#{{ $comparison['baseline_id'] }})</span>
+                            <span><strong style="color:{{ ($comparison['peak_g']['delta'] ?? 0) > 0.5 ? '#ef4444' : '#16a34a' }};">■</strong> Current (#{{ $diagnostic->id }})</span>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+        </div>
+    @endif
+
+    {{-- ═══════════════════════════════════════════════════════════════
          4. DETAILED RECOMMENDATIONS & COPILOT CONSOLE
          ═══════════════════════════════════════════════════════════════ --}}
     @if(!empty($aiRecommendations))
@@ -710,7 +853,7 @@
                     Duration: <strong>{{ floor($diagnostic->audio_duration_sec/60) }}:{{ str_pad($diagnostic->audio_duration_sec%60,2,'0',STR_PAD_LEFT) }}</strong>
                     @if($diagnostic->audio_original_name) · {{ $diagnostic->audio_original_name }} @endif
                 </div>
-                <audio controls style="width:100%;height:38px;border-radius:6px;" src="{{ Storage::disk('public')->url($diagnostic->audio_path) }}"></audio>
+                <audio controls style="width:100%;height:38px;border-radius:6px;" src="{{ route('diagnostics.audio', $diagnostic) }}"></audio>
             @else
                 <p style="font-size:0.78rem;color:#94a3b8;margin:0;">No audio recorded for this session.</p>
             @endif
@@ -733,7 +876,7 @@
                     <span>Peak: <strong style="color:#d97706;">{{ $diagnostic->vibration_peak_g }}g</strong></span>
                     <span>RMS: <strong style="color:#0284c7;">{{ $diagnostic->vibration_rms_g }}g</strong></span>
                 </div>
-                <a href="{{ Storage::disk('public')->url($diagnostic->vibration_path) }}" download class="h-diag-btn-subtle" style="text-decoration:none;font-size:0.75rem;padding:0.4rem 0.75rem;display:inline-flex;align-items:center;gap:0.4rem;">
+                <a href="{{ route('diagnostics.vibration', $diagnostic) }}" download class="h-diag-btn-subtle" style="text-decoration:none;font-size:0.75rem;padding:0.4rem 0.75rem;display:inline-flex;align-items:center;gap:0.4rem;">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Download Vibration CSV
                 </a>
@@ -1631,7 +1774,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!thread) return;
         const d = document.createElement('div');
         d.className = 'ai-bubble-bot';
-        d.innerHTML = msg.replace(/\n/g, '<br>');
+        d.innerHTML = escapeHtml(msg || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
         thread.appendChild(d);
         thread.scrollTop = thread.scrollHeight;
     }

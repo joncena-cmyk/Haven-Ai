@@ -6,6 +6,13 @@
     <meta name="description" content="HAVEN AI — Intelligent Automotive Diagnostics and Real-Time Multi-Sensor Telemetry.">
     <title>HAVEN AI — Intelligent Vehicle Diagnostics</title>
 
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -29,6 +36,204 @@
             --h-muted: #94a3b8;
             --h-mono: 'JetBrains Mono', monospace;
             --h-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        html[data-theme="light"] {
+            --h-bg: #f8fafc;
+            --h-surface: #ffffff;
+            --h-surface-2: #f1f5f9;
+            --h-border: #cbd5e1;
+            --h-border-subtle: rgba(15, 23, 42, 0.08);
+            --h-blue: #0284c7;
+            --h-blue-glow: #0284c7;
+            --h-blue-hover: #0369a1;
+            --h-white: #0f172a;
+            --h-text: #0f172a;
+            --h-muted: #64748b;
+        }
+
+        html[data-theme="light"] header {
+            background: rgba(255, 255, 255, 0.94) !important;
+            border-bottom: 1px solid #cbd5e1 !important;
+        }
+
+        html[data-theme="light"] .haven-nav-link {
+            color: #475569;
+        }
+        html[data-theme="light"] .haven-nav-link:hover {
+            color: #0f172a;
+        }
+
+        html[data-theme="light"] .haven-btn-ghost {
+            color: #0f172a;
+            border-color: #cbd5e1;
+        }
+        html[data-theme="light"] .haven-btn-ghost:hover {
+            background: #f1f5f9;
+            border-color: #0284c7;
+            color: #0284c7;
+        }
+
+        html[data-theme="light"] .haven-btn-solid {
+            background: #0284c7;
+            border-color: #0284c7;
+            color: #ffffff;
+        }
+        html[data-theme="light"] .haven-btn-solid:hover {
+            background: #0369a1;
+            border-color: #0369a1;
+            color: #ffffff;
+        }
+
+        html[data-theme="light"] .haven-card {
+            background: #ffffff;
+            border-color: #cbd5e1;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 6px 16px rgba(15, 23, 42, 0.04);
+        }
+        html[data-theme="light"] .haven-card:hover {
+            background: #f8fafc;
+            border-color: #0284c7;
+        }
+
+        html[data-theme="light"] .haven-tab {
+            color: #64748b;
+        }
+        html[data-theme="light"] .haven-tab:hover {
+            color: #0f172a;
+        }
+        html[data-theme="light"] .haven-tab.active {
+            color: #0284c7;
+            border-bottom-color: #0284c7;
+        }
+
+        html[data-theme="light"] footer {
+            background: #f1f5f9 !important;
+            border-top: 1px solid #cbd5e1 !important;
+        }
+
+        /* ── HERO SECTION: Always isolated dark automotive cockpit in BOTH themes ── */
+        .hero-section {
+            background: #05070a !important;
+            color: #ffffff !important;
+        }
+        .hero-section h1,
+        .hero-section h2,
+        .hero-section h3,
+        .hero-section p,
+        .hero-section span,
+        .hero-section div {
+            color: inherit;
+        }
+        .hero-section .hero-title {
+            color: #ffffff !important;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.85);
+        }
+        .hero-section .hero-sub {
+            color: #cbd5e1 !important;
+            text-shadow: 0 1px 10px rgba(0, 0, 0, 0.8);
+        }
+        .hero-section .hero-accent {
+            color: #38bdf8 !important;
+            text-shadow: 0 0 25px rgba(56, 189, 248, 0.6);
+        }
+        .hero-section .hero-pop-5 {
+            background: rgba(13, 17, 26, 0.94) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6) !important;
+        }
+        .hero-section .hero-pop-5 * {
+            color: inherit;
+        }
+        .hero-section .hero-strip-header {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+        }
+        .hero-section .hero-strip-title {
+            color: #ffffff !important;
+        }
+        .hero-section .hero-strip-label {
+            color: #94a3b8 !important;
+        }
+        .hero-section .hero-strip-val {
+            color: #ffffff !important;
+        }
+        .hero-section .haven-btn-solid {
+            background: #0284c7 !important;
+            border-color: #0284c7 !important;
+            color: #ffffff !important;
+        }
+        .hero-section .haven-btn-solid:hover {
+            background: #0369a1 !important;
+            border-color: #0369a1 !important;
+        }
+        .hero-section .haven-btn-ghost {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-color: rgba(255, 255, 255, 0.35) !important;
+            color: #ffffff !important;
+        }
+        .hero-section .haven-btn-ghost:hover {
+            background: rgba(255, 255, 255, 0.18) !important;
+            border-color: #ffffff !important;
+            color: #ffffff !important;
+        }
+
+        /* Light mode overrides for the live telemetry card */
+        html[data-theme="light"] .hero-section .hero-pop-5 {
+            background: rgba(255, 255, 255, 0.95) !important;
+            border: 1px solid #cbd5e1 !important;
+            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16) !important;
+        }
+        html[data-theme="light"] .hero-section .hero-strip-header {
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+        html[data-theme="light"] .hero-section .hero-strip-title {
+            color: #0f172a !important;
+        }
+        html[data-theme="light"] .hero-section .hero-strip-label {
+            color: #64748b !important;
+        }
+        html[data-theme="light"] .hero-section .hero-strip-val {
+            color: #0f172a !important;
+        }
+        html[data-theme="light"] .hero-section .hero-strip-unit {
+            color: #64748b !important;
+        }
+        html[data-theme="light"] .hero-section .hero-strip-profile {
+            color: #0284c7 !important;
+        }
+
+        /* Light mode section overrides */
+        html[data-theme="light"] #telemetry {
+            background: #f8fafc !important;
+        }
+        html[data-theme="light"] #telemetry .split-grid > div:last-child {
+            background: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+        }
+        html[data-theme="light"] #telemetry .split-grid > div:last-child > div {
+            border-color: #e2e8f0 !important;
+        }
+        html[data-theme="light"] .cta-section {
+            background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important;
+        }
+        html[data-theme="light"] .cta-box {
+            background: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08) !important;
+        }
+        html[data-theme="light"] .cta-box h2 {
+            color: #0f172a !important;
+        }
+        html[data-theme="light"] .cta-box p {
+            color: #475569 !important;
+        }
+        html[data-theme="light"] .standards-card {
+            background: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        }
+        html[data-theme="light"] footer a:hover {
+            color: #0284c7 !important;
         }
 
         *, *::before, *::after {
@@ -310,6 +515,7 @@
             </a>
 
             <nav style="display:none;align-items:center;gap:1.75rem;" class="nav-links">
+                <a href="#how-it-works" class="haven-nav-link">Workflow</a>
                 <a href="#modules" class="haven-nav-link">Modules</a>
                 <a href="#telemetry" class="haven-nav-link">Telemetry</a>
                 <a href="#standards" class="haven-nav-link">Standards</a>
@@ -321,10 +527,17 @@
 
         {{-- Actions --}}
         <div style="display:flex;align-items:center;gap:1rem;">
-            <div style="display:flex;align-items:center;gap:0.45rem;padding:0.35rem 0.75rem;background:var(--h-surface);border:1px solid var(--h-border);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--h-muted);">
-                <span class="live-dot" id="top-dot" style="background:#64748b;box-shadow:none;"></span>
-                <span id="top-status-text" class="h-mono">Checking...</span>
-            </div>
+            @auth
+                <div style="display:flex;align-items:center;gap:0.45rem;padding:0.35rem 0.75rem;background:var(--h-surface);border:1px solid var(--h-border);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--h-muted);">
+                    <span class="live-dot" id="top-dot" style="background:#64748b;box-shadow:none;"></span>
+                    <span id="top-status-text" class="h-mono">Checking...</span>
+                </div>
+            @else
+                <div style="display:flex;align-items:center;gap:0.45rem;padding:0.35rem 0.75rem;background:var(--h-surface);border:1px solid var(--h-border);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--h-muted);" title="Reference engine profile for preview">
+                    <span class="live-dot" style="background:#0284c7;box-shadow:0 0 6px #0284c7;"></span>
+                    <span class="h-mono" style="color:var(--h-blue-glow);">Baseline Demo</span>
+                </div>
+            @endauth
 
             @auth
                 <a href="{{ url('/dashboard') }}" class="haven-btn-solid" style="padding:0.5rem 1.25rem;font-size:0.72rem;">
@@ -332,15 +545,28 @@
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
                 </a>
             @else
-                <a href="{{ route('login') }}" class="haven-btn-ghost" style="padding:0.5rem 1.1rem;font-size:0.72rem;">
+                <button type="button" onclick="openAuthModal(event)" class="haven-btn-ghost" style="padding:0.5rem 1.1rem;font-size:0.72rem;cursor:pointer;">
                     Sign In
-                </a>
+                </button>
                 @if(Route::has('register'))
                     <a href="{{ route('register') }}" class="haven-btn-solid" style="padding:0.5rem 1.25rem;font-size:0.72rem;">
                         <span>Get Started</span>
                     </a>
                 @endif
             @endauth
+
+            {{-- Theme Toggle Button --}}
+            <button onclick="toggleWelcomeTheme()" type="button" aria-label="Toggle theme" title="Switch theme"
+                style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;background:var(--h-surface);border:1px solid var(--h-border);cursor:pointer;color:var(--h-muted);transition:all 0.15s;"
+                onmouseover="this.style.color='var(--h-text)'"
+                onmouseout="this.style.color='var(--h-muted)'">
+                <svg id="welcome-theme-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+                <svg id="welcome-theme-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
         </div>
 
     </div>
@@ -350,7 +576,7 @@
 {{-- ═══════════════════════════════════════════════════════════════
      HERO SECTION
      ═══════════════════════════════════════════════════════════════ --}}
-<section style="position:relative;width:100%;min-height:85vh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:#05070a;">
+<section class="hero-section" style="position:relative;width:100%;min-height:85vh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:#05070a;">
 
     {{-- Dark Automotive Backdrop --}}
     <div style="position:absolute;inset:0;z-index:1;background-image:url('{{ asset('images/hero.jpg') }}');background-size:cover;background-position:center right;filter:brightness(0.75) contrast(1.05);"></div>
@@ -366,12 +592,12 @@
             </span>
         </div>
 
-        <h1 class="hero-pop-2" style="font-size:clamp(2.2rem, 5.2vw, 4.4rem);font-weight:900;line-height:1.05;letter-spacing:-0.03em;margin:0 0 1.25rem;text-transform:uppercase;max-width:920px;">
+        <h1 class="hero-pop-2 hero-title" style="font-size:clamp(2.2rem, 5.2vw, 4.4rem);font-weight:900;line-height:1.05;letter-spacing:-0.03em;margin:0 0 1.25rem;text-transform:uppercase;max-width:920px;">
             Decode the Machine.<br>
-            <span style="color:var(--h-blue-glow);">Master the Drive.</span>
+            <span class="hero-accent">Master the Drive.</span>
         </h1>
 
-        <p class="hero-pop-3" style="font-size:1.05rem;color:var(--h-muted);line-height:1.7;max-width:560px;margin:0 0 2.25rem;">
+        <p class="hero-pop-3 hero-sub" style="font-size:1.05rem;line-height:1.7;max-width:560px;margin:0 0 2.25rem;">
             Autonomous ESP32 multi-sensor edge streaming and machine learning diagnostics for internal combustion engines.
         </p>
 
@@ -393,28 +619,150 @@
         </div>
 
         {{-- Live Telemetry Strip --}}
-        <div class="hero-pop-5" style="background:rgba(13,17,26,0.9);backdrop-filter:blur(12px);border:1px solid var(--h-border);padding:1.25rem 1.75rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1.5rem;align-items:center;">
-            <div>
-                <div style="font-size:0.65rem;color:var(--h-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Coolant Temp</div>
-                <div id="h-temp" class="h-mono" style="font-size:1.35rem;font-weight:700;color:var(--h-white);">--.- °C</div>
+        <div class="hero-pop-5" style="padding:1.25rem 1.75rem;position:relative;">
+            <div class="hero-strip-header" style="display:flex;align-items:center;justify-content:space-between;padding-bottom:0.65rem;margin-bottom:1rem;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span class="live-dot" style="width:6px;height:6px;background:@auth #16a34a @else #38bdf8 @endauth;box-shadow:0 0 8px @auth #16a34a @else #38bdf8 @endauth;"></span>
+                    <span class="hero-strip-title" style="font-weight:700;">
+                        @auth Live Powertrain Telemetry @else Active Baseline Reference @endauth
+                    </span>
+                </div>
+                <div>
+                    @auth
+                        <span class="h-mono" style="color:#4ade80;">Hardware DAQ Link Active</span>
+                    @else
+                        <span class="h-mono hero-accent hero-strip-profile">Sample Profile · 4-Cyl ICE Idle</span>
+                    @endauth
+                </div>
             </div>
-            <div>
-                <div style="font-size:0.65rem;color:var(--h-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Engine Speed</div>
-                <div id="h-rpm" class="h-mono" style="font-size:1.35rem;font-weight:700;color:var(--h-white);">0 <span style="font-size:0.75rem;color:var(--h-muted);">RPM</span></div>
-            </div>
-            <div>
-                <div style="font-size:0.65rem;color:var(--h-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Vibration Peak</div>
-                <div id="h-vib" class="h-mono" style="font-size:1.35rem;font-weight:700;color:var(--h-white);">--.- <span style="font-size:0.75rem;color:var(--h-muted);">m/s²</span></div>
-            </div>
-            <div>
-                <div style="font-size:0.65rem;color:var(--h-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Bus Voltage</div>
-                <div id="h-volt" class="h-mono" style="font-size:1.35rem;font-weight:700;color:var(--h-white);">--.- <span style="font-size:0.75rem;color:var(--h-muted);">V</span></div>
-            </div>
-            <div>
-                <div style="font-size:0.65rem;color:var(--h-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Acoustic Level</div>
-                <div id="h-audio" class="h-mono" style="font-size:1.35rem;font-weight:700;color:var(--h-white);">-- <span style="font-size:0.75rem;color:var(--h-muted);">RMS</span></div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1.5rem;align-items:center;">
+                <div>
+                    <div class="hero-strip-label" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Coolant Temp</div>
+                    <div id="h-temp" class="h-mono hero-strip-val" style="font-size:1.35rem;font-weight:700;">@auth --.- °C @else 88.5 °C @endauth</div>
+                </div>
+                <div>
+                    <div class="hero-strip-label" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Engine Speed</div>
+                    <div id="h-rpm" class="h-mono hero-strip-val" style="font-size:1.35rem;font-weight:700;">@auth 0 <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">RPM</span> @else 780 <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">RPM</span> @endauth</div>
+                </div>
+                <div>
+                    <div class="hero-strip-label" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Vibration Peak</div>
+                    <div id="h-vib" class="h-mono hero-strip-val" style="font-size:1.35rem;font-weight:700;">@auth --.- <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">m/s²</span> @else 1.14 <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">m/s²</span> @endauth</div>
+                </div>
+                <div>
+                    <div class="hero-strip-label" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Bus Voltage</div>
+                    <div id="h-volt" class="h-mono hero-strip-val" style="font-size:1.35rem;font-weight:700;">@auth --.- <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">V</span> @else 14.18 <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">V</span> @endauth</div>
+                </div>
+                <div>
+                    <div class="hero-strip-label" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Acoustic Level</div>
+                    <div id="h-audio" class="h-mono hero-strip-val" style="font-size:1.35rem;font-weight:700;">@auth -- <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">RMS</span> @else 425 <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">RMS</span> @endauth</div>
+                </div>
             </div>
         </div>
+
+    </div>
+</section>
+
+
+{{-- ═══════════════════════════════════════════════════════════════
+     HOW IT WORKS (3-STEP DIAGNOSTIC WORKFLOW)
+     ═══════════════════════════════════════════════════════════════ --}}
+<section id="how-it-works" style="max-width:1380px;margin:0 auto;padding:5.5rem 2rem 3rem;">
+
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:1.5rem;margin-bottom:3rem;border-bottom:1px solid var(--h-border);padding-bottom:1.5rem;">
+        <div>
+            <div class="haven-pill">Diagnostic Workflow</div>
+            <h2 style="font-size:clamp(1.6rem, 3vw, 2.4rem);font-weight:800;letter-spacing:-0.02em;margin:0;text-transform:uppercase;">
+                How HAVEN AI Works
+            </h2>
+        </div>
+        <p style="font-size:0.9rem;color:var(--h-muted);max-width:480px;margin:0;line-height:1.6;">
+            From raw engine acoustics and vibration telemetry to actionable mechanical intelligence in three orchestrated steps.
+        </p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:2rem;">
+
+        {{-- Step 1 --}}
+        <div class="haven-card scroll-pop" style="position:relative;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+                <span class="h-mono" style="font-size:2rem;font-weight:900;color:var(--h-blue-glow);line-height:1;">01</span>
+                <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:0.25rem 0.6rem;background:rgba(2,132,199,0.12);color:var(--h-blue-glow);border:1px solid rgba(2,132,199,0.3);">Data Acquisition</span>
+            </div>
+            <div>
+                <h3 style="font-size:1.2rem;font-weight:700;text-transform:uppercase;margin:0 0 0.75rem;color:var(--h-white);">
+                    Capture &amp; Connect
+                </h3>
+                <p style="font-size:0.88rem;color:var(--h-muted);line-height:1.65;margin:0 0 1.5rem;">
+                    Record 10 seconds of idle or revving engine sound directly with your smartphone microphone, or stream real-time 5-sensor telemetry from our ESP32 IoT node (vibration, coolant temp, Hall RPM, and battery voltage).
+                </p>
+            </div>
+            <div style="border-top:1px solid var(--h-border);padding-top:1rem;display:flex;flex-direction:column;gap:0.4rem;font-size:0.75rem;color:var(--h-muted);">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="color:#16a34a;">✓</span>
+                    <span>No specialized tools required for audio capture</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="color:#16a34a;">✓</span>
+                    <span>Direct Wi-Fi telemetry with ISO/SAE 21434 device authentication</span>
+                </div>
+            </div>
+        </div>
+
+        {{-- Step 2 --}}
+        <div class="haven-card scroll-pop" style="position:relative;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+                <span class="h-mono" style="font-size:2rem;font-weight:900;color:var(--h-blue-glow);line-height:1;">02</span>
+                <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:0.25rem 0.6rem;background:rgba(2,132,199,0.12);color:var(--h-blue-glow);border:1px solid rgba(2,132,199,0.3);">Signal Processing</span>
+            </div>
+            <div>
+                <h3 style="font-size:1.2rem;font-weight:700;text-transform:uppercase;margin:0 0 0.75rem;color:var(--h-white);">
+                    Dual-Tier ML Extraction
+                </h3>
+                <p style="font-size:0.88rem;color:var(--h-muted);line-height:1.65;margin:0 0 1.5rem;">
+                    Our machine learning pipeline decomposes acoustic waves via Fast Fourier Transform (FFT) into 13 MFCC coefficients and spectral centroids, while accelerometer telemetry isolates Peak G and Crest Factor impulsiveness spikes.
+                </p>
+            </div>
+            <div style="border-top:1px solid var(--h-border);padding-top:1rem;display:flex;flex-direction:column;gap:0.4rem;font-size:0.75rem;color:var(--h-muted);">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="color:#16a34a;">✓</span>
+                    <span>13-band Mel-Frequency Cepstral Coefficients (MFCC)</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="color:#16a34a;">✓</span>
+                    <span>Crest Factor impulsiveness separates knock spikes from steady hum</span>
+                </div>
+            </div>
+        </div>
+
+        {{-- Step 3 --}}
+        <div class="haven-card scroll-pop" style="position:relative;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+                <span class="h-mono" style="font-size:2rem;font-weight:900;color:var(--h-blue-glow);line-height:1;">03</span>
+                <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:0.25rem 0.6rem;background:rgba(2,132,199,0.12);color:var(--h-blue-glow);border:1px solid rgba(2,132,199,0.3);">Intelligence</span>
+            </div>
+            <div>
+                <h3 style="font-size:1.2rem;font-weight:700;text-transform:uppercase;margin:0 0 0.75rem;color:var(--h-white);">
+                    Verdict &amp; Action Plan
+                </h3>
+                <p style="font-size:0.88rem;color:var(--h-muted);line-height:1.65;margin:0 0 1.5rem;">
+                    Receive an immediate condition classification (Normal Baseline, Valve Clearance Lash, Cylinder Misfire, or Loose Mount) with confidence score, SAE J1979 DTC cross-references, driveability risk status, and actionable repair steps.
+                </p>
+            </div>
+            <div style="border-top:1px solid var(--h-border);padding-top:1rem;display:flex;flex-direction:column;gap:0.4rem;font-size:0.75rem;color:var(--h-muted);">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="color:#16a34a;">✓</span>
+                    <span>Driveability &amp; urgency guidance to protect catalytic converter</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="color:#16a34a;">✓</span>
+                    <span>Exportable diagnostic report for workshop visits</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</section>
 
     </div>
 </section>
@@ -583,12 +931,12 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.5rem;">
                 <div style="background:var(--h-surface);border:1px solid var(--h-border);padding:1.25rem;text-align:center;">
                     <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--h-muted);margin-bottom:0.35rem;">RPM</div>
-                    <div id="c-rpm" class="h-mono" style="font-size:2rem;font-weight:800;color:var(--h-white);line-height:1;">0</div>
+                    <div id="c-rpm" class="h-mono" style="font-size:2rem;font-weight:800;color:var(--h-white);line-height:1;">@auth 0 @else 780 @endauth</div>
                     <div style="font-size:0.68rem;color:var(--h-blue-glow);font-weight:700;letter-spacing:0.08em;margin-top:0.35rem;">HALL SENSOR</div>
                 </div>
                 <div style="background:var(--h-surface);border:1px solid var(--h-border);padding:1.25rem;text-align:center;">
                     <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--h-muted);margin-bottom:0.35rem;">BLOCK TEMP</div>
-                    <div id="c-temp" class="h-mono" style="font-size:2rem;font-weight:800;color:var(--h-white);line-height:1;">--.-°</div>
+                    <div id="c-temp" class="h-mono" style="font-size:2rem;font-weight:800;color:var(--h-white);line-height:1;">@auth --.-° @else 88.5° @endauth</div>
                     <div style="font-size:0.68rem;color:#16a34a;font-weight:700;letter-spacing:0.08em;margin-top:0.35rem;">DS18B20</div>
                 </div>
             </div>
@@ -628,7 +976,7 @@
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem;">
 
-        <div class="scroll-pop" style="background:var(--h-surface);border:1px solid var(--h-border);padding:1.75rem;">
+        <div class="scroll-pop standards-card" style="background:var(--h-surface);border:1px solid var(--h-border);padding:1.75rem;">
             <div style="font-size:0.7rem;font-weight:700;color:var(--h-blue-glow);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.5rem;">
                 ISO/SAE 21434
             </div>
@@ -638,7 +986,7 @@
             </p>
         </div>
 
-        <div class="scroll-pop" style="background:var(--h-surface);border:1px solid var(--h-border);padding:1.75rem;">
+        <div class="scroll-pop standards-card" style="background:var(--h-surface);border:1px solid var(--h-border);padding:1.75rem;">
             <div style="font-size:0.7rem;font-weight:700;color:var(--h-blue-glow);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.5rem;">
                 SAE J1979 / OBD-II
             </div>
@@ -648,7 +996,7 @@
             </p>
         </div>
 
-        <div class="scroll-pop" style="background:var(--h-surface);border:1px solid var(--h-border);padding:1.75rem;">
+        <div class="scroll-pop standards-card" style="background:var(--h-surface);border:1px solid var(--h-border);padding:1.75rem;">
             <div style="font-size:0.7rem;font-weight:700;color:var(--h-blue-glow);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.5rem;">
                 ISO/IEC 27001
             </div>
@@ -656,6 +1004,66 @@
             <p style="font-size:0.85rem;color:var(--h-muted);line-height:1.6;margin:0;">
                 Immutable logging of all logins, telemetry transmissions, and diagnostics.
             </p>
+        </div>
+
+    </div>
+</section>
+
+
+{{-- ═══════════════════════════════════════════════════════════════
+     CLOSING CALL TO ACTION
+     ═══════════════════════════════════════════════════════════════ --}}
+<section class="cta-section" style="background:linear-gradient(180deg, var(--h-bg) 0%, #05070a 100%);border-top:1px solid var(--h-border);padding:6rem 2rem;">
+    <div class="scroll-pop cta-box" style="max-width:1180px;margin:0 auto;text-align:center;background:radial-gradient(ellipse at 50% 0%, rgba(2,132,199,0.18) 0%, transparent 70%), var(--h-surface);border:1px solid var(--h-border);padding:4.5rem 2.5rem;position:relative;overflow:hidden;">
+
+        <div class="haven-pill" style="margin-bottom:1rem;">Precision Automotive Intelligence</div>
+
+        <h2 style="font-size:clamp(1.9rem, 3.8vw, 3rem);font-weight:900;letter-spacing:-0.03em;text-transform:uppercase;margin:0 0 1.25rem;color:var(--h-text);">
+            Ready to Decode Your Powertrain?
+        </h2>
+
+        <p style="font-size:1.05rem;color:var(--h-muted);max-width:640px;margin:0 auto 2.5rem;line-height:1.7;">
+            Capture 10 seconds of engine sound with your mobile device or connect an ESP32 accelerometer node to detect valvetrain wear, cylinder misfires, and structural vibration anomalies.
+        </p>
+
+        <div style="display:flex;align-items:center;justify-content:center;gap:1.25rem;flex-wrap:wrap;margin-bottom:3rem;">
+            @auth
+                <a href="{{ url('/diagnostics/create') }}" class="haven-btn-solid" style="padding:1rem 2.25rem;font-size:0.82rem;">
+                    <span>Launch Diagnostic Studio</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                </a>
+                <a href="{{ url('/dashboard') }}" class="haven-btn-ghost" style="padding:1rem 2rem;font-size:0.82rem;">
+                    <span>Open Dashboard</span>
+                </a>
+            @else
+                <a href="{{ route('register') }}" class="haven-btn-solid" style="padding:1rem 2.25rem;font-size:0.82rem;">
+                    <span>Get Started Free</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                </a>
+                <a href="{{ url('/learning') }}" class="haven-btn-ghost" style="padding:1rem 2rem;font-size:0.82rem;">
+                    <span>Explore Learning Hub</span>
+                </a>
+            @endauth
+        </div>
+
+        {{-- Trust & Architecture Badges --}}
+        <div style="display:flex;align-items:center;justify-content:center;gap:2rem;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.08);padding-top:2rem;font-size:0.75rem;color:var(--h-muted);text-transform:uppercase;letter-spacing:0.08em;">
+            <div style="display:flex;align-items:center;gap:0.45rem;">
+                <span style="color:#16a34a;font-weight:700;">✓</span>
+                <span>Private Disk Isolation</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.45rem;">
+                <span style="color:#16a34a;font-weight:700;">✓</span>
+                <span>ISO/SAE 21434 Hardware Keys</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.45rem;">
+                <span style="color:#16a34a;font-weight:700;">✓</span>
+                <span>Zero-PII AI Redaction</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.45rem;">
+                <span style="color:#16a34a;font-weight:700;">✓</span>
+                <span>SAE J1979 DTC Mapping</span>
+            </div>
         </div>
 
     </div>
@@ -685,6 +1093,8 @@
                 <a href="{{ url('/diagnostics') }}" style="color:var(--h-muted);text-decoration:none;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='var(--h-muted)'">Diagnostics</a>
                 <a href="{{ url('/vehicles') }}" style="color:var(--h-muted);text-decoration:none;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='var(--h-muted)'">Vehicles</a>
                 <a href="{{ url('/learning') }}" style="color:var(--h-muted);text-decoration:none;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='var(--h-muted)'">Learning Hub</a>
+                <a href="{{ route('terms') }}" style="color:var(--h-muted);text-decoration:none;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='var(--h-muted)'">Terms</a>
+                <a href="{{ route('privacy') }}" style="color:var(--h-muted);text-decoration:none;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='var(--h-muted)'">Privacy</a>
             </div>
         </div>
 
@@ -757,8 +1167,10 @@ function pollTelemetry() {
         .catch(() => {});
 }
 
+@auth
 pollTelemetry();
 setInterval(pollTelemetry, 3000);
+@endauth
 
 // Intersection Observer for scroll-triggered pop-up animation
 const popObserver = new IntersectionObserver((entries) => {
@@ -774,7 +1186,31 @@ document.querySelectorAll('.scroll-pop').forEach((el, index) => {
     el.style.transitionDelay = (index % 3 * 0.18) + 's';
     popObserver.observe(el);
 });
+
+// ── Theme Switcher ──────────────────────────────────────────────────────────
+function updateWelcomeThemeIcons(theme) {
+    const sun = document.getElementById('welcome-theme-sun');
+    const moon = document.getElementById('welcome-theme-moon');
+    if (sun && moon) {
+        sun.style.display = theme === 'light' ? 'none' : 'block';
+        moon.style.display = theme === 'light' ? 'block' : 'none';
+    }
+}
+function toggleWelcomeTheme() {
+    const html = document.documentElement;
+    const currentTheme = html.getAttribute('data-theme') || 'dark';
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    html.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateWelcomeThemeIcons(newTheme);
+}
+(function initWelcomeTheme() {
+    const t = localStorage.getItem('theme') || 'dark';
+    updateWelcomeThemeIcons(t);
+})();
 </script>
+
+<x-auth-modal />
 
 </body>
 </html>

@@ -24,6 +24,8 @@ class PasswordController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
+        \App\Services\AuditLogger::log('auth.password_updated', []);
+
         return back()->with('status', 'password-updated');
     }
 }
