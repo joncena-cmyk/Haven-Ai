@@ -69,17 +69,7 @@
                 @endif
             </p>
         </div>
-        @if($vehicleCount > 0)
-            <a href="{{ route('diagnostics.create') }}" style="text-decoration:none;flex-shrink:0;">
-                <button class="haven-btn-primary" style="width:auto;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                    </svg>
-                    New Diagnostic
-                </button>
-            </a>
-        @else
+        @if($vehicleCount === 0)
             <a href="{{ route('vehicles.create') }}" style="text-decoration:none;flex-shrink:0;">
                 <button class="haven-btn-primary" style="width:auto;">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
