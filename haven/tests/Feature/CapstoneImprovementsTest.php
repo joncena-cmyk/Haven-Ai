@@ -261,4 +261,48 @@ class CapstoneImprovementsTest extends TestCase
             'email' => 'second.admin@haven.ai',
         ]);
     }
+
+    /**
+     * Verify integrated fix/diagnostics-flow UI & local auth modal coexist cleanly.
+     */
+    public function test_diagnostics_flow_and_ui_improvements(): void
+    {
+        $user = User::factory()->create();
+        $vehicle = Vehicle::create([
+            'user_id'      => $user->id,
+            'make'         => 'Toyota',
+            'model'        => 'Corolla',
+            'year'         => 2022,
+            'body_type'    => 'sedan',
+            'engine_type'  => '1.8L 4-Cylinder Gasoline',
+            'transmission' => 'CVT',
+            'plate_number' => 'ABC-1234',
+        ]);
+
+        // 1. Diagnostics Create page (Groupmate's Diagnose UI + 3D/2D + 4-step flow)
+        $createResponse = $this->actingAs($user)->get(route('diagnostics.create', ['vehicle_id' => $vehicle->id]));
+        $createResponse->assertOk();
+        $createResponse->assertSee('id="vehicle-pill"', false);
+        $createResponse->assertSee('id="vehicle-menu"', false);
+        $createResponse->assertSee('class="h-diagnosis-flow"', false);
+        $createResponse->assertSee('data-flow-step="capture"', false);
+        $createResponse->assertSee('id="view-mode-3d"', false);
+        $createResponse->assertSee('id="view-mode-2d"', false);
+        $createResponse->assertSee('id="diagnostic-sketchfab-stage"', false);
+        $createResponse->assertSee('<span>Diagnose</span>', false);
+        $createResponse->assertSee('<span>Diagnostic History</span>', false);
+
+        // 2. Diagnostics Index page (Groupmate's History search & dropdown)
+        $indexResponse = $this->actingAs($user)->get(route('diagnostics.index'));
+        $indexResponse->assertOk();
+        $indexResponse->assertSee('id="vehicle-pill"', false);
+        $indexResponse->assertSee('focusHistorySearch()', false);
+
+        // 3. Guest Homepage (Local auth modal popup + Google button)
+        $homeResponse = $this->post('/logout');
+        $guestHome = $this->get('/');
+        $guestHome->assertOk();
+        $guestHome->assertSee('id="haven-auth-modal"', false);
+        $guestHome->assertSee('Continue with Google', false);
+    }
 }
