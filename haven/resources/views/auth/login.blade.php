@@ -156,14 +156,38 @@ if (pwField && capsWarning) {
     });
 }
 
-// Form Submit Loading Feedback
+// Form Submit Loading Feedback & Device Persistence
 const loginForm = document.getElementById('login-form');
 const loginBtn = document.getElementById('login-submit');
 const loginIcon = document.getElementById('login-submit-icon');
 const loginText = document.getElementById('login-submit-text');
+const emailField = document.getElementById('email');
+const rememberBox = document.getElementById('remember_me');
+
+// Pre-fill remembered email
+try {
+    const savedEmail = localStorage.getItem('haven_remember_email');
+    const shouldRemember = localStorage.getItem('haven_remember_device') === '1';
+    if (savedEmail && emailField && !emailField.value) {
+        emailField.value = savedEmail;
+    }
+    if (rememberBox && shouldRemember) {
+        rememberBox.checked = true;
+    }
+} catch (e) {}
 
 if (loginForm && loginBtn) {
     loginForm.addEventListener('submit', function() {
+        try {
+            if (rememberBox && rememberBox.checked && emailField && emailField.value.trim()) {
+                localStorage.setItem('haven_remember_device', '1');
+                localStorage.setItem('haven_remember_email', emailField.value.trim());
+            } else {
+                localStorage.removeItem('haven_remember_device');
+                localStorage.removeItem('haven_remember_email');
+            }
+        } catch (e) {}
+
         loginBtn.disabled = true;
         loginBtn.style.opacity = '0.8';
         loginBtn.style.cursor = 'wait';

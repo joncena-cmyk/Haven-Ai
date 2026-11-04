@@ -26,9 +26,9 @@
         position: relative;
         width: 100%;
         max-width: 440px;
-        background: var(--h-surface);
-        border: 1px solid var(--h-border);
-        border-radius: 16px !important;
+        background: var(--h-surface, #0f172a);
+        border: 1px solid var(--h-border, rgba(255, 255, 255, 0.12));
+        border-radius: 24px !important;
         box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
         padding: 2.25rem;
         box-sizing: border-box;
@@ -39,19 +39,106 @@
         overflow: hidden;
     }
 
-    .haven-modal-card * {
-        border-radius: inherit;
-    }
-
-    .haven-modal-card input,
+    .haven-modal-card input[type="text"],
+    .haven-modal-card input[type="email"],
+    .haven-modal-card input[type="password"],
     .haven-modal-card button,
     .haven-modal-card .haven-btn-google,
     .haven-modal-card .haven-btn-solid {
-        border-radius: 10px !important;
+        border-radius: 12px !important;
     }
 
     .haven-modal-card .haven-modal-badge-icon {
         border-radius: 8px !important;
+    }
+
+    /* Custom Accessible "Remember me on this device" Checkbox */
+    .haven-remember-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.65rem;
+        margin-bottom: 1.25rem;
+        cursor: pointer;
+        user-select: none;
+        -webkit-user-select: none;
+        position: relative;
+    }
+
+    .haven-remember-input {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+        margin: 0;
+        pointer-events: none;
+    }
+
+    .haven-remember-box {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        background: var(--h-surface-2, rgba(255, 255, 255, 0.06));
+        border: 1.5px solid var(--h-border, rgba(255, 255, 255, 0.22));
+        border-radius: 5px !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        box-sizing: border-box;
+    }
+
+    [data-theme="light"] .haven-remember-box {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+    }
+
+    .haven-remember-check {
+        opacity: 0;
+        transform: scale(0.6);
+        transition: opacity 0.16s ease, transform 0.16s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        color: #ffffff;
+    }
+
+    /* Checked state */
+    .haven-remember-input:checked + .haven-remember-box {
+        background: #0284c7 !important;
+        border-color: #0284c7 !important;
+        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4), 0 2px 8px rgba(2, 132, 199, 0.35);
+    }
+
+    .haven-remember-input:checked + .haven-remember-box .haven-remember-check {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    /* Focus & Hover states */
+    .haven-remember-wrap:hover .haven-remember-box {
+        border-color: #0284c7;
+    }
+
+    .haven-remember-input:focus-visible + .haven-remember-box {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.35);
+        border-color: #38bdf8;
+    }
+
+    .haven-remember-text {
+        font-size: 0.82rem;
+        color: var(--h-muted, #94a3b8);
+        transition: color 0.15s ease;
+        line-height: 1.2;
+    }
+
+    [data-theme="light"] .haven-remember-text {
+        color: #64748b;
+    }
+
+    .haven-remember-wrap:hover .haven-remember-text {
+        color: var(--h-text, #ffffff);
+    }
+
+    [data-theme="light"] .haven-remember-wrap:hover .haven-remember-text {
+        color: #0f172a;
     }
 
     .haven-modal-backdrop.is-open .haven-modal-card {
@@ -132,10 +219,16 @@
                 <input id="modal_password" type="password" name="password" required autocomplete="current-password" placeholder="••••••••" class="haven-input" style="width:100%;padding:0.65rem 0.85rem;background:var(--h-surface-2);border:1px solid var(--h-border);color:var(--h-text);font-size:0.875rem;box-sizing:border-box;">
             </div>
 
-            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1.25rem;">
-                <input id="modal_remember" type="checkbox" name="remember" style="accent-color:var(--h-blue);cursor:pointer;">
-                <label for="modal_remember" style="font-size:0.8rem;color:var(--h-muted);cursor:pointer;">Remember me on this device</label>
-            </div>
+            {{-- Remember me on this device --}}
+            <label class="haven-remember-wrap" for="modal_remember">
+                <input id="modal_remember" type="checkbox" name="remember" class="haven-remember-input" value="1">
+                <span class="haven-remember-box" aria-hidden="true">
+                    <svg class="haven-remember-check" width="11" height="9" viewBox="0 0 11 9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="1.5 4.5 4 7 9.5 1.5"/>
+                    </svg>
+                </span>
+                <span class="haven-remember-text">Remember me on this device</span>
+            </label>
 
             <button type="submit" id="modal-login-btn" class="haven-btn-solid" style="width:100%;padding:0.75rem 1rem;font-size:0.8rem;font-weight:700;letter-spacing:0.08em;background:var(--h-blue);color:#ffffff;border:1px solid var(--h-blue);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.5rem;">
                 <span>Sign In to HAVEN</span>
@@ -153,10 +246,30 @@
 <script>
     let isModalAnimating = false;
 
+    function restoreRememberedDevice() {
+        try {
+            const savedEmail = localStorage.getItem('haven_remember_email');
+            const shouldRemember = localStorage.getItem('haven_remember_device') === '1';
+            const emailInput = document.getElementById('modal_email');
+            const rememberCheckbox = document.getElementById('modal_remember');
+
+            if (savedEmail && emailInput && !emailInput.value) {
+                emailInput.value = savedEmail;
+            }
+            if (rememberCheckbox) {
+                rememberCheckbox.checked = shouldRemember;
+            }
+        } catch (e) {
+            // localStorage might be unavailable in restricted environments
+        }
+    }
+
     function openAuthModal(e) {
         if (e) e.preventDefault();
         const modal = document.getElementById('haven-auth-modal');
         if (!modal || isModalAnimating) return;
+
+        restoreRememberedDevice();
 
         isModalAnimating = true;
         modal.classList.remove('is-closing');
@@ -172,7 +285,12 @@
         setTimeout(() => {
             isModalAnimating = false;
             const emailInput = document.getElementById('modal_email');
-            if (emailInput) emailInput.focus();
+            const passwordInput = document.getElementById('modal_password');
+            if (emailInput && emailInput.value) {
+                if (passwordInput) passwordInput.focus();
+            } else if (emailInput) {
+                emailInput.focus();
+            }
         }, 320);
     }
 
@@ -195,11 +313,32 @@
 
     // Close on backdrop click (outside card)
     document.addEventListener('DOMContentLoaded', function() {
+        restoreRememberedDevice();
+
         const modal = document.getElementById('haven-auth-modal');
         if (modal) {
             modal.addEventListener('click', function(e) {
                 if (e.target === modal) {
                     closeAuthModal();
+                }
+            });
+        }
+
+        const modalForm = document.getElementById('modal-login-form');
+        if (modalForm) {
+            modalForm.addEventListener('submit', function() {
+                try {
+                    const rememberCheckbox = document.getElementById('modal_remember');
+                    const emailInput = document.getElementById('modal_email');
+                    if (rememberCheckbox && rememberCheckbox.checked && emailInput && emailInput.value.trim()) {
+                        localStorage.setItem('haven_remember_device', '1');
+                        localStorage.setItem('haven_remember_email', emailInput.value.trim());
+                    } else {
+                        localStorage.removeItem('haven_remember_device');
+                        localStorage.removeItem('haven_remember_email');
+                    }
+                } catch (e) {
+                    // Ignore storage access errors
                 }
             });
         }

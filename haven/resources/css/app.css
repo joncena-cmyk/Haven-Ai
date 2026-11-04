@@ -503,9 +503,11 @@ body {
 
 /* ── Checkbox ── */
 .haven-checkbox {
-    width: 15px; height: 15px;
-    accent-color: var(--h-teal);
+    width: 16px; height: 16px;
+    accent-color: #0284c7;
     cursor: pointer;
+    border-radius: 4px;
+    vertical-align: middle;
 }
 
 /* ── Alert ── */
