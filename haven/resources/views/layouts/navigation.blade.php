@@ -44,13 +44,13 @@
                     </a>
 
                     <a href="{{ route('diagnostics.index') }}"
-                       class="haven-nav-link {{ request()->routeIs('diagnostics.*') ? 'active' : '' }}">
+                       class="haven-nav-link {{ request()->routeIs('diagnostics.index') || request()->routeIs('diagnostics.show') ? 'active' : '' }}">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                             <polyline points="14 2 14 8 20 8"/>
                             <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
                         </svg>
-                        <span>Diagnostics</span>
+                        <span>Diagnostic History</span>
                     </a>
                 @else
                     <a href="{{ url('/') }}"
@@ -95,11 +95,11 @@
         <div class="haven-nav-actions">
             @auth
                 {{-- Quick New Session CTA --}}
-                <a href="{{ route('diagnostics.create') }}" class="haven-nav-cta" title="Start New Diagnostic Session">
+                <a href="{{ route('diagnostics.create') }}" class="haven-nav-cta {{ request()->routeIs('diagnostics.create') ? 'active' : '' }}" title="Start New Diagnostic Session">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
-                    <span>New Session</span>
+                    <span>Diagnose</span>
                 </a>
 
                 {{-- Stat Pill Context --}}
@@ -206,7 +206,7 @@
                 <span>Dashboard</span>
             </a>
             <a href="{{ route('vehicles.index') }}" class="haven-nav-link {{ request()->routeIs('vehicles.*') ? 'active' : '' }}" onclick="toggleMobileDrawer()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
                 <span>My Vehicles</span>
             </a>
             <a href="{{ route('diagnostics.index') }}" class="haven-nav-link {{ request()->routeIs('diagnostics.index') ? 'active' : '' }}" onclick="toggleMobileDrawer()">
@@ -215,7 +215,7 @@
             </a>
             <a href="{{ route('diagnostics.create') }}" class="haven-nav-link {{ request()->routeIs('diagnostics.create') ? 'active' : '' }}" onclick="toggleMobileDrawer()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
-                <span>New Diagnostic Session</span>
+                <span>Diagnose</span>
             </a>
         @else
             <a href="{{ url('/') }}" class="haven-nav-link" onclick="toggleMobileDrawer()">
@@ -223,7 +223,6 @@
                 <span>Home</span>
             </a>
         @endauth
-
         <a href="{{ route('learning.index') }}" class="haven-nav-link {{ request()->routeIs('learning.*') ? 'active' : '' }}" onclick="toggleMobileDrawer()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
             <span>Learning Modules</span>

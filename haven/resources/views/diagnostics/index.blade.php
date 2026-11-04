@@ -25,7 +25,6 @@
          ═══════════════════════════════════════════════════════════════ --}}
     <header class="h-diag-topbar">
         <div class="h-diag-topbar-left">
-
             {{-- Vehicle Dropdown Selector (Pill) --}}
             <div class="h-diag-vehicle-dropdown-wrap">
                 <button type="button" class="h-diag-vehicle-pill" id="vehicle-pill" onclick="toggleVehicleMenu()" aria-expanded="false" title="Switch Active Vehicle">
@@ -80,19 +79,6 @@
                 </div>
             </div>
 
-            <div class="h-diag-topbar-left-subrow">
-                {{-- 360° View Mode Toggle --}}
-                <button type="button" class="h-diag-mode-pill" onclick="toggleVehiclePerspective()" title="Toggle View Mode">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg>
-                    <span id="view-mode-label" class="h-diag-mode-text">360° view</span>
-                </button>
-
-                {{-- IoT Hub Button --}}
-                <button type="button" class="h-diag-mode-pill" onclick="document.getElementById('iot-modal').style.display='flex'" title="ESP32 IoT Hub">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                    <span>IoT Hub</span>
-                </button>
-            </div>
         </div>
 
         <div class="h-diag-topbar-right">
@@ -100,6 +86,9 @@
             <div class="h-diag-search-wrap">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input type="text" placeholder="Search sessions..." oninput="filterHistory(this.value)" id="hist-search" aria-label="Search diagnostic history">
+                <button type="button" onclick="focusHistorySearch()" aria-label="Search diagnostic history" title="Search sessions">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </button>
             </div>
 
             {{-- Notifications / History Count --}}
@@ -132,6 +121,7 @@
         </div>
     @else
 
+    @if(false)
     {{-- ═══════════════════════════════════════════════════════════════
          2. MAIN DIAGNOSTIC HERO (3D Vehicle Stage + HUD)
          ═══════════════════════════════════════════════════════════════ --}}
@@ -213,7 +203,7 @@
                     <span class="h-diag-cta-icon">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
                     </span>
-                    <span>AI Analyzes</span>
+                    <span>Diagnose</span>
                     <svg class="h-diag-cta-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.22-8.56"/></svg>
                 </a>
             </div>
@@ -317,34 +307,6 @@
                         <button type="button" class="h-diag-model-option is-active" id="mopt-active-car" onclick="restoreActiveVehicleModel()">
                             <span class="h-diag-model-opt-name">Active: {{ $selectedVehicle?->make }} {{ $selectedVehicle?->model }}</span>
                             <span class="h-diag-model-opt-sub">Correlated 3D Model</span>
-                        </button>
-
-                        <div class="h-diag-model-menu-divider"></div>
-                        <div class="h-diag-model-menu-title">Preview Alternate Body</div>
-
-                        <button type="button" class="h-diag-model-option" id="mopt-corolla" onclick="switch3DModel('corolla', '36f95efb0585464cae43a25a3b3392e8', 'Toyota Corolla')">
-                            <span class="h-diag-model-opt-name">Toyota Corolla</span>
-                            <span class="h-diag-model-opt-sub">Compact Sedan</span>
-                        </button>
-                        <button type="button" class="h-diag-model-option" id="mopt-camry" onclick="switch3DModel('camry', '53f8cbf2483940fba956f4e740a3a4ae', 'Toyota Camry')">
-                            <span class="h-diag-model-opt-name">Toyota Camry</span>
-                            <span class="h-diag-model-opt-sub">Midsize Sedan</span>
-                        </button>
-                        <button type="button" class="h-diag-model-option" id="mopt-honda" onclick="switch3DModel('honda', 'd5ca29a5d2f341b691118ffb5560b19b', 'Honda Civic')">
-                            <span class="h-diag-model-opt-name">Honda Civic</span>
-                            <span class="h-diag-model-opt-sub">Japanese Sedan</span>
-                        </button>
-                        <button type="button" class="h-diag-model-option" id="mopt-supra" onclick="switch3DModel('supra', 'b7616ec43ecf4ffd8ed810d94f15eea6', 'Toyota Supra')">
-                            <span class="h-diag-model-opt-name">Toyota Supra</span>
-                            <span class="h-diag-model-opt-sub">Sports Coupe</span>
-                        </button>
-                        <button type="button" class="h-diag-model-option" id="mopt-bmw" onclick="switch3DModel('bmw', 'ac3c7013434e403e8faff87948caf422', 'BMW M3')">
-                            <span class="h-diag-model-opt-name">BMW M3</span>
-                            <span class="h-diag-model-opt-sub">Performance Sedan</span>
-                        </button>
-                        <button type="button" class="h-diag-model-option" id="mopt-tesla3" onclick="switch3DModel('tesla3', '5ef9b845aaf44203b6d04e2c677e444f', 'Tesla Model 3')">
-                            <span class="h-diag-model-opt-name">Tesla Model 3</span>
-                            <span class="h-diag-model-opt-sub">Executive Sedan</span>
                         </button>
 
                         <div class="h-diag-model-menu-divider"></div>
@@ -750,6 +712,16 @@
 
     </div>
 
+    @endif
+
+    <div class="h-diag-history-page-heading">
+        <div>
+            <span class="h-diag-history-page-eyebrow">DIAGNOSTIC HISTORY</span>
+            <h1>Vehicle Diagnostic Sessions</h1>
+            <p>Review completed tests, reports, and previous vehicle conditions.</p>
+        </div>
+    </div>
+
     {{-- ═══════════════════════════════════════════════════════════════
          4. DIAGNOSTIC HISTORY FOR SELECTED VEHICLE
          ═══════════════════════════════════════════════════════════════ --}}
@@ -764,23 +736,7 @@
                 </h3>
             </div>
             <div class="h-diag-hist-actions">
-                {{-- Horizontal Vehicle Scroll Track --}}
-                <div class="h-diag-v-tabs-track">
-                    @foreach($vehicles as $v)
-                        <a href="{{ route('diagnostics.index', ['vehicle_id' => $v->id]) }}" class="h-diag-v-tab {{ $v->id == $selectedVid ? 'is-active' : '' }}">
-                            <span>{{ $v->year }} {{ Str::words($v->make . ' ' . $v->model, 2, '') }}</span>
-                            @if(($vehicleStats[$v->id]['total'] ?? 0) > 0)
-                                <span class="h-diag-v-tab-count">{{ $vehicleStats[$v->id]['total'] }}</span>
-                            @endif
-                        </a>
-                    @endforeach
-                </div>
-
                 <div class="h-diag-hist-btn-group">
-                    <a href="{{ route('diagnostics.create', ['vehicle_id' => $selectedVid]) }}" class="h-diag-hist-cta">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        <span>New Diagnostic</span>
-                    </a>
                     <a href="{{ route('diagnostics.export.dataset') }}" class="h-diag-hist-export">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         <span>Export CSV</span>
@@ -823,7 +779,12 @@
                         default           => ['dot'=>'#0284c7','chip'=>'is-info','icon-txt'=>'#0284c7'],
                     };
                 @endphp
-                <div class="h-hist-row diag-hist-item">
+                <div
+                    class="h-hist-row diag-hist-item"
+                    data-session-id="{{ $d->id }}"
+                    data-session-date="{{ $d->created_at->format('Y-m-d') }}"
+                    data-search="{{ e(Str::lower($d->id . ' ' . $d->vehicle->display_name . ' ' . $d->created_at->format('M j, Y g:i A') . ' ' . $d->created_at->format('Y-m-d') . ' ' . $d->created_at->format('m/d/Y') . ' ' . $d->created_at->format('F j, Y') . ' ' . ($d->ml_condition ?? '') . ' ' . ($d->status_label ?? '') )) }}"
+                >
 
                     {{-- Status Icon --}}
                     <div class="h-hist-icon-box {{ $dColor['chip'] }}">
@@ -1372,6 +1333,54 @@ const char* token    = "YOUR_VEHICLE_TOKEN";</span>
     border-color: var(--ds-blue);
     color: var(--ds-blue);
 }
+.h-diag-action-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--ds-border);
+    border-radius: 999px;
+    background: var(--ds-pill-bg);
+}
+.h-diag-action-switch-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    min-height: 30px;
+    padding: 0.35rem 0.7rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ds-text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.16s ease;
+}
+.h-diag-action-switch-btn:hover,
+.h-diag-action-switch-btn.is-active {
+    background: var(--ds-blue);
+    color: #fff;
+    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.28);
+}
+.h-diag-diagnose-btn {
+    background: #2563eb;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18), 0 4px 14px rgba(37, 99, 235, 0.35);
+    color: #fff;
+    font-weight: 800;
+    letter-spacing: 0.025em;
+    text-decoration: none;
+    text-transform: uppercase;
+}
+.h-diag-diagnose-btn:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22), 0 6px 18px rgba(37, 99, 235, 0.45);
+    color: #fff;
+    transform: translateY(-1px);
+}
 
 .h-diag-search-wrap {
     display: flex;
@@ -1398,6 +1407,23 @@ const char* token    = "YOUR_VEHICLE_TOKEN";</span>
 }
 .h-diag-search-wrap input::placeholder {
     color: var(--ds-text-dim);
+}
+.h-diag-search-wrap button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--ds-text-dim);
+    cursor: pointer;
+}
+.h-diag-search-wrap button:hover {
+    background: var(--ds-blue);
+    color: #fff;
 }
 
 .h-diag-topbar-btn {
@@ -2400,6 +2426,27 @@ const char* token    = "YOUR_VEHICLE_TOKEN";</span>
 }
 
 /* ─── Diagnostic History Section ─── */
+.h-diag-history-page-heading {
+    margin: 0 0 0.85rem;
+    padding: 0.25rem 0;
+}
+.h-diag-history-page-eyebrow {
+    color: var(--ds-blue);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+}
+.h-diag-history-page-heading h1 {
+    margin: 0.35rem 0 0.25rem;
+    color: var(--ds-text);
+    font-size: 1.65rem;
+    line-height: 1.1;
+}
+.h-diag-history-page-heading p {
+    margin: 0;
+    color: var(--ds-text-muted);
+    font-size: 0.82rem;
+}
 .h-diag-history-card {
     background: var(--ds-card-bg);
     border: 1px solid var(--ds-card-border);
@@ -3947,11 +3994,59 @@ window.toggleVehiclePerspective = function() {
 
 // History search filter
 window.filterHistory = function(q) {
-    q = (q || '').toLowerCase();
+    const query = (q || '').trim().toLowerCase();
+    if (!query) {
+        document.querySelectorAll('.diag-hist-item').forEach(row => row.style.display = '');
+        return;
+    }
+
+    const normalizedQuery = query.replace(/#\s*/g, '').replace(/\s+/g, ' ').trim();
+    const sessionQuery = normalizedQuery.match(/^session(?:\s+number)?\s*(\d+)$/);
+    const numericQuery = normalizedQuery.match(/^#?(\d+)$/);
+
     document.querySelectorAll('.diag-hist-item').forEach(row => {
-        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+        const haystack = [
+            row.dataset.search || '',
+            row.textContent.toLowerCase(),
+            row.dataset.sessionDate || '',
+        ].join(' ').replace(/\s+/g, ' ');
+        const normalizedHaystack = haystack.replace(/#\s*/g, '').replace(/\s+/g, ' ');
+
+        let matches = false;
+        if (sessionQuery || numericQuery) {
+            const sessionId = sessionQuery ? sessionQuery[1] : numericQuery[1];
+            matches = String(row.dataset.sessionId || '') === sessionId;
+        } else {
+            matches = normalizedHaystack.includes(normalizedQuery);
+        }
+
+        row.style.display = matches ? '' : 'none';
     });
 };
+
+window.focusHistorySearch = function() {
+    const input = document.getElementById('hist-search');
+    if (!input) return;
+    input.focus();
+    input.select();
+    document.getElementById('history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.filterHistory(input.value);
+};
+
+window.openIotHub = function() {
+    const modal = document.getElementById('iot-modal');
+    if (modal) modal.style.display = 'flex';
+};
+
+const historySearch = document.getElementById('hist-search');
+if (historySearch) {
+    historySearch.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            window.focusHistorySearch();
+        }
+    });
+}
 
 // Inline AI assistant on index
 window.sendIdxAi = function() {

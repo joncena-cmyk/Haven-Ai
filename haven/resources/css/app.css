@@ -3886,3 +3886,145 @@ html, body {
         transform: none !important;
     }
 }
+
+    /* ============================================================
+       GLOBAL UI POLISH — Shared navigation, cards, controls & forms
+       ============================================================ */
+    :root {
+        --h-radius: 10px;
+        --h-radius-lg: 14px;
+        --h-radius-xl: 18px;
+        --h-focus-ring: rgba(2, 132, 199, 0.22);
+    }
+
+    .haven-navbar {
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--h-border);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    .haven-brand-mark {
+        border-radius: 8px;
+    }
+
+    .haven-nav-link {
+        min-height: 36px;
+        border-radius: 8px;
+    }
+
+    .haven-nav-link.active {
+        box-shadow: inset 0 -2px 0 var(--h-teal);
+    }
+
+    .haven-nav-cta,
+    .haven-btn-primary {
+        border-radius: 9px;
+        box-shadow: 0 6px 18px rgba(2, 132, 199, 0.18);
+    }
+
+    .haven-nav-cta:hover,
+    .haven-btn-primary:hover {
+        transform: translateY(-1px);
+    }
+
+    .haven-user-btn,
+    .haven-stat-pill {
+        border-radius: 9px;
+    }
+
+    .haven-content-container {
+        padding-top: 1.75rem;
+    }
+
+    .h-page-header {
+        gap: 1rem;
+        padding-bottom: 1.15rem;
+        margin-bottom: 1.35rem;
+    }
+
+    .h-page-title {
+        letter-spacing: -0.025em;
+    }
+
+    .h-card,
+    .h-list-card,
+    .h-form-card,
+    .h-detail-card,
+    .h-stat-row,
+    .h-action-panel,
+    .h-vehicle-card,
+    .haven-vehicle-card,
+    .h-empty {
+        border-radius: var(--h-radius-lg);
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+    }
+
+    .haven-vehicle-card:hover,
+    .h-card:hover {
+        border-color: var(--h-border2);
+    }
+
+    .h-stat-cell,
+    .haven-btn-primary,
+    .haven-btn-secondary,
+    .h-btn-sm,
+    .h-form-input,
+    .h-form-select,
+    .h-form-textarea,
+    .haven-input,
+    .haven-vehicle-card,
+    .h-list-card {
+        transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .h-form-input,
+    .h-form-select,
+    .h-form-textarea,
+    .haven-input {
+        border-radius: 9px;
+    }
+
+    .h-form-input:focus,
+    .h-form-select:focus,
+    .h-form-textarea:focus,
+    .haven-input:focus,
+    .h-card input:focus,
+    .h-card select:focus,
+    .h-card textarea:focus {
+        border-color: var(--h-teal);
+        box-shadow: 0 0 0 3px var(--h-focus-ring);
+    }
+
+    .haven-btn-primary,
+    .haven-btn-secondary,
+    .h-btn-sm {
+        min-height: 38px;
+    }
+
+    .h-flash,
+    .h-notice {
+        border-radius: 10px;
+    }
+
+    @media (max-width: 767px) {
+        .haven-content-container {
+            padding-top: 1rem;
+        }
+
+        .h-page-header {
+            align-items: flex-start;
+        }
+
+        .h-card,
+        .h-list-card,
+        .h-form-card,
+        .h-detail-card,
+        .h-stat-row,
+        .h-action-panel,
+        .h-vehicle-card,
+        .haven-vehicle-card,
+        .h-empty {
+            border-radius: 12px;
+        }
+    }

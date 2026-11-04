@@ -2,7 +2,10 @@
 
 @php
     $selectedVehicle = $vehicles->firstWhere('id', $selectedVehicleId) ?? $vehicles->first();
+    $diagnosticModelUid = $selectedVehicle?->sketchfab_uid;
 @endphp
+
+<script src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
 
 <div class="h-diag-studio-wrapper">
 
@@ -22,31 +25,44 @@
                             <circle cx="18.5" cy="18.5" r="2.5"></circle>
                         </svg>
                     </div>
-                    <select id="vehicle-switcher" class="h-diag-vehicle-select" onchange="switchVehicle(this.value)">
-                        @forelse($vehicles as $v)
-                            <option value="{{ $v->id }}"
-                                    data-name="{{ $v->display_name }}"
-                                    data-plate="{{ $v->plate_number ?: 'NO PLATE' }}"
-                                    data-engine="{{ $v->engine_type ?: 'Gasoline ICE' }}"
-                                    data-year="{{ $v->year }}"
-                                    data-scope-label="{{ $v->scope_meta['label'] }}"
-                                    data-scope-compliant="{{ $v->isScopeCompliant() ? '1' : '0' }}"
-                                    {{ $v->id == ($selectedVehicle?->id) ? 'selected' : '' }}>
-                                {{ $v->display_name }} ({{ $v->year }})
-                            </option>
-                        @empty
-                            <option value="">No vehicles found</option>
-                        @endforelse
-                    </select>
+                    <button type="button" id="vehicle-pill" class="h-diag-dropdown-trigger" onclick="toggleVehicleMenu()" aria-expanded="false">
+                        <span>{{ $selectedVehicle?->display_name }}</span>
+                        @if($selectedVehicle)
+                            <span class="h-diag-vehicle-year">{{ $selectedVehicle->year }}</span>
+                        @endif
+                    </button>
+                    <input type="hidden" id="vehicle-switcher" value="{{ $selectedVehicle?->id }}">
                     <svg class="h-diag-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
-            </div>
 
-            {{-- 360° Perspective View Switcher Mode --}}
-            <button type="button" class="h-diag-mode-pill" id="view-mode-btn" onclick="toggleVehiclePerspective()" title="Toggle View Angle">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg>
-                <span id="view-mode-label">360° Studio View</span>
-            </button>
+                <div id="vehicle-menu" class="h-diag-dropdown-menu" style="display:none;">
+                    <div class="h-diag-dropdown-header">Your Vehicles</div>
+                    <div class="h-diag-dropdown-scroll">
+                        @forelse($vehicles as $v)
+                            <a href="{{ route('diagnostics.create', ['vehicle_id' => $v->id]) }}" class="h-diag-dropdown-item {{ $v->id == $selectedVehicle?->id ? 'is-active' : '' }}">
+                                <div class="h-diag-dropdown-item-left">
+                                    <div class="h-diag-dropdown-v-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                                    </div>
+                                    <div>
+                                        <div class="h-diag-dropdown-v-name">{{ $v->display_name }}</div>
+                                        <div class="h-diag-dropdown-v-meta">{{ $v->year }} · {{ $v->engine_type ?: 'Gasoline ICE' }}</div>
+                                    </div>
+                                </div>
+                                <div class="h-diag-dropdown-v-stat">{{ $recentDiagnostics->where('vehicle_id', $v->id)->count() }} sessions</div>
+                            </a>
+                        @empty
+                            <div class="h-diag-dropdown-empty">No vehicles registered yet.</div>
+                        @endforelse
+                    </div>
+                    <div class="h-diag-dropdown-footer">
+                        <a href="{{ route('vehicles.create') }}" class="h-diag-dropdown-add">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Register New Vehicle
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="h-diag-topbar-right">
@@ -111,6 +127,28 @@
                 <div class="h-diag-hud-status-label" id="hud-progress-label">READY FOR ENGINE CAPTURE</div>
             </div>
 
+            <div class="h-diagnosis-flow" aria-label="Diagnosis progress">
+                <div class="h-diagnosis-flow-step is-complete" data-flow-step="vehicle">
+                    <span class="h-diagnosis-flow-number">1</span>
+                    <span class="h-diagnosis-flow-label">Vehicle</span>
+                </div>
+                <div class="h-diagnosis-flow-line is-complete"></div>
+                <div class="h-diagnosis-flow-step is-active" data-flow-step="capture">
+                    <span class="h-diagnosis-flow-number">2</span>
+                    <span class="h-diagnosis-flow-label">Capture</span>
+                </div>
+                <div class="h-diagnosis-flow-line"></div>
+                <div class="h-diagnosis-flow-step" data-flow-step="analyze">
+                    <span class="h-diagnosis-flow-number">3</span>
+                    <span class="h-diagnosis-flow-label">Analyze</span>
+                </div>
+                <div class="h-diagnosis-flow-line"></div>
+                <div class="h-diagnosis-flow-step" data-flow-step="results">
+                    <span class="h-diagnosis-flow-number">4</span>
+                    <span class="h-diagnosis-flow-label">Results</span>
+                </div>
+            </div>
+
             {{-- Primary Status Pill & Link --}}
             <div class="h-diag-hud-tag-row">
                 <div class="h-diag-status-chip normal" id="hud-condition-chip">
@@ -169,8 +207,17 @@
             {{-- 3D Ground Plane Radial Grid --}}
             <div class="h-diag-grid-plane"></div>
 
+            <div id="diagnostic-sketchfab-stage" style="{{ $diagnosticModelUid ? '' : 'display:none;' }}">
+                <iframe
+                    id="diagnostic-sketchfab-frame"
+                    title="Interactive 3D vehicle viewer"
+                    allow="autoplay; fullscreen; xr-spatial-tracking"
+                    allowfullscreen>
+                </iframe>
+            </div>
+
             {{-- High-Precision 3D Automotive Vector Render --}}
-            <div class="h-diag-car-stage" id="car-3d-model">
+            <div class="h-diag-car-stage" id="car-3d-model" style="{{ $diagnosticModelUid ? 'display:none;' : '' }}">
                 <svg viewBox="0 0 740 380" class="h-diag-car-svg" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                         {{-- Gradients for Sleek White/Silver Luxury Body --}}
@@ -303,6 +350,13 @@
             <div class="h-diag-viewport-controls">
                 <button type="button" class="h-diag-zoom-btn" onclick="zoomVehicle(1.1)" title="Zoom in">+</button>
                 <button type="button" class="h-diag-zoom-btn" onclick="zoomVehicle(0.9)" title="Zoom out">−</button>
+                <button type="button" class="h-diag-zoom-btn h-diag-reset-view-btn" onclick="resetDiagnosticView()" title="Reset view" aria-label="Reset view">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+                </button>
+                <div class="h-diag-view-mode-rail" role="group" aria-label="Vehicle model view">
+                    <button type="button" class="h-diag-view-mode-btn is-active" id="view-mode-3d" onclick="setDiagnosticViewMode('3d')">3D</button>
+                    <button type="button" class="h-diag-view-mode-btn" id="view-mode-2d" onclick="setDiagnosticViewMode('2d')">2D</button>
+                </div>
             </div>
         </div>
 
@@ -916,8 +970,18 @@
 .h-diag-topbar-left, .h-diag-topbar-right {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
+    gap: 0.75rem;
     flex-wrap: wrap;
+}
+.h-diag-topbar-left {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+}
+.h-diag-view-mode-row {
+    display: flex;
+    align-items: center;
+    min-height: 36px;
 }
 .h-diag-vehicle-pill {
     display: flex;
@@ -928,6 +992,103 @@
     padding: 0.35rem 0.85rem;
     border-radius: var(--ds-radius-pill);
     position: relative;
+}
+.h-diag-vehicle-dropdown-wrap {
+    position: relative;
+}
+.h-diag-dropdown-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    border: 0;
+    background: transparent;
+    color: var(--ds-text);
+    font: inherit;
+    font-weight: 700;
+    font-size: 0.86rem;
+    padding: 0;
+    cursor: pointer;
+}
+.h-diag-vehicle-year {
+    color: var(--ds-text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.h-diag-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: min(300px, 92vw);
+    background: #111827;
+    border: 1px solid var(--ds-border);
+    border-radius: 14px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.35);
+    z-index: 999;
+    overflow: hidden;
+}
+.h-diag-dropdown-header {
+    padding: 0.65rem 0.85rem;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: var(--ds-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--ds-border);
+}
+.h-diag-dropdown-scroll {
+    max-height: 280px;
+    overflow-y: auto;
+}
+.h-diag-dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 0.85rem;
+    text-decoration: none;
+    color: var(--ds-text);
+    background: #111827;
+    border-bottom: 1px solid var(--ds-border);
+    transition: background 0.15s;
+}
+.h-diag-dropdown-item:hover,
+.h-diag-dropdown-item.is-active {
+    background: #1e293b;
+}
+.h-diag-dropdown-item-left {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+.h-diag-dropdown-v-icon {
+    color: var(--ds-blue);
+}
+.h-diag-dropdown-v-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+.h-diag-dropdown-v-meta,
+.h-diag-dropdown-v-stat {
+    color: var(--ds-text-muted);
+    font-size: 0.68rem;
+}
+.h-diag-dropdown-footer {
+    border-top: 1px solid var(--ds-border);
+}
+.h-diag-dropdown-add {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.75rem 0.85rem;
+    color: var(--ds-blue);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+.h-diag-dropdown-empty {
+    padding: 0.85rem;
+    color: var(--ds-text-muted);
+    font-size: 0.75rem;
 }
 .h-diag-vehicle-icon {
     color: var(--ds-blue);
@@ -966,6 +1127,12 @@
 .h-diag-mode-pill:hover {
     border-color: var(--ds-blue);
     color: var(--ds-blue);
+}
+.h-diag-topbar .h-diag-mode-pill {
+    min-height: 34px;
+    box-sizing: border-box;
+    justify-content: center;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
 }
 .h-diag-search-wrap {
     display: flex;
@@ -1102,6 +1269,56 @@
 }
 .h-diag-hud-progress-block {
     margin-bottom: 1rem;
+}
+.h-diagnosis-flow {
+    display: grid;
+    grid-template-columns: auto 1fr auto 1fr auto 1fr auto;
+    align-items: center;
+    width: min(100%, 420px);
+    margin-bottom: 1rem;
+}
+.h-diagnosis-flow-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.28rem;
+    color: var(--ds-text-dim);
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+.h-diagnosis-flow-number {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--ds-border);
+    border-radius: 50%;
+    background: var(--ds-surface-subtle);
+    font-size: 0.72rem;
+}
+.h-diagnosis-flow-step.is-active {
+    color: var(--ds-blue);
+}
+.h-diagnosis-flow-step.is-active .h-diagnosis-flow-number {
+    border-color: var(--ds-blue);
+    background: var(--ds-blue);
+    color: #fff;
+}
+.h-diagnosis-flow-step.is-complete {
+    color: var(--ds-text-muted);
+}
+.h-diagnosis-flow-step.is-complete .h-diagnosis-flow-number {
+    border-color: rgba(34, 197, 94, 0.55);
+    background: rgba(34, 197, 94, 0.14);
+    color: #16a34a;
+}
+.h-diagnosis-flow-line {
+    height: 1px;
+    margin: 0 0.35rem 1rem;
+    background: var(--ds-border);
+}
+.h-diagnosis-flow-line.is-complete {
+    background: rgba(34, 197, 94, 0.55);
 }
 .h-diag-hud-pct {
     font-size: 1.8rem;
@@ -1281,6 +1498,21 @@
     max-width: 640px;
     transition: transform 0.3s ease;
 }
+#diagnostic-sketchfab-stage {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    min-width: 0;
+    min-height: 380px;
+    background: transparent;
+}
+#diagnostic-sketchfab-frame {
+    width: 100%;
+    height: 100%;
+    min-height: 380px;
+    border: 0;
+    display: block;
+}
 .h-diag-car-svg {
     width: 100%;
     height: auto;
@@ -1290,6 +1522,7 @@
     position: absolute;
     right: 0.5rem;
     top: 0.5rem;
+    z-index: 3;
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
@@ -1308,7 +1541,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+    box-shadow: none;
 }
 
 /* Glowing Telemetry Pins */
@@ -1688,6 +1921,34 @@
     border-radius: 8px;
     padding: 0 0.75rem;
     cursor: pointer;
+}
+.h-diag-view-mode-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 0;
+    border: 1px solid var(--ds-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--ds-surface);
+    box-shadow: none;
+}
+.h-diag-view-mode-btn {
+    width: 38px;
+    height: 30px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ds-text-muted);
+    font-size: 0.76rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+.h-diag-view-mode-btn.is-active {
+    background: #111827;
+    color: #fff;
+    box-shadow: none;
 }
 .h-diag-ai-quick-tags {
     display: flex;
@@ -2567,7 +2828,130 @@
      ═══════════════════════════════════════════════════════════════ --}}
 <script>
 (function() {
+    const diagnosticModelUid = @json($diagnosticModelUid);
+    let diagnosticSketchfabApi = null;
+    let diagnosticViewerReady = false;
+    let diagnosticApiAttempts = 0;
+    const diagnosticInitialCamera = [0, 1.35, 3.25];
+
+    function setDiagnosticInitialCamera(api, delay = 0) {
+        if (!api) return;
+        window.setTimeout(function() {
+            api.getBoundingBox(function(error, bounds) {
+                if (!error && bounds && bounds.min && bounds.max) {
+                    const center = bounds.min.map(function(value, index) {
+                        return (value + bounds.max[index]) / 2;
+                    });
+                    const size = bounds.max.map(function(value, index) {
+                        return value - bounds.min[index];
+                    });
+                    const radius = Math.max(...size) / 2;
+                    const distanceScale = radius > 0 ? Math.max(2.4, Math.min(3.6, 5.8 / radius)) : 3.2;
+                    const eye = [
+                        center[0] + radius * 1.25,
+                        center[1] + radius * (0.65 * distanceScale / 3.2),
+                        center[2] + radius * 1.8 * distanceScale / 3.2
+                    ];
+                    api.setCameraLookAt(eye, center, 0.45);
+                    return;
+                }
+                api.setCameraLookAt(diagnosticInitialCamera, [0, 0, 0], 0.45);
+            });
+        }, delay);
+    }
+
+    function initDiagnosticSketchfab() {
+        const iframe = document.getElementById('diagnostic-sketchfab-frame');
+        const stage = document.getElementById('diagnostic-sketchfab-stage');
+        if (!diagnosticModelUid || !iframe || !stage || !window.Sketchfab) return;
+
+        const embedParams = new URLSearchParams({
+            autostart: '1',
+            transparent: '1',
+            ui_controls: '0',
+            ui_infos: '0',
+            ui_watermark: '0',
+            ui_watermark_link: '0',
+            ui_help: '0',
+            ui_settings: '0',
+            ui_inspector: '0',
+            ui_hint: '0',
+            ui_stop: '0',
+            ui_loading: '0',
+            ui_annotations: '0',
+            annotations_visible: '0',
+            ui_theme: 'dark'
+        });
+        iframe.src = `https://sketchfab.com/models/${diagnosticModelUid}/embed?${embedParams.toString()}`;
+
+        const client = new window.Sketchfab(iframe);
+        client.init(diagnosticModelUid, {
+            success: function(api) {
+                diagnosticSketchfabApi = api;
+                api.start();
+                api.addEventListener('viewerready', function() {
+                    diagnosticViewerReady = true;
+                    setDiagnosticInitialCamera(api, 0);
+                    setDiagnosticInitialCamera(api, 500);
+                    setDiagnosticInitialCamera(api, 1200);
+                    window.dispatchEvent(new Event('resize'));
+                });
+            },
+            error: function() {
+                diagnosticSketchfabApi = null;
+            },
+            autostart: 1,
+            transparent: 1,
+            ui_controls: 0,
+            ui_infos: 0,
+            ui_watermark: 0,
+            ui_help: 0,
+            ui_settings: 0,
+            ui_annotations: 0
+        });
+    }
+
+    function waitForDiagnosticSketchfab() {
+        if (window.Sketchfab) {
+            initDiagnosticSketchfab();
+            return;
+        }
+        diagnosticApiAttempts += 1;
+        if (diagnosticApiAttempts >= 40) {
+            const iframe = document.getElementById('diagnostic-sketchfab-frame');
+            if (iframe && diagnosticModelUid) {
+                iframe.src = `https://sketchfab.com/models/${diagnosticModelUid}/embed?autostart=1&transparent=1&ui_controls=0&ui_infos=0&ui_watermark=0&ui_help=0&ui_settings=0&ui_annotations=0`;
+            }
+            return;
+        }
+        window.setTimeout(waitForDiagnosticSketchfab, 250);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', waitForDiagnosticSketchfab);
+    } else {
+        waitForDiagnosticSketchfab();
+    }
+
     // 1. Vehicle Switching
+    window.toggleVehicleMenu = function() {
+        const menu = document.getElementById('vehicle-menu');
+        const pill = document.getElementById('vehicle-pill');
+        if (!menu) return;
+        const isShowing = menu.style.display !== 'none';
+        menu.style.display = isShowing ? 'none' : 'block';
+        if (pill) pill.setAttribute('aria-expanded', isShowing ? 'false' : 'true');
+    };
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.h-diag-vehicle-dropdown-wrap')) {
+            const menu = document.getElementById('vehicle-menu');
+            const pill = document.getElementById('vehicle-pill');
+            if (menu) menu.style.display = 'none';
+            if (pill) pill.setAttribute('aria-expanded', 'false');
+        }
+    });
+
     window.switchVehicle = function(vehicleId) {
         if (!vehicleId) return;
         const url = new URL(window.location.href);
@@ -2575,28 +2959,56 @@
         window.location.href = url.toString();
     };
 
-    // 2. Perspective View Angle Toggle
-    let isPerspective360 = true;
-    window.toggleVehiclePerspective = function() {
-        const car = document.getElementById('car-3d-model');
-        const lbl = document.getElementById('view-mode-label');
-        if (!car) return;
-        isPerspective360 = !isPerspective360;
-        if (isPerspective360) {
-            car.style.transform = 'scale(1) rotate(0deg)';
-            lbl.textContent = '360° Studio View';
-        } else {
-            car.style.transform = 'scale(1.15) rotate(4deg) translateY(-8px)';
-            lbl.textContent = 'Powertrain Top Angle';
+    // 2D / 3D vehicle presentation
+    let diagnosticViewMode = diagnosticModelUid ? '3d' : '2d';
+    window.setDiagnosticViewMode = function(mode) {
+        const stage3d = document.getElementById('diagnostic-sketchfab-stage');
+        const stage2d = document.getElementById('car-3d-model');
+        const button3d = document.getElementById('view-mode-3d');
+        const button2d = document.getElementById('view-mode-2d');
+
+        if (!stage3d || !stage2d || !button3d || !button2d) return;
+        if (mode === '3d' && !diagnosticModelUid) mode = '2d';
+
+        diagnosticViewMode = mode;
+        stage3d.style.display = mode === '3d' ? 'block' : 'none';
+        stage2d.style.display = mode === '2d' ? 'block' : 'none';
+        button3d.classList.toggle('is-active', mode === '3d');
+        button2d.classList.toggle('is-active', mode === '2d');
+        button3d.disabled = !diagnosticModelUid;
+
+        if (mode === '3d') {
+            window.dispatchEvent(new Event('resize'));
+            setDiagnosticInitialCamera(diagnosticSketchfabApi, 350);
         }
     };
+    window.setDiagnosticViewMode(diagnosticViewMode);
 
     let zoomLevel = 1.0;
+    window.resetDiagnosticView = function() {
+        zoomLevel = 1.0;
+        const car = document.getElementById('car-3d-model');
+        if (car) car.style.transform = `scale(${zoomLevel})`;
+        if (diagnosticSketchfabApi) {
+            setDiagnosticInitialCamera(diagnosticSketchfabApi, 0);
+        }
+    };
     window.zoomVehicle = function(factor) {
         const car = document.getElementById('car-3d-model');
         if (!car) return;
         zoomLevel = Math.max(0.8, Math.min(1.4, zoomLevel * factor));
         car.style.transform = `scale(${zoomLevel})`;
+
+        if (diagnosticSketchfabApi) {
+            diagnosticSketchfabApi.getCameraLookAt(function(error, camera) {
+                if (error || !camera) return;
+                const scale = factor > 1 ? 0.9 : 1.1;
+                const eye = camera.position.map(function(value, index) {
+                    return value * scale + camera.target[index] * (1 - scale);
+                });
+                diagnosticSketchfabApi.setCameraLookAt(eye, camera.target, 0.35);
+            });
+        }
     };
 
     // 3. Interactive Marker Focus
@@ -2615,6 +3027,21 @@
     let mediaRecorder, audioChunks = [], audioBlob, analyser, animFrame, audioCtx, recordTimer, recSeconds = 0;
     const canvas = document.getElementById('live-oscilloscope');
     const canvasCtx = canvas ? canvas.getContext('2d') : null;
+
+    window.setDiagnosisFlowStep = function(activeStep) {
+        const steps = ['vehicle', 'capture', 'analyze', 'results'];
+        const activeIndex = steps.indexOf(activeStep);
+        if (activeIndex < 0) return;
+
+        document.querySelectorAll('[data-flow-step]').forEach(function(stepElement) {
+            const stepIndex = steps.indexOf(stepElement.dataset.flowStep);
+            stepElement.classList.toggle('is-complete', stepIndex < activeIndex);
+            stepElement.classList.toggle('is-active', stepIndex === activeIndex);
+        });
+        document.querySelectorAll('.h-diagnosis-flow-line').forEach(function(line, index) {
+            line.classList.toggle('is-complete', index < activeIndex);
+        });
+    };
 
     window.startAudioRecording = async function() {
         try {
@@ -2638,6 +3065,7 @@
             document.getElementById('canvas-overlay-text').style.display = 'none';
             document.getElementById('hud-progress-label').textContent = 'RECORDING AUDIO HARMONICS...';
             document.getElementById('hud-progress-pct').textContent = '35%';
+            window.setDiagnosisFlowStep('capture');
 
             // Start timer
             recSeconds = 0;
@@ -2693,6 +3121,7 @@
         document.getElementById('tick-audio').classList.add('active');
         document.getElementById('hud-progress-pct').textContent = '80%';
         document.getElementById('hud-progress-label').textContent = 'ACOUSTIC CAPTURED · READY TO ANALYZE';
+        window.setDiagnosisFlowStep('analyze');
     }
 
     function drawOscilloscope() {
@@ -2788,6 +3217,7 @@
         document.getElementById('btn-submit-session').disabled = false;
         document.getElementById('hud-progress-pct').textContent = '90%';
         document.getElementById('hud-progress-label').textContent = 'OFFLINE SAMPLES ATTACHED · READY';
+        window.setDiagnosisFlowStep('analyze');
     };
 
     window.saveManualTelemetry = function() {
@@ -2808,12 +3238,17 @@
         document.getElementById('gauge-rpm-num').textContent = rpm;
 
         closeManualTelemetryDrawer();
+        window.setDiagnosisFlowStep('capture');
+        document.getElementById('hud-progress-label').textContent = 'MANUAL TELEMETRY ATTACHED · READY TO ANALYZE';
+        document.getElementById('hud-progress-pct').textContent = '90%';
+        document.getElementById('btn-submit-session').disabled = false;
     };
 
     // 8. 6-Stage AI Stepper Animation & Form Submission
     window.submitDiagnosticForm = function() {
         const form = document.getElementById('haven-hidden-diag-form');
         document.getElementById('analysis-pipeline-card').scrollIntoView({ behavior: 'smooth' });
+        window.setDiagnosisFlowStep('analyze');
 
         // Animate Pipeline Stages
         let step = 1;
