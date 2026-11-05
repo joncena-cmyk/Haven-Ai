@@ -2456,12 +2456,15 @@
     background: rgba(15, 23, 42, 0.7) !important;
     backdrop-filter: blur(8px) !important;
     z-index: 99999 !important;
-    display: flex !important;
+    display: none;
     align-items: center !important;
     justify-content: center !important;
     padding: 1.5rem !important;
     margin: 0 !important;
     overflow-y: auto !important;
+}
+.h-diag-modal-backdrop.is-open {
+    display: flex !important;
 }
 .h-diag-modal-box {
     background: #ffffff;
@@ -3572,10 +3575,42 @@
     };
 
     // 7. Modals & Sample Uploads
-    window.openSampleUploadModal = () => document.getElementById('modal-sample-upload').style.display = 'flex';
-    window.closeSampleUploadModal = () => document.getElementById('modal-sample-upload').style.display = 'none';
-    window.openManualTelemetryDrawer = () => document.getElementById('drawer-manual-telemetry').style.display = 'flex';
-    window.closeManualTelemetryDrawer = () => document.getElementById('drawer-manual-telemetry').style.display = 'none';
+    window.openSampleUploadModal = () => {
+        const el = document.getElementById('modal-sample-upload');
+        if (el) {
+            el.classList.add('is-open');
+            el.style.setProperty('display', 'flex', 'important');
+        }
+    };
+    window.closeSampleUploadModal = () => {
+        const el = document.getElementById('modal-sample-upload');
+        if (el) {
+            el.classList.remove('is-open');
+            el.style.setProperty('display', 'none', 'important');
+        }
+    };
+    window.openManualTelemetryDrawer = () => {
+        const el = document.getElementById('drawer-manual-telemetry');
+        if (el) {
+            el.classList.add('is-open');
+            el.style.setProperty('display', 'flex', 'important');
+        }
+    };
+    window.closeManualTelemetryDrawer = () => {
+        const el = document.getElementById('drawer-manual-telemetry');
+        if (el) {
+            el.classList.remove('is-open');
+            el.style.setProperty('display', 'none', 'important');
+        }
+    };
+
+    // Global keyboard listener to close modals on Escape key
+    window.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' || e.key === 'Esc') {
+            closeSampleUploadModal();
+            closeManualTelemetryDrawer();
+        }
+    });
 
     window.previewModalVibration = function(input) {
         if (!input.files || !input.files[0]) return;
