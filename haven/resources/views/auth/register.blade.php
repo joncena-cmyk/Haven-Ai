@@ -76,15 +76,62 @@
                     </svg>
                 </button>
             </div>
-            {{-- Password strength & Caps Lock hint --}}
-            <div id="pw-strength-wrap" style="display:none;margin-top:0.45rem;">
-                <div style="display:flex;gap:4px;height:4px;margin-bottom:0.3rem;">
-                    <div id="pw-bar-1" style="flex:1;border-radius:99px;background:var(--h-border);transition:background 0.2s;"></div>
-                    <div id="pw-bar-2" style="flex:1;border-radius:99px;background:var(--h-border);transition:background 0.2s;"></div>
-                    <div id="pw-bar-3" style="flex:1;border-radius:99px;background:var(--h-border);transition:background 0.2s;"></div>
-                    <div id="pw-bar-4" style="flex:1;border-radius:99px;background:var(--h-border);transition:background 0.2s;"></div>
+            {{-- Interactive Password Security Guide & Strength Meter --}}
+            <div id="pw-guide-wrap" style="margin-top:0.65rem;background:var(--h-surface2);border:1px solid var(--h-border);border-radius:10px;padding:0.75rem 0.85rem;transition:all 0.2s ease;">
+                {{-- Header Row: Label & Dynamic Strength Badge --}}
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.45rem;">
+                    <span style="font-size:0.72rem;font-weight:700;color:var(--h-text2);text-transform:uppercase;letter-spacing:0.04em;display:flex;align-items:center;gap:0.35rem;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        Password Strength Guide
+                    </span>
+                    <span id="pw-strength-badge" style="font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--h-border);color:var(--h-text3);transition:all 0.2s;">
+                        Enter Password
+                    </span>
                 </div>
-                <div id="pw-strength-label" style="font-size:0.72rem;color:var(--h-text3);">At least 8 characters recommended</div>
+
+                {{-- Segmented Visual Meter --}}
+                <div style="display:flex;gap:4px;height:4px;margin-bottom:0.65rem;">
+                    <div id="pw-bar-1" style="flex:1;border-radius:99px;background:var(--h-border);transition:background 0.25s;"></div>
+                    <div id="pw-bar-2" style="flex:1;border-radius:99px;background:var(--h-border);transition:background 0.25s;"></div>
+                    <div id="pw-bar-3" style="flex:1;border-radius:99px;background:var(--h-border);transition:background 0.25s;"></div>
+                    <div id="pw-bar-4" style="flex:1;border-radius:99px;background:var(--h-border);transition:background 0.25s;"></div>
+                </div>
+
+                {{-- Dynamic Requirements Checklist --}}
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem 0.5rem;font-size:0.72rem;margin-bottom:0.65rem;">
+                    <div id="crit-len" style="display:flex;align-items:center;gap:0.35rem;color:var(--h-text3);transition:color 0.2s;">
+                        <span class="crit-icon" style="font-weight:700;min-width:12px;">○</span>
+                        <span>8+ characters</span>
+                    </div>
+                    <div id="crit-case" style="display:flex;align-items:center;gap:0.35rem;color:var(--h-text3);transition:color 0.2s;">
+                        <span class="crit-icon" style="font-weight:700;min-width:12px;">○</span>
+                        <span>Upper &amp; lower case</span>
+                    </div>
+                    <div id="crit-num" style="display:flex;align-items:center;gap:0.35rem;color:var(--h-text3);transition:color 0.2s;">
+                        <span class="crit-icon" style="font-weight:700;min-width:12px;">○</span>
+                        <span>At least 1 number</span>
+                    </div>
+                    <div id="crit-sym" style="display:flex;align-items:center;gap:0.35rem;color:var(--h-text3);transition:color 0.2s;">
+                        <span class="crit-icon" style="font-weight:700;min-width:12px;">○</span>
+                        <span>Special symbol (!@#$)</span>
+                    </div>
+                </div>
+
+                {{-- Benchmark Guide (Weak / Medium / Strong) --}}
+                <div style="border-top:1px dashed var(--h-border);padding-top:0.5rem;font-size:0.68rem;color:var(--h-text3);display:flex;flex-direction:column;gap:0.25rem;">
+                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                        <span style="font-weight:700;color:var(--h-red);min-width:56px;display:inline-flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--h-red);display:inline-block;"></span>Weak:</span>
+                        <span>Fewer than 8 characters or letters only</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                        <span style="font-weight:700;color:var(--h-amber);min-width:56px;display:inline-flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--h-amber);display:inline-block;"></span>Medium:</span>
+                        <span>8+ chars with mix of letters &amp; numbers</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                        <span style="font-weight:700;color:var(--h-green);min-width:56px;display:inline-flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--h-green);display:inline-block;"></span>Strong:</span>
+                        <span>8+ chars with mixed case, numbers &amp; symbols</span>
+                    </div>
+                </div>
             </div>
             <div id="caps-lock-warning" style="display:none;margin-top:0.4rem;font-size:0.75rem;color:var(--h-amber);align-items:center;gap:0.35rem;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -117,6 +164,10 @@
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
                     </svg>
                 </button>
+            </div>
+            <div id="pw-match-wrap" style="display:none;margin-top:0.45rem;font-size:0.75rem;align-items:center;gap:0.35rem;">
+                <span id="pw-match-icon" style="font-weight:700;">✓</span>
+                <span id="pw-match-text">Passwords match</span>
             </div>
             @error('password_confirmation')
                 <p class="haven-error-msg">{{ $message }}</p>
@@ -167,8 +218,11 @@ function togglePw(fieldId, btnId) {
     const pwInput = document.getElementById('password');
     const pwConfirm = document.getElementById('password_confirmation');
     const capsWarn = document.getElementById('caps-lock-warning');
-    const strengthWrap = document.getElementById('pw-strength-wrap');
-    const strengthLabel = document.getElementById('pw-strength-label');
+    const badge = document.getElementById('pw-strength-badge');
+    const matchWrap = document.getElementById('pw-match-wrap');
+    const matchIcon = document.getElementById('pw-match-icon');
+    const matchText = document.getElementById('pw-match-text');
+
     const bars = [
         document.getElementById('pw-bar-1'),
         document.getElementById('pw-bar-2'),
@@ -176,9 +230,54 @@ function togglePw(fieldId, btnId) {
         document.getElementById('pw-bar-4'),
     ];
 
+    const critLen = document.getElementById('crit-len');
+    const critCase = document.getElementById('crit-case');
+    const critNum = document.getElementById('crit-num');
+    const critSym = document.getElementById('crit-sym');
+
     function checkCaps(e) {
         if (!capsWarn || typeof e.getModifierState !== 'function') return;
         capsWarn.style.display = e.getModifierState('CapsLock') ? 'flex' : 'none';
+    }
+
+    function setCrit(el, passed) {
+        if (!el) return;
+        const icon = el.querySelector('.crit-icon');
+        if (passed) {
+            el.style.color = 'var(--h-green)';
+            el.style.fontWeight = '600';
+            if (icon) {
+                icon.textContent = '✓';
+                icon.style.color = 'var(--h-green)';
+            }
+        } else {
+            el.style.color = 'var(--h-text3)';
+            el.style.fontWeight = '400';
+            if (icon) {
+                icon.textContent = '○';
+                icon.style.color = 'var(--h-text3)';
+            }
+        }
+    }
+
+    function updateMatch() {
+        if (!pwConfirm || !matchWrap) return;
+        const p1 = pwInput ? pwInput.value : '';
+        const p2 = pwConfirm.value;
+        if (!p2) {
+            matchWrap.style.display = 'none';
+            return;
+        }
+        matchWrap.style.display = 'flex';
+        if (p1 === p2) {
+            matchWrap.style.color = 'var(--h-green)';
+            if (matchIcon) matchIcon.textContent = '✓';
+            if (matchText) matchText.textContent = 'Passwords match';
+        } else {
+            matchWrap.style.color = 'var(--h-red)';
+            if (matchIcon) matchIcon.textContent = '✕';
+            if (matchText) matchText.textContent = 'Passwords do not match';
+        }
     }
 
     if (pwInput) {
@@ -187,30 +286,81 @@ function togglePw(fieldId, btnId) {
         pwInput.addEventListener('input', function() {
             const val = pwInput.value;
             if (!val) {
-                strengthWrap.style.display = 'none';
+                if (badge) {
+                    badge.textContent = 'Enter Password';
+                    badge.style.background = 'var(--h-border)';
+                    badge.style.color = 'var(--h-text3)';
+                }
+                bars.forEach(b => { if (b) b.style.background = 'var(--h-border)'; });
+                setCrit(critLen, false);
+                setCrit(critCase, false);
+                setCrit(critNum, false);
+                setCrit(critSym, false);
+                updateMatch();
                 return;
             }
-            strengthWrap.style.display = 'block';
-            let score = 0;
-            if (val.length >= 8) score++;
-            if (/[A-Z]/.test(val) && /[a-z]/.test(val)) score++;
-            if (/\d/.test(val)) score++;
-            if (/[^A-Za-z0-9]/.test(val) || val.length >= 12) score++;
 
-            const colors = ['var(--h-red)', 'var(--h-amber)', 'var(--h-teal)', 'var(--h-green)'];
-            const labels = ['Weak — use at least 8 characters', 'Fair — add uppercase or numbers', 'Good password strength', 'Strong password'];
-            const activeColor = colors[Math.max(0, score - 1)];
+            const hasLen = val.length >= 8;
+            const hasCase = /[a-z]/.test(val) && /[A-Z]/.test(val);
+            const hasNum = /\d/.test(val);
+            const hasSym = /[^A-Za-z0-9]/.test(val);
+
+            setCrit(critLen, hasLen);
+            setCrit(critCase, hasCase);
+            setCrit(critNum, hasNum);
+            setCrit(critSym, hasSym);
+
+            const passedCount = (hasLen ? 1 : 0) + (hasCase ? 1 : 0) + (hasNum ? 1 : 0) + (hasSym ? 1 : 0);
+
+            let score = 0;
+            let label = 'Weak';
+            let color = 'var(--h-red)';
+            let bgColor = 'var(--h-red-bg)';
+
+            if (!hasLen || passedCount <= 1) {
+                // Weak: less than 8 chars or single criterion
+                score = 1;
+                label = 'Weak';
+                color = 'var(--h-red)';
+                bgColor = 'var(--h-red-bg)';
+            } else if (passedCount === 2) {
+                // Fair / Moderate
+                score = 2;
+                label = 'Fair';
+                color = 'var(--h-amber)';
+                bgColor = 'var(--h-amber-bg)';
+            } else if (passedCount === 3) {
+                // Medium / Good
+                score = 3;
+                label = 'Medium';
+                color = 'var(--h-amber)';
+                bgColor = 'var(--h-amber-bg)';
+            } else {
+                // Strong / Very Strong (all criteria met)
+                score = 4;
+                label = (val.length >= 12) ? 'Very Strong' : 'Strong';
+                color = 'var(--h-green)';
+                bgColor = 'var(--h-green-bg)';
+            }
 
             bars.forEach((b, idx) => {
-                b.style.background = idx < score ? activeColor : 'var(--h-border)';
+                if (b) b.style.background = idx < score ? color : 'var(--h-border)';
             });
-            strengthLabel.textContent = labels[Math.max(0, score - 1)];
-            strengthLabel.style.color = activeColor;
+
+            if (badge) {
+                badge.textContent = label;
+                badge.style.color = color;
+                badge.style.background = bgColor;
+            }
+
+            updateMatch();
         });
     }
+
     if (pwConfirm) {
         pwConfirm.addEventListener('keyup', checkCaps);
         pwConfirm.addEventListener('keydown', checkCaps);
+        pwConfirm.addEventListener('input', updateMatch);
     }
 
     const form = document.getElementById('register-form');

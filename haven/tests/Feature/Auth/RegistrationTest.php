@@ -14,6 +14,14 @@ class RegistrationTest extends TestCase
         $response = $this->get('/register');
 
         $response->assertStatus(200);
+        $response->assertSee('Password Strength Guide');
+        $response->assertSee('8+ characters');
+        $response->assertSee('Upper &amp; lower case', false);
+        $response->assertSee('At least 1 number');
+        $response->assertSee('Special symbol (!@#$)');
+        $response->assertSee('Weak:');
+        $response->assertSee('Medium:');
+        $response->assertSee('Strong:');
     }
 
     public function test_new_users_can_register(): void
