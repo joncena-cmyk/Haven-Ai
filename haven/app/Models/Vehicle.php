@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class Vehicle extends Model
 {
@@ -35,6 +36,15 @@ class Vehicle extends Model
         static::creating(function (Vehicle $vehicle) {
             if (empty($vehicle->device_key)) {
                 $vehicle->device_key = 'hvn_dev_' . bin2hex(random_bytes(16));
+            }
+        });
+
+        static::deleting(function (Vehicle $vehicle) {
+            if (!empty($vehicle->image_path)) {
+                Storage::disk('public')->delete($vehicle->image_path);
+            }
+            foreach ($vehicle->diagnostics as $diagnostic) {
+                $diagnostic->deleteFiles();
             }
         });
     }

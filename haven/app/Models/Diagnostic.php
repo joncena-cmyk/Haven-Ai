@@ -4,9 +4,35 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class Diagnostic extends Model
 {
+    protected static function booted(): void
+    {
+        static::deleting(function (Diagnostic $diagnostic) {
+            $diagnostic->deleteFiles();
+        });
+    }
+
+    /**
+     * Purge stored audio and vibration recording files from disk.
+     */
+    public function deleteFiles(): void
+    {
+        foreach (['local', 'private', 'public'] as $disk) {
+            try {
+                if (!empty($this->audio_path) && Storage::disk($disk)->exists($this->audio_path)) {
+                    Storage::disk($disk)->delete($this->audio_path);
+                }
+                if (!empty($this->vibration_path) && Storage::disk($disk)->exists($this->vibration_path)) {
+                    Storage::disk($disk)->delete($this->vibration_path);
+                }
+            } catch (\Throwable) {
+                // Silently catch missing disk / unmounted storage exceptions
+            }
+        }
+    }
     protected $fillable = [
         'user_id',
         'vehicle_id',

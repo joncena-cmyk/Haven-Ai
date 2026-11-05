@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 
 use Laravel\Sanctum\HasApiTokens;
 
@@ -16,6 +17,20 @@ class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    protected static function booted(): void
+    {
+        static::deleting(function (User $user) {
+            foreach ($user->vehicles as $vehicle) {
+                if (!empty($vehicle->image_path)) {
+                    Storage::disk('public')->delete($vehicle->image_path);
+                }
+            }
+            foreach ($user->diagnostics as $diagnostic) {
+                $diagnostic->deleteFiles();
+            }
+        });
+    }
 
     /**
      * The attributes that are mass assignable.
