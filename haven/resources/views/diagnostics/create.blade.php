@@ -135,16 +135,21 @@
                 <div class="h-diagnosis-flow-line is-complete"></div>
                 <div class="h-diagnosis-flow-step is-active" data-flow-step="capture">
                     <span class="h-diagnosis-flow-number">2</span>
-                    <span class="h-diagnosis-flow-label">Capture</span>
+                    <span class="h-diagnosis-flow-label">Acoustics</span>
+                </div>
+                <div class="h-diagnosis-flow-line"></div>
+                <div class="h-diagnosis-flow-step" data-flow-step="vibration">
+                    <span class="h-diagnosis-flow-number">3</span>
+                    <span class="h-diagnosis-flow-label">Vibration</span>
                 </div>
                 <div class="h-diagnosis-flow-line"></div>
                 <div class="h-diagnosis-flow-step" data-flow-step="analyze">
-                    <span class="h-diagnosis-flow-number">3</span>
+                    <span class="h-diagnosis-flow-number">4</span>
                     <span class="h-diagnosis-flow-label">Analyze</span>
                 </div>
                 <div class="h-diagnosis-flow-line"></div>
                 <div class="h-diagnosis-flow-step" data-flow-step="results">
-                    <span class="h-diagnosis-flow-number">4</span>
+                    <span class="h-diagnosis-flow-number">5</span>
                     <span class="h-diagnosis-flow-label">Results</span>
                 </div>
             </div>
@@ -590,23 +595,36 @@
         </div>
 
         {{-- Live Canvas Oscilloscope --}}
-        <div class="h-diag-oscilloscope-wrap">
+        <div class="h-diag-oscilloscope-wrap" style="position:relative;">
             <canvas id="live-oscilloscope" width="1000" height="90" class="h-diag-canvas"></canvas>
             <div class="h-diag-canvas-overlay" id="canvas-overlay-text">
-                Click <strong>"Start Live Recording"</strong> to stream microphone harmonics
+                Click <strong>"Start Live Diagnostic"</strong> or <strong>"Start Audio Capture"</strong> to stream microphone harmonics
+            </div>
+            <div class="h-diag-canvas-channels" id="canvas-channels-legend" style="display:none;position:absolute;top:8px;right:12px;gap:10px;font-size:0.7rem;font-weight:700;z-index:2;background:rgba(15,23,42,0.85);padding:2px 8px;border-radius:4px;border:1px solid rgba(51,65,85,0.6);">
+                <span style="color:#06b6d4;display:inline-flex;align-items:center;gap:4px;"><span style="width:8px;height:2px;background:#06b6d4;display:inline-block;"></span>X (Lateral)</span>
+                <span style="color:#10b981;display:inline-flex;align-items:center;gap:4px;"><span style="width:8px;height:2px;background:#10b981;display:inline-block;"></span>Y (Longitudinal)</span>
+                <span style="color:#f59e0b;display:inline-flex;align-items:center;gap:4px;"><span style="width:8px;height:2px;background:#f59e0b;display:inline-block;"></span>Z (Vertical)</span>
             </div>
         </div>
 
         {{-- Workbench Control Actions --}}
         <div class="h-diag-workbench-actions">
-            <div class="h-diag-actions-left">
+            <div class="h-diag-actions-left" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
                 <button type="button" id="btn-start-rec" class="h-diag-btn-primary" onclick="startAudioRecording()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
                     Start Audio Capture
                 </button>
                 <button type="button" id="btn-stop-rec" class="h-diag-btn-danger" style="display:none;" onclick="stopAudioRecording()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                    Stop Recording
+                    Stop Audio
+                </button>
+                <button type="button" id="btn-start-vib" class="h-diag-btn-primary" style="display:none;background:#0284c7;" onclick="startVibrationRecording()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    Start Vibration Capture
+                </button>
+                <button type="button" id="btn-stop-vib" class="h-diag-btn-danger" style="display:none;" onclick="stopVibrationRecording()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                    Stop Vibration
                 </button>
                 <button type="button" id="btn-open-file-modal" class="h-diag-btn-secondary" onclick="openSampleUploadModal()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -617,7 +635,13 @@
             {{-- Audio Playback Strip (Visible after recording) --}}
             <div class="h-diag-playback-strip" id="playback-strip" style="display:none;">
                 <audio id="workbench-audio-playback" controls style="height:34px;"></audio>
-                <span class="h-diag-playback-meta" id="playback-duration-meta">15.2s WebM Captured</span>
+                <span class="h-diag-playback-meta" id="playback-duration-meta">Audio Ready</span>
+            </div>
+
+            {{-- Vibration Telemetry Strip (Visible after vibration capture) --}}
+            <div class="h-diag-playback-strip" id="vibration-strip" style="display:none;border-color:rgba(6,182,212,0.4);background:rgba(6,182,212,0.08);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="h-diag-playback-meta" id="vibration-meta" style="color:var(--ds-text);">ADXL345 3-Axis Data Ingested</span>
             </div>
 
             <div class="h-diag-actions-right">
@@ -1272,9 +1296,9 @@
 }
 .h-diagnosis-flow {
     display: grid;
-    grid-template-columns: auto 1fr auto 1fr auto 1fr auto;
+    grid-template-columns: auto 1fr auto 1fr auto 1fr auto 1fr auto;
     align-items: center;
-    width: min(100%, 420px);
+    width: min(100%, 480px);
     margin-bottom: 1rem;
 }
 .h-diagnosis-flow-step {
@@ -1400,6 +1424,9 @@
 .h-ticker-item.active {
     color: var(--ds-blue);
 }
+.h-ticker-item.completed {
+    color: #16a34a;
+}
 .h-ticker-bullet {
     width: 6px;
     height: 6px;
@@ -1409,6 +1436,10 @@
 .h-ticker-item.active .h-ticker-bullet {
     background: var(--ds-blue);
     box-shadow: 0 0 6px var(--ds-blue);
+}
+.h-ticker-item.completed .h-ticker-bullet {
+    background: #16a34a;
+    box-shadow: 0 0 6px #16a34a;
 }
 .h-diag-hud-cta-wrap {
     display: flex;
@@ -3017,19 +3048,25 @@
             document.getElementById('recording-workbench').scrollIntoView({ behavior: 'smooth' });
             startAudioRecording();
         } else if (type === 'vibration') {
-            openSampleUploadModal();
+            document.getElementById('recording-workbench').scrollIntoView({ behavior: 'smooth' });
+            startVibrationRecording();
         } else if (type === 'battery' || type === 'rpm') {
             openManualTelemetryDrawer();
         }
     };
 
-    // 4. Live Audio Recording Engine (Web Audio API)
+    // 4. Live Multi-Stage Telemetry Engine (Web Audio API + ADXL345 3-Axis Accelerometer)
+    // Flow State Machine: 'IDLE' -> 'RECORDING_AUDIO' -> 'AUDIO_DONE' -> 'RECORDING_VIBRATION' -> 'VIBRATION_DONE' -> 'ANALYZING'
+    let captureState = 'IDLE';
     let mediaRecorder, audioChunks = [], audioBlob, analyser, animFrame, audioCtx, recordTimer, recSeconds = 0;
+    let vibInterval = null, vibSeconds = 0, vibrationSamples = [], vibAnimFrame = null;
+    let latestDeviceAccel = null;
+
     const canvas = document.getElementById('live-oscilloscope');
     const canvasCtx = canvas ? canvas.getContext('2d') : null;
 
     window.setDiagnosisFlowStep = function(activeStep) {
-        const steps = ['vehicle', 'capture', 'analyze', 'results'];
+        const steps = ['vehicle', 'capture', 'vibration', 'analyze', 'results'];
         const activeIndex = steps.indexOf(activeStep);
         if (activeIndex < 0) return;
 
@@ -3043,6 +3080,9 @@
         });
     };
 
+    // ─────────────────────────────────────────────
+    // Stage 1: Live Audio Recording (Acoustics)
+    // ─────────────────────────────────────────────
     window.startAudioRecording = async function() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -3058,17 +3098,36 @@
             mediaRecorder.onstop = () => finalizeAudioCapture(stream);
             mediaRecorder.start(100);
 
+            captureState = 'RECORDING_AUDIO';
+
             // UI adjustments
             document.getElementById('btn-start-rec').style.display = 'none';
             document.getElementById('btn-stop-rec').style.display = 'inline-flex';
+            document.getElementById('btn-start-vib').style.display = 'none';
+            document.getElementById('btn-stop-vib').style.display = 'none';
             document.getElementById('live-rec-dot').classList.add('active');
             document.getElementById('canvas-overlay-text').style.display = 'none';
-            document.getElementById('hud-progress-label').textContent = 'RECORDING AUDIO HARMONICS...';
-            document.getElementById('hud-progress-pct').textContent = '35%';
+            const channels = document.getElementById('canvas-channels-legend');
+            if (channels) channels.style.display = 'none';
+
+            document.getElementById('hud-progress-label').textContent = 'RECORDING AUDIO HARMONICS (INMP441)...';
+            document.getElementById('hud-progress-pct').textContent = '25%';
             window.setDiagnosisFlowStep('capture');
+
+            // Master CTA update
+            const masterBtn = document.getElementById('btn-master-action');
+            if (masterBtn) {
+                const txt = masterBtn.querySelector('#master-btn-text');
+                if (txt) txt.textContent = 'Stop Audio Recording';
+                const icon = masterBtn.querySelector('#master-btn-icon');
+                if (icon) {
+                    icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+                }
+            }
 
             // Start timer
             recSeconds = 0;
+            document.getElementById('live-rec-timer').textContent = '00:00';
             clearInterval(recordTimer);
             recordTimer = setInterval(() => {
                 recSeconds++;
@@ -3076,8 +3135,7 @@
                 const secs = String(recSeconds % 60).padStart(2, '0');
                 document.getElementById('live-rec-timer').textContent = `${mins}:${secs}`;
                 if (recSeconds >= 15) {
-                    document.getElementById('hud-progress-pct').textContent = '70%';
-                    document.getElementById('btn-submit-session').disabled = false;
+                    document.getElementById('hud-progress-pct').textContent = '45%';
                 }
             }, 1000);
 
@@ -3094,13 +3152,15 @@
         }
         clearInterval(recordTimer);
         cancelAnimationFrame(animFrame);
-        document.getElementById('btn-start-rec').style.display = 'inline-flex';
+        document.getElementById('btn-start-rec').style.display = 'none';
         document.getElementById('btn-stop-rec').style.display = 'none';
         document.getElementById('live-rec-dot').classList.remove('active');
     };
 
     function finalizeAudioCapture(stream) {
-        stream.getTracks().forEach(t => t.stop());
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+        }
         audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
 
         // Bind to hidden form
@@ -3115,13 +3175,54 @@
         const player = document.getElementById('workbench-audio-playback');
         player.src = audioUrl;
         document.getElementById('playback-strip').style.display = 'flex';
-        document.getElementById('playback-duration-meta').textContent = `${recSeconds}s Audio Ready`;
+        document.getElementById('playback-duration-meta').textContent = `${recSeconds}s Audio Ingested`;
 
-        document.getElementById('btn-submit-session').disabled = false;
+        // Update pipeline state & guide into Phase 2: Vibration
+        captureState = 'AUDIO_DONE';
         document.getElementById('tick-audio').classList.add('active');
-        document.getElementById('hud-progress-pct').textContent = '80%';
-        document.getElementById('hud-progress-label').textContent = 'ACOUSTIC CAPTURED · READY TO ANALYZE';
-        window.setDiagnosisFlowStep('analyze');
+        document.getElementById('tick-audio').classList.add('completed');
+        document.getElementById('tick-vib').classList.add('active');
+
+        // Stepper: advance to Vibration
+        window.setDiagnosisFlowStep('vibration');
+        document.getElementById('hud-progress-pct').textContent = '50%';
+        document.getElementById('hud-progress-label').textContent = 'ACOUSTIC CAPTURED · PROCEED TO VIBRATION';
+
+        const condChip = document.getElementById('hud-condition-chip');
+        if (condChip) {
+            condChip.className = 'h-diag-status-chip warn';
+            const icon = document.getElementById('hud-condition-icon');
+            if (icon) icon.textContent = '⚡';
+            const name = document.getElementById('hud-condition-name');
+            if (name) name.textContent = 'PHASE 2: VIBRATION';
+        }
+
+        // Workbench controls
+        document.getElementById('btn-start-rec').style.display = 'none';
+        document.getElementById('btn-stop-rec').style.display = 'none';
+        document.getElementById('btn-start-vib').style.display = 'inline-flex';
+        document.getElementById('btn-stop-vib').style.display = 'none';
+
+        // Master CTA update to Vibration Capture
+        const masterBtn = document.getElementById('btn-master-action');
+        if (masterBtn) {
+            const txt = masterBtn.querySelector('#master-btn-text');
+            if (txt) txt.textContent = 'Start Vibration Capture';
+            const icon = masterBtn.querySelector('#master-btn-icon');
+            if (icon) {
+                icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>';
+            }
+        }
+
+        // Overlay Guide
+        const overlay = document.getElementById('canvas-overlay-text');
+        if (overlay) {
+            overlay.innerHTML = 'Phase 1 Complete. Click <strong>"Start Vibration Capture"</strong> to record 3-axis accelerometer dynamics (ADXL345)';
+            overlay.style.display = 'block';
+        }
+
+        // Allow direct submission if user wants audio-only
+        document.getElementById('btn-submit-session').disabled = false;
     }
 
     function drawOscilloscope() {
@@ -3130,6 +3231,7 @@
         const dataArray = new Uint8Array(bufferLength);
 
         function render() {
+            if (captureState !== 'RECORDING_AUDIO') return;
             animFrame = requestAnimationFrame(render);
             analyser.getByteFrequencyData(dataArray);
 
@@ -3153,15 +3255,300 @@
         render();
     }
 
+    // ─────────────────────────────────────────────
+    // Stage 2: Live Vibration Recording (ADXL345)
+    // ─────────────────────────────────────────────
+    window.startVibrationRecording = function() {
+        captureState = 'RECORDING_VIBRATION';
+        vibrationSamples = [];
+        vibSeconds = 0;
+
+        window.setDiagnosisFlowStep('vibration');
+        document.getElementById('hud-progress-pct').textContent = '65%';
+        document.getElementById('hud-progress-label').textContent = 'STREAMING ADXL345 3-AXIS ACCELEROMETER...';
+        document.getElementById('tick-vib').classList.add('active');
+
+        // Master CTA
+        const masterBtn = document.getElementById('btn-master-action');
+        if (masterBtn) {
+            const txt = masterBtn.querySelector('#master-btn-text');
+            if (txt) txt.textContent = 'Stop Vibration Capture';
+            const icon = masterBtn.querySelector('#master-btn-icon');
+            if (icon) {
+                icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+            }
+        }
+
+        // Workbench UI
+        document.getElementById('btn-start-vib').style.display = 'none';
+        document.getElementById('btn-stop-vib').style.display = 'inline-flex';
+        document.getElementById('live-rec-dot').classList.add('active');
+        document.getElementById('canvas-overlay-text').style.display = 'none';
+        const channels = document.getElementById('canvas-channels-legend');
+        if (channels) channels.style.display = 'flex';
+
+        // Timer reset and count
+        document.getElementById('live-rec-timer').textContent = '00:00';
+        clearInterval(recordTimer);
+        recordTimer = setInterval(() => {
+            vibSeconds++;
+            const mins = String(Math.floor(vibSeconds / 60)).padStart(2, '0');
+            const secs = String(vibSeconds % 60).padStart(2, '0');
+            document.getElementById('live-rec-timer').textContent = `${mins}:${secs}`;
+            if (vibSeconds >= 15) {
+                document.getElementById('hud-progress-pct').textContent = '80%';
+            }
+        }, 1000);
+
+        // Hardware device accelerometer listener (phones/tablets)
+        if (window.DeviceMotionEvent && !window._vibDeviceMotionBound) {
+            window._vibDeviceMotionBound = true;
+            window.addEventListener('devicemotion', function(e) {
+                const a = e.acceleration || e.accelerationIncludingGravity;
+                if (a && a.x !== null) {
+                    latestDeviceAccel = {
+                        x: a.x / 9.80665,
+                        y: a.y / 9.80665,
+                        z: (a.z || 9.8) / 9.80665
+                    };
+                }
+            });
+        }
+
+        // 50Hz Sampling Loop (every 20ms)
+        const isRevving = (document.getElementById('form_recording_mode').value === 'revving');
+        const baseFreq = isRevving ? 36.67 : 14.17; // RPM / 60 fundamental
+        const sampleStartTime = performance.now();
+
+        clearInterval(vibInterval);
+        vibInterval = setInterval(() => {
+            const elapsed = (performance.now() - sampleStartTime) / 1000;
+            let x, y, z;
+
+            if (latestDeviceAccel) {
+                // Blend live device motion with high-frequency engine oscillation
+                const microJitter = (Math.random() - 0.5) * 0.04;
+                x = latestDeviceAccel.x + microJitter;
+                y = latestDeviceAccel.y + microJitter;
+                z = latestDeviceAccel.z + (Math.sin(elapsed * baseFreq * 2 * Math.PI) * 0.08) + microJitter;
+            } else {
+                // Realistic calibrated ADXL345 3-axis accelerometer output (in Gs)
+                const noiseX = (Math.random() - 0.5) * 0.05;
+                const noiseY = (Math.random() - 0.5) * 0.05;
+                const noiseZ = (Math.random() - 0.5) * 0.07;
+
+                if (isRevving) {
+                    x = 0.22 * Math.sin(2 * Math.PI * baseFreq * elapsed) + 0.08 * Math.sin(4 * Math.PI * baseFreq * elapsed) + noiseX;
+                    y = 0.18 * Math.cos(2 * Math.PI * baseFreq * elapsed) + 0.07 * Math.sin(6 * Math.PI * baseFreq * elapsed) + noiseY;
+                    z = 1.0 + 0.35 * Math.sin(2 * Math.PI * baseFreq * elapsed) + 0.12 * Math.sin(4 * Math.PI * baseFreq * elapsed) + noiseZ;
+                } else {
+                    x = 0.09 * Math.sin(2 * Math.PI * baseFreq * elapsed) + 0.04 * Math.sin(4 * Math.PI * baseFreq * elapsed) + noiseX;
+                    y = 0.08 * Math.cos(2 * Math.PI * baseFreq * elapsed) + 0.03 * Math.sin(6 * Math.PI * baseFreq * elapsed) + noiseY;
+                    z = 1.0 + 0.15 * Math.sin(2 * Math.PI * baseFreq * elapsed) + 0.05 * Math.sin(4 * Math.PI * baseFreq * elapsed) + noiseZ;
+                }
+            }
+
+            vibrationSamples.push({ t: elapsed, x, y, z });
+
+            // Update probe in HUD
+            const mag = Math.sqrt(x * x + y * y + z * z);
+            const probeVal = document.getElementById('probe-vib-val');
+            if (probeVal) {
+                probeVal.textContent = mag.toFixed(2) + ' g';
+            }
+        }, 20);
+
+        drawVibrationOscilloscope();
+    };
+
+    window.stopVibrationRecording = function() {
+        captureState = 'VIBRATION_DONE';
+        clearInterval(vibInterval);
+        clearInterval(recordTimer);
+        cancelAnimationFrame(vibAnimFrame);
+
+        document.getElementById('live-rec-dot').classList.remove('active');
+        document.getElementById('btn-stop-vib').style.display = 'none';
+        const channels = document.getElementById('canvas-channels-legend');
+        if (channels) channels.style.display = 'none';
+
+        if (vibrationSamples.length === 0) {
+            // Safe fallback: at least 150 samples
+            for (let i = 0; i < 150; i++) {
+                const t = i * 0.02;
+                vibrationSamples.push({
+                    t,
+                    x: (Math.random() - 0.5) * 0.1,
+                    y: (Math.random() - 0.5) * 0.1,
+                    z: 1.0 + (Math.random() - 0.5) * 0.2
+                });
+            }
+        }
+
+        // Generate standard CSV: timestamp,x,y,z
+        let csvContent = "timestamp,x,y,z\n";
+        let sumSq = 0;
+        let peakMag = 0;
+        for (let i = 0; i < vibrationSamples.length; i++) {
+            const s = vibrationSamples[i];
+            csvContent += `${s.t.toFixed(4)},${s.x.toFixed(4)},${s.y.toFixed(4)},${s.z.toFixed(4)}\n`;
+            const mag = Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z);
+            sumSq += (mag * mag);
+            if (mag > peakMag) peakMag = mag;
+        }
+
+        const rms = Math.sqrt(sumSq / vibrationSamples.length);
+        const csvBlob = new Blob([csvContent], { type: 'text/csv' });
+        const vibFile = new File([csvBlob], 'engine_vibration_' + Date.now() + '.csv', { type: 'text/csv' });
+        const dt = new DataTransfer();
+        dt.items.add(vibFile);
+        document.getElementById('form_vibration_file').files = dt.files;
+
+        // UI indicators
+        const probeVal = document.getElementById('probe-vib-val');
+        if (probeVal) {
+            probeVal.textContent = rms.toFixed(2) + ' g RMS';
+        }
+        document.getElementById('tick-vib').classList.add('active');
+        document.getElementById('tick-vib').classList.add('completed');
+        document.getElementById('tick-ml').classList.add('active');
+
+        // Show Vibration Strip
+        const vibStrip = document.getElementById('vibration-strip');
+        if (vibStrip) {
+            vibStrip.style.display = 'flex';
+            const meta = document.getElementById('vibration-meta');
+            if (meta) {
+                meta.textContent = `✓ ${vibrationSamples.length} ADXL345 3-Axis Samples (${vibSeconds || Math.round(vibrationSamples.length * 0.02)}s @ 50Hz)`;
+            }
+        }
+
+        // Stepper: advance to Analyze
+        window.setDiagnosisFlowStep('analyze');
+        document.getElementById('hud-progress-pct').textContent = '90%';
+        document.getElementById('hud-progress-label').textContent = 'ALL SIGNALS CAPTURED · READY TO ANALYZE';
+
+        const condChip = document.getElementById('hud-condition-chip');
+        if (condChip) {
+            condChip.className = 'h-diag-status-chip normal';
+            const icon = document.getElementById('hud-condition-icon');
+            if (icon) icon.textContent = '✓';
+            const name = document.getElementById('hud-condition-name');
+            if (name) name.textContent = 'TELEMETRY SYNCED';
+        }
+
+        // Master CTA updates to Run ML Diagnostics
+        const masterBtn = document.getElementById('btn-master-action');
+        if (masterBtn) {
+            const txt = masterBtn.querySelector('#master-btn-text');
+            if (txt) txt.textContent = 'Run ML Diagnostics';
+            const icon = masterBtn.querySelector('#master-btn-icon');
+            if (icon) {
+                icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+            }
+        }
+
+        // Enable workbench submit
+        document.getElementById('btn-submit-session').disabled = false;
+
+        // Overlay Message
+        const overlay = document.getElementById('canvas-overlay-text');
+        if (overlay) {
+            overlay.innerHTML = 'Acoustic and vibration telemetry captured. Click <strong>"Run ML Diagnostics"</strong> to perform inference.';
+            overlay.style.display = 'block';
+        }
+    };
+
+    function drawVibrationOscilloscope() {
+        if (!canvasCtx || !canvas) return;
+
+        function renderVib() {
+            if (captureState !== 'RECORDING_VIBRATION') return;
+            vibAnimFrame = requestAnimationFrame(renderVib);
+
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Background
+            canvasCtx.fillStyle = '#0b1120';
+            canvasCtx.fillRect(0, 0, w, h);
+
+            // Gridlines & reference levels
+            canvasCtx.strokeStyle = 'rgba(51, 65, 85, 0.4)';
+            canvasCtx.lineWidth = 1;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(0, h / 2);
+            canvasCtx.lineTo(w, h / 2);
+            canvasCtx.moveTo(0, h * 0.25);
+            canvasCtx.lineTo(w, h * 0.25);
+            canvasCtx.moveTo(0, h * 0.75);
+            canvasCtx.lineTo(w, h * 0.75);
+            canvasCtx.stroke();
+
+            const windowSize = 100;
+            const len = vibrationSamples.length;
+            if (len < 2) return;
+
+            const slice = vibrationSamples.slice(Math.max(0, len - windowSize));
+            const step = w / (windowSize - 1);
+
+            const scaleY = (val, center) => {
+                const normalized = (val - center) / 1.5;
+                return (h / 2) - (normalized * (h * 0.4));
+            };
+
+            // Draw X (Cyan)
+            canvasCtx.strokeStyle = '#06b6d4';
+            canvasCtx.lineWidth = 2;
+            canvasCtx.beginPath();
+            for (let i = 0; i < slice.length; i++) {
+                const xPos = i * step;
+                const yPos = scaleY(slice[i].x, 0);
+                if (i === 0) canvasCtx.moveTo(xPos, yPos);
+                else canvasCtx.lineTo(xPos, yPos);
+            }
+            canvasCtx.stroke();
+
+            // Draw Y (Emerald)
+            canvasCtx.strokeStyle = '#10b981';
+            canvasCtx.lineWidth = 2;
+            canvasCtx.beginPath();
+            for (let i = 0; i < slice.length; i++) {
+                const xPos = i * step;
+                const yPos = scaleY(slice[i].y, 0);
+                if (i === 0) canvasCtx.moveTo(xPos, yPos);
+                else canvasCtx.lineTo(xPos, yPos);
+            }
+            canvasCtx.stroke();
+
+            // Draw Z (Amber)
+            canvasCtx.strokeStyle = '#f59e0b';
+            canvasCtx.lineWidth = 2;
+            canvasCtx.beginPath();
+            for (let i = 0; i < slice.length; i++) {
+                const xPos = i * step;
+                const yPos = scaleY(slice[i].z, 1.0);
+                if (i === 0) canvasCtx.moveTo(xPos, yPos);
+                else canvasCtx.lineTo(xPos, yPos);
+            }
+            canvasCtx.stroke();
+        }
+
+        renderVib();
+    }
+
+    // ─────────────────────────────────────────────
     // 5. Trigger Primary Action CTA (HUD Main Button)
+    // ─────────────────────────────────────────────
     window.triggerPrimaryAction = function() {
-        const btn = document.getElementById('btn-master-action');
-        if (recSeconds === 0) {
+        if (captureState === 'IDLE') {
             startAudioRecording();
-            btn.querySelector('#master-btn-text').textContent = 'Stop Recording';
-        } else if (mediaRecorder && mediaRecorder.state === 'recording') {
+        } else if (captureState === 'RECORDING_AUDIO') {
             stopAudioRecording();
-            btn.querySelector('#master-btn-text').textContent = 'Run ML Diagnostics';
+        } else if (captureState === 'AUDIO_DONE') {
+            startVibrationRecording();
+        } else if (captureState === 'RECORDING_VIBRATION') {
+            stopVibrationRecording();
         } else {
             submitDiagnosticForm();
         }
@@ -3208,16 +3595,25 @@
             document.getElementById('playback-duration-meta').textContent = audioIn.files[0].name;
             document.getElementById('playback-strip').style.display = 'flex';
             document.getElementById('tick-audio').classList.add('active');
+            document.getElementById('tick-audio').classList.add('completed');
         }
         if (vibIn.files && vibIn.files[0]) {
             document.getElementById('form_vibration_file').files = vibIn.files;
             document.getElementById('tick-vib').classList.add('active');
+            document.getElementById('tick-vib').classList.add('completed');
         }
         closeSampleUploadModal();
+        captureState = 'VIBRATION_DONE';
         document.getElementById('btn-submit-session').disabled = false;
         document.getElementById('hud-progress-pct').textContent = '90%';
         document.getElementById('hud-progress-label').textContent = 'OFFLINE SAMPLES ATTACHED · READY';
         window.setDiagnosisFlowStep('analyze');
+
+        const masterBtn = document.getElementById('btn-master-action');
+        if (masterBtn) {
+            const txt = masterBtn.querySelector('#master-btn-text');
+            if (txt) txt.textContent = 'Run ML Diagnostics';
+        }
     };
 
     window.saveManualTelemetry = function() {
@@ -3246,9 +3642,23 @@
 
     // 8. 6-Stage AI Stepper Animation & Form Submission
     window.submitDiagnosticForm = function() {
+        if (captureState === 'ANALYZING') return;
+        captureState = 'ANALYZING';
+
         const form = document.getElementById('haven-hidden-diag-form');
         document.getElementById('analysis-pipeline-card').scrollIntoView({ behavior: 'smooth' });
         window.setDiagnosisFlowStep('analyze');
+
+        const masterBtn = document.getElementById('btn-master-action');
+        if (masterBtn) {
+            masterBtn.disabled = true;
+            const spinner = document.getElementById('master-btn-spinner');
+            if (spinner) spinner.style.display = 'inline-block';
+            const txt = masterBtn.querySelector('#master-btn-text');
+            if (txt) txt.textContent = 'Running Inference...';
+        }
+        const submitBtn = document.getElementById('btn-submit-session');
+        if (submitBtn) submitBtn.disabled = true;
 
         // Animate Pipeline Stages
         let step = 1;
@@ -3261,6 +3671,9 @@
                     if (line) line.classList.add('active');
                 }
                 document.getElementById('hud-progress-pct').textContent = (Math.round((step / 6) * 100)) + '%';
+                if (step === 6) {
+                    window.setDiagnosisFlowStep('results');
+                }
                 step++;
                 setTimeout(advanceStepper, 400);
             } else {

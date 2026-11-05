@@ -279,13 +279,18 @@ class CapstoneImprovementsTest extends TestCase
             'plate_number' => 'ABC-1234',
         ]);
 
-        // 1. Diagnostics Create page (Groupmate's Diagnose UI + 3D/2D + 4-step flow)
+        // 1. Diagnostics Create page (Groupmate's Diagnose UI + 3D/2D + 5-step flow with Vibration)
         $createResponse = $this->actingAs($user)->get(route('diagnostics.create', ['vehicle_id' => $vehicle->id]));
         $createResponse->assertOk();
         $createResponse->assertSee('id="vehicle-pill"', false);
         $createResponse->assertSee('id="vehicle-menu"', false);
         $createResponse->assertSee('class="h-diagnosis-flow"', false);
         $createResponse->assertSee('data-flow-step="capture"', false);
+        $createResponse->assertSee('data-flow-step="vibration"', false);
+        $createResponse->assertSee('id="btn-start-vib"', false);
+        $createResponse->assertSee('id="btn-stop-vib"', false);
+        $createResponse->assertSee('id="vibration-strip"', false);
+        $createResponse->assertSee('id="canvas-channels-legend"', false);
         $createResponse->assertSee('id="view-mode-3d"', false);
         $createResponse->assertSee('id="view-mode-2d"', false);
         $createResponse->assertSee('id="diagnostic-sketchfab-stage"', false);
