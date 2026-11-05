@@ -51,4 +51,35 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
         $response->assertRedirect('/');
     }
+
+    public function test_modal_ajax_login_succeeds_and_returns_json(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->postJson('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertOk();
+        $response->assertJson([
+            'success' => true,
+            'redirect' => route('dashboard', absolute: false),
+        ]);
+    }
+
+    public function test_modal_ajax_login_fails_and_returns_422_json(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->postJson('/login', [
+            'email' => $user->email,
+            'password' => 'incorrect-password',
+        ]);
+
+        $this->assertGuest();
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['email']);
+    }
 }

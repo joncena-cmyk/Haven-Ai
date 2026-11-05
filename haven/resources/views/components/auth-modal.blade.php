@@ -141,6 +141,10 @@
         color: #0f172a;
     }
 
+    @keyframes havenSpin {
+        to { transform: rotate(360deg); }
+    }
+
     .haven-modal-backdrop.is-open .haven-modal-card {
         transform: scale(1) translateY(0);
         opacity: 1;
@@ -203,6 +207,19 @@
         {{-- Standard Email & Password Form --}}
         <form method="POST" action="{{ route('login') }}" id="modal-login-form">
             @csrf
+
+            {{-- Dynamic AJAX Error Alert --}}
+            <div id="modal-error-alert" style="display:none;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);color:#f87171;border-radius:10px;padding:0.65rem 0.85rem;font-size:0.8rem;margin-bottom:1rem;line-height:1.4;align-items:center;gap:0.5rem;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span id="modal-error-text">These credentials do not match our records.</span>
+            </div>
+
+            @if ($errors->any())
+                <div id="modal-server-error" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);color:#f87171;border-radius:10px;padding:0.65rem 0.85rem;font-size:0.8rem;margin-bottom:1rem;line-height:1.4;display:flex;align-items:center;gap:0.5rem;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>{{ $errors->first() }}</span>
+                </div>
+            @endif
 
             <div style="margin-bottom:1rem;">
                 <label class="haven-label" for="modal_email" style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--h-muted);margin-bottom:0.35rem;display:block;">Email address</label>
@@ -315,6 +332,10 @@
     document.addEventListener('DOMContentLoaded', function() {
         restoreRememberedDevice();
 
+        @if ($errors->any())
+            openAuthModal();
+        @endif
+
         const modal = document.getElementById('haven-auth-modal');
         if (modal) {
             modal.addEventListener('click', function(e) {
@@ -325,8 +346,20 @@
         }
 
         const modalForm = document.getElementById('modal-login-form');
-        if (modalForm) {
-            modalForm.addEventListener('submit', function() {
+        const submitBtn = document.getElementById('modal-login-btn');
+        const errorAlert = document.getElementById('modal-error-alert');
+        const errorText = document.getElementById('modal-error-text');
+
+        if (modalForm && submitBtn) {
+            modalForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                // Clear previous errors
+                if (errorAlert) errorAlert.style.display = 'none';
+                const serverErr = document.getElementById('modal-server-error');
+                if (serverErr) serverErr.style.display = 'none';
+
+                // Save remember me preference
                 try {
                     const rememberCheckbox = document.getElementById('modal_remember');
                     const emailInput = document.getElementById('modal_email');
@@ -337,8 +370,68 @@
                         localStorage.removeItem('haven_remember_device');
                         localStorage.removeItem('haven_remember_email');
                     }
-                } catch (e) {
-                    // Ignore storage access errors
+                } catch (err) {}
+
+                // Button loading feedback
+                const originalHtml = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.85';
+                submitBtn.style.cursor = 'wait';
+                submitBtn.innerHTML = `
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:havenSpin 0.9s linear infinite;">
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+                    </svg>
+                    <span>Signing In...</span>
+                `;
+
+                try {
+                    const formData = new FormData(modalForm);
+                    const response = await fetch(modalForm.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        window.location.href = data.redirect || '{{ route('dashboard', absolute: false) }}';
+                        return;
+                    }
+
+                    // On error (422 or 401)
+                    const data = await response.json().catch(() => null);
+                    let message = 'These credentials do not match our records.';
+                    if (data && data.errors) {
+                        const firstKey = Object.keys(data.errors)[0];
+                        if (firstKey && data.errors[firstKey][0]) {
+                            message = data.errors[firstKey][0];
+                        }
+                    } else if (data && data.message) {
+                        message = data.message;
+                    }
+
+                    if (errorAlert && errorText) {
+                        errorText.textContent = message;
+                        errorAlert.style.display = 'flex';
+                    }
+
+                    const pwInput = document.getElementById('modal_password');
+                    if (pwInput) {
+                        pwInput.value = '';
+                        pwInput.focus();
+                    }
+                } catch (err) {
+                    modalForm.submit();
+                    return;
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.style.opacity = '1';
+                    submitBtn.style.cursor = 'pointer';
+                    submitBtn.innerHTML = originalHtml;
                 }
             });
         }
