@@ -67,12 +67,13 @@
             </a>
 
             {{-- Re-analyze or Analyze Button --}}
-            @if(in_array($diagnostic->status, ['draft','submitted']) && ($diagnostic->hasAudio() || $diagnostic->hasVibration() || $diagnostic->hasMultiSensor()))
+            @if(in_array($diagnostic->status, ['draft','submitted', 'processing']) && ($diagnostic->hasAudio() || $diagnostic->hasVibration() || $diagnostic->hasMultiSensor()))
                 <form method="POST" action="{{ route('diagnostics.analyze', $diagnostic) }}">
                     @csrf
-                    <button type="submit" class="h-diag-cta-btn" style="height:34px;padding:0 0.85rem;font-size:0.75rem;">
+                    <input type="hidden" name="sync" value="1">
+                    <button type="submit" class="h-diag-cta-btn" style="height:34px;padding:0 0.85rem;font-size:0.75rem;" title="Run fast synchronous ML analysis immediately">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
-                        Run Analysis
+                        Run Analysis (Direct)
                     </button>
                 </form>
             @elseif($diagnostic->status === 'completed')
@@ -116,6 +117,25 @@
         <div class="h-flash h-flash-error" style="margin-bottom:1rem;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             {{ session('error') }}
+        </div>
+    @endif
+
+    @if(in_array($diagnostic->status, ['submitted', 'processing']))
+        <div id="queue-status-banner" class="h-flash" style="background:rgba(2,132,199,0.08);border:1px solid rgba(2,132,199,0.25);color:var(--ds-text);margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+                <span class="h-diag-live-dot" style="background:#0284c7;width:9px;height:9px;border-radius:50%;display:inline-block;animation:pulse 1.5s infinite;"></span>
+                <span style="font-size:0.82rem;font-weight:600;">
+                    Diagnostic session is queued for ML inference. Live results will automatically refresh when ready...
+                </span>
+            </div>
+            <form method="POST" action="{{ route('diagnostics.analyze', $diagnostic) }}" style="margin:0;">
+                @csrf
+                <input type="hidden" name="sync" value="1">
+                <button type="submit" class="h-diag-cta-btn" style="height:30px;padding:0 0.75rem;font-size:0.72rem;background:#0284c7;border-color:#0284c7;" title="Run ML inference immediately in direct synchronous mode">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    Run Fast Analysis Now (Direct)
+                </button>
+            </form>
         </div>
     @endif
 
@@ -864,10 +884,10 @@
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
                 <div style="display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.88rem;color:#0f172a;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                    Vibration Data (ADXL345)
+                    Vibration Telemetry
                 </div>
-                <span class="h-badge {{ $diagnostic->hasVibration() ? 'h-badge-teal' : 'h-badge-gray' }}" style="font-size:0.65rem;">
-                    {{ $diagnostic->hasVibration() ? 'Captured' : 'Missing' }}
+                <span class="h-badge {{ $diagnostic->vibration_source_badge }}" style="font-size:0.65rem;">
+                    {{ $diagnostic->vibration_source_label }}
                 </span>
             </div>
             @if($diagnostic->hasVibration())
@@ -876,12 +896,17 @@
                     <span>Peak: <strong style="color:#d97706;">{{ $diagnostic->vibration_peak_g }}g</strong></span>
                     <span>RMS: <strong style="color:#0284c7;">{{ $diagnostic->vibration_rms_g }}g</strong></span>
                 </div>
+                @if($diagnostic->vibration_source === 'simulated')
+                    <div style="margin-bottom:0.75rem;padding:0.4rem 0.6rem;border-radius:6px;background:#fef3c7;border:1px solid #fde68a;font-size:0.73rem;color:#92400e;">
+                        <strong>Demo Notice:</strong> Synthesized browser waveform. Excluded from machine learning retraining datasets.
+                    </div>
+                @endif
                 <a href="{{ route('diagnostics.vibration', $diagnostic) }}" download class="h-diag-btn-subtle" style="text-decoration:none;font-size:0.75rem;padding:0.4rem 0.75rem;display:inline-flex;align-items:center;gap:0.4rem;">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Download Vibration CSV
                 </a>
             @else
-                <p style="font-size:0.78rem;color:#94a3b8;margin:0;">No vibration data captured.</p>
+                <p style="font-size:0.78rem;color:#94a3b8;margin:0;">{{ $diagnostic->vibration_source === 'skipped' ? 'Vibration capture was skipped (Audio-only session).' : 'No vibration data captured.' }}</p>
             @endif
         </div>
 
@@ -1832,6 +1857,34 @@ window.toggleVehiclePerspective = function() {
     const car = document.getElementById('car-stage-wrap');
     if (car) car.style.transform = transforms[currentPerspective];
 };
+</script>
+@endif
+
+@if(in_array($diagnostic->status, ['submitted', 'processing']))
+<script>
+(function() {
+    let pollAttempts = 0;
+    const pollInterval = setInterval(async () => {
+        pollAttempts++;
+        try {
+            const resp = await fetch("{{ route('diagnostics.status', $diagnostic) }}", {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.status === 'completed' || data.status === 'failed') {
+                    clearInterval(pollInterval);
+                    window.location.reload();
+                }
+            }
+        } catch (e) {
+            console.warn('Status poll warning:', e);
+        }
+        if (pollAttempts >= 120) {
+            clearInterval(pollInterval);
+        }
+    }, 2500);
+})();
 </script>
 @endif
 

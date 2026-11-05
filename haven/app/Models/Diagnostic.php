@@ -40,6 +40,7 @@ class Diagnostic extends Model
         'audio_duration_sec',
         'audio_original_name',
         'vibration_path',
+        'vibration_source',
         'vibration_sample_count',
         'vibration_peak_g',
         'vibration_rms_g',
@@ -129,6 +130,29 @@ class Diagnostic extends Model
             'completed'  => 'h-badge-green',
             'failed'     => 'h-badge-red',
             default      => 'h-badge-gray',
+        };
+    }
+
+    public function getVibrationSourceLabelAttribute(): string
+    {
+        return match ($this->vibration_source) {
+            'adxl345_live'  => 'ADXL345 Hardware Stream',
+            'device_sensor' => 'Device Motion Accelerometer',
+            'csv_import'    => 'Imported CSV Telemetry',
+            'simulated'     => 'Simulated Waveform (Demo)',
+            'skipped'       => 'Skipped (Audio Only)',
+            default         => $this->hasVibration() ? 'Vibration Telemetry' : 'None',
+        };
+    }
+
+    public function getVibrationSourceBadgeAttribute(): string
+    {
+        return match ($this->vibration_source) {
+            'adxl345_live', 'device_sensor' => 'h-badge-teal',
+            'csv_import'                    => 'h-badge-teal',
+            'simulated'                     => 'h-badge-amber',
+            'skipped'                       => 'h-badge-gray',
+            default                         => $this->hasVibration() ? 'h-badge-teal' : 'h-badge-gray',
         };
     }
 

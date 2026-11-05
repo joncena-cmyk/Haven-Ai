@@ -626,6 +626,10 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
                     Stop Vibration
                 </button>
+                <button type="button" id="btn-skip-vib" class="h-diag-btn-secondary" style="display:none;" onclick="skipVibrationCapture()" title="Proceed directly to ML analysis with acoustic telemetry only">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+                    Skip Vibration (Audio Only)
+                </button>
                 <button type="button" id="btn-open-file-modal" class="h-diag-btn-secondary" onclick="openSampleUploadModal()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                     Import Vibration CSV
@@ -811,6 +815,7 @@
     <input type="hidden" name="vehicle_id" id="form_vehicle_id" value="{{ $selectedVehicle?->id }}">
     <input type="hidden" name="recording_mode" id="form_recording_mode" value="idle">
     <input type="hidden" name="notes" id="form_notes" value="Live Diagnostic Studio Session">
+    <input type="hidden" name="vibration_source" id="form_vibration_source" value="none">
     <input type="file" name="audio_blob" id="form_audio_blob">
     <input type="file" name="audio_file" id="form_audio_file">
     <input type="file" name="vibration_file" id="form_vibration_file">
@@ -3212,6 +3217,8 @@
         document.getElementById('btn-stop-rec').style.display = 'none';
         document.getElementById('btn-start-vib').style.display = 'inline-flex';
         document.getElementById('btn-stop-vib').style.display = 'none';
+        const skipVibBtn = document.getElementById('btn-skip-vib');
+        if (skipVibBtn) skipVibBtn.style.display = 'inline-flex';
 
         // Master CTA update to Vibration Capture
         const masterBtn = document.getElementById('btn-master-action');
@@ -3227,7 +3234,7 @@
         // Overlay Guide
         const overlay = document.getElementById('canvas-overlay-text');
         if (overlay) {
-            overlay.innerHTML = 'Phase 1 Complete. Click <strong>"Start Vibration Capture"</strong> to record 3-axis accelerometer dynamics (ADXL345)';
+            overlay.innerHTML = 'Phase 1 Complete. Click <strong>"Start Vibration Capture"</strong> for 3-axis accelerometer data, or <strong>"Skip Vibration"</strong> for audio-only.';
             overlay.style.display = 'block';
         }
 
@@ -3266,7 +3273,7 @@
     }
 
     // ─────────────────────────────────────────────
-    // Stage 2: Live Vibration Recording (ADXL345)
+    // Stage 2: Live Vibration Recording (ADXL345 / Device Sensor)
     // ─────────────────────────────────────────────
     window.startVibrationRecording = function() {
         captureState = 'RECORDING_VIBRATION';
@@ -3275,7 +3282,7 @@
 
         window.setDiagnosisFlowStep('vibration');
         document.getElementById('hud-progress-pct').textContent = '65%';
-        document.getElementById('hud-progress-label').textContent = 'STREAMING ADXL345 3-AXIS ACCELEROMETER...';
+        document.getElementById('hud-progress-label').textContent = latestDeviceAccel ? 'STREAMING HARDWARE ACCELEROMETER...' : 'SIMULATING VIBRATION HARMONICS (DEMO)...';
         document.getElementById('tick-vib').classList.add('active');
 
         // Master CTA
@@ -3292,6 +3299,8 @@
         // Workbench UI
         document.getElementById('btn-start-vib').style.display = 'none';
         document.getElementById('btn-stop-vib').style.display = 'inline-flex';
+        const skipVibBtn = document.getElementById('btn-skip-vib');
+        if (skipVibBtn) skipVibBtn.style.display = 'none';
         document.getElementById('live-rec-dot').classList.add('active');
         document.getElementById('canvas-overlay-text').style.display = 'none';
         const channels = document.getElementById('canvas-channels-legend');
@@ -3310,7 +3319,10 @@
             }
         }, 1000);
 
-        // Hardware device accelerometer listener (phones/tablets)
+        // Hardware device accelerometer listener (phones/tablets / iOS permission)
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            DeviceMotionEvent.requestPermission().catch(() => {});
+        }
         if (window.DeviceMotionEvent && !window._vibDeviceMotionBound) {
             window._vibDeviceMotionBound = true;
             window.addEventListener('devicemotion', function(e) {
@@ -3321,6 +3333,10 @@
                         y: a.y / 9.80665,
                         z: (a.z || 9.8) / 9.80665
                     };
+                    const label = document.getElementById('hud-progress-label');
+                    if (label && captureState === 'RECORDING_VIBRATION') {
+                        label.textContent = 'STREAMING HARDWARE ACCELEROMETER...';
+                    }
                 }
             });
         }
@@ -3414,6 +3430,11 @@
         dt.items.add(vibFile);
         document.getElementById('form_vibration_file').files = dt.files;
 
+        // Determine sensor source transparency
+        const isSimulated = !latestDeviceAccel;
+        const source = isSimulated ? 'simulated' : 'device_sensor';
+        document.getElementById('form_vibration_source').value = source;
+
         // UI indicators
         const probeVal = document.getElementById('probe-vib-val');
         if (probeVal) {
@@ -3423,20 +3444,26 @@
         document.getElementById('tick-vib').classList.add('completed');
         document.getElementById('tick-ml').classList.add('active');
 
-        // Show Vibration Strip
+        // Show Vibration Strip with Source Transparency
         const vibStrip = document.getElementById('vibration-strip');
         if (vibStrip) {
             vibStrip.style.display = 'flex';
             const meta = document.getElementById('vibration-meta');
             if (meta) {
-                meta.textContent = `✓ ${vibrationSamples.length} ADXL345 3-Axis Samples (${vibSeconds || Math.round(vibrationSamples.length * 0.02)}s @ 50Hz)`;
+                if (isSimulated) {
+                    meta.innerHTML = `<span style="color:#f59e0b;font-weight:700;">[DEMO SIMULATION]</span> Synthetic 3-Axis Data (${vibrationSamples.length} samples @ 50Hz) · <em style="color:#64748b;">Excluded from retraining</em>`;
+                } else {
+                    meta.innerHTML = `<span style="color:#10b981;font-weight:700;">[HARDWARE SENSOR]</span> ${vibrationSamples.length} Live 3-Axis Samples (${vibSeconds || Math.round(vibrationSamples.length * 0.02)}s @ 50Hz)`;
+                }
             }
         }
 
         // Stepper: advance to Analyze
         window.setDiagnosisFlowStep('analyze');
         document.getElementById('hud-progress-pct').textContent = '90%';
-        document.getElementById('hud-progress-label').textContent = 'ALL SIGNALS CAPTURED · READY TO ANALYZE';
+        document.getElementById('hud-progress-label').textContent = isSimulated
+            ? 'ACOUSTIC & DEMO VIBRATION CAPTURED · READY TO ANALYZE'
+            : 'ALL SIGNALS CAPTURED · READY TO ANALYZE';
 
         const condChip = document.getElementById('hud-condition-chip');
         if (condChip) {
@@ -3465,6 +3492,68 @@
         const overlay = document.getElementById('canvas-overlay-text');
         if (overlay) {
             overlay.innerHTML = 'Acoustic and vibration telemetry captured. Click <strong>"Run ML Diagnostics"</strong> to perform inference.';
+            overlay.style.display = 'block';
+        }
+    };
+
+    window.skipVibrationCapture = function() {
+        captureState = 'VIBRATION_DONE';
+        document.getElementById('form_vibration_source').value = 'skipped';
+        document.getElementById('form_vibration_file').value = '';
+
+        // UI buttons
+        document.getElementById('btn-start-vib').style.display = 'none';
+        document.getElementById('btn-stop-vib').style.display = 'none';
+        const skipVibBtn = document.getElementById('btn-skip-vib');
+        if (skipVibBtn) skipVibBtn.style.display = 'none';
+
+        // Ticks
+        document.getElementById('tick-vib').classList.add('active');
+        document.getElementById('tick-vib').classList.add('completed');
+        document.getElementById('tick-ml').classList.add('active');
+
+        // Stepper: advance to Analyze
+        window.setDiagnosisFlowStep('analyze');
+        document.getElementById('hud-progress-pct').textContent = '90%';
+        document.getElementById('hud-progress-label').textContent = 'AUDIO CAPTURED · VIBRATION SKIPPED (AUDIO ONLY)';
+
+        const condChip = document.getElementById('hud-condition-chip');
+        if (condChip) {
+            condChip.className = 'h-diag-status-chip normal';
+            const icon = document.getElementById('hud-condition-icon');
+            if (icon) icon.textContent = '✓';
+            const name = document.getElementById('hud-condition-name');
+            if (name) name.textContent = 'ACOUSTIC TELEMETRY READY';
+        }
+
+        // Show vibration strip with skipped note
+        const vibStrip = document.getElementById('vibration-strip');
+        if (vibStrip) {
+            vibStrip.style.display = 'flex';
+            const meta = document.getElementById('vibration-meta');
+            if (meta) {
+                meta.innerHTML = `<span style="color:#94a3b8;font-weight:600;">[SKIPPED]</span> Vibration omitted — running acoustic-only ML inference`;
+            }
+        }
+
+        // Master CTA updates to Run ML Diagnostics
+        const masterBtn = document.getElementById('btn-master-action');
+        if (masterBtn) {
+            const txt = masterBtn.querySelector('#master-btn-text');
+            if (txt) txt.textContent = 'Run ML Diagnostics';
+            const icon = masterBtn.querySelector('#master-btn-icon');
+            if (icon) {
+                icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+            }
+        }
+
+        // Enable workbench submit
+        document.getElementById('btn-submit-session').disabled = false;
+
+        // Overlay Message
+        const overlay = document.getElementById('canvas-overlay-text');
+        if (overlay) {
+            overlay.innerHTML = 'Acoustic telemetry captured (Vibration skipped). Click <strong>"Run ML Diagnostics"</strong> to perform inference.';
             overlay.style.display = 'block';
         }
     };
@@ -3633,16 +3722,20 @@
 
         if (vibIn && vibIn.files && vibIn.files[0]) {
             document.getElementById('form_vibration_file').files = vibIn.files;
+            document.getElementById('form_vibration_source').value = 'csv_import';
             document.getElementById('tick-vib').classList.add('active');
             document.getElementById('tick-vib').classList.add('completed');
             document.getElementById('probe-vib-val').textContent = 'CSV Attached';
+
+            const skipVibBtn = document.getElementById('btn-skip-vib');
+            if (skipVibBtn) skipVibBtn.style.display = 'none';
 
             const vibStrip = document.getElementById('vibration-strip');
             if (vibStrip) {
                 vibStrip.style.display = 'flex';
                 const meta = document.getElementById('vibration-meta');
                 if (meta) {
-                    meta.textContent = `✓ Ingested ${vibIn.files[0].name}`;
+                    meta.innerHTML = `<span style="color:#0284c7;font-weight:700;">[CSV IMPORT]</span> Ingested ${vibIn.files[0].name}`;
                 }
             }
 

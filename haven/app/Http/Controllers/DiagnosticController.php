@@ -75,10 +75,11 @@ class DiagnosticController extends Controller
     {
         $request->validate([
             'vehicle_id'     => ['required', 'integer', 'exists:vehicles,id'],
-            'audio_blob'     => ['nullable', 'file', 'mimes:webm,ogg,wav,mp3,mp4', 'max:51200'], // 50 MB
-            'audio_file'     => ['nullable', 'file', 'mimes:webm,ogg,wav,mp3,mp4,m4a', 'max:51200'],
-            'vibration_file' => ['nullable', 'file', 'mimes:csv,json,txt', 'max:5120'], // 5 MB
-            'notes'          => ['nullable', 'string', 'max:1000'],
+            'audio_blob'       => ['nullable', 'file', 'mimes:webm,ogg,wav,mp3,mp4', 'max:51200'], // 50 MB
+            'audio_file'       => ['nullable', 'file', 'mimes:webm,ogg,wav,mp3,mp4,m4a', 'max:51200'],
+            'vibration_file'   => ['nullable', 'file', 'mimes:csv,json,txt', 'max:5120'], // 5 MB
+            'vibration_source' => ['nullable', 'string', 'in:adxl345_live,device_sensor,csv_import,simulated,skipped'],
+            'notes'            => ['nullable', 'string', 'max:1000'],
             'recording_mode' => ['nullable', 'string', 'in:idle,revving'],
             'temperature_c'  => ['nullable', 'numeric', 'min:-40', 'max:200'],
             'rpm'            => ['nullable', 'integer', 'min:0', 'max:12000'],
@@ -122,19 +123,28 @@ class DiagnosticController extends Controller
             }
         }
 
-        // ── Vibration file ──
+        // ── Vibration file & sensor source ──
+        $vibrationSource = $request->input('vibration_source');
         if ($request->hasFile('vibration_file')) {
             $vib  = $request->file('vibration_file');
             $dir  = "diagnostics/{$vehicle->id}/vibration";
             $path = $vib->store($dir, 'local');
             $data['vibration_path'] = $path;
 
+            if (empty($vibrationSource)) {
+                $vibrationSource = 'csv_import';
+            }
+
             // Parse sample count and peak/RMS from CSV if provided
             [$sampleCount, $peakG, $rmsG] = $this->parseVibrationSummary($vib->getRealPath(), $vib->getClientOriginalExtension());
             $data['vibration_sample_count'] = $sampleCount;
             $data['vibration_peak_g']       = $peakG;
             $data['vibration_rms_g']        = $rmsG;
+        } elseif ($vibrationSource === 'skipped') {
+            $data['vibration_path'] = null;
         }
+
+        $data['vibration_source'] = $vibrationSource;
 
         // Mark as submitted and auto-queue analysis if telemetry or files are present
         $hasData = !empty($data['audio_path']) || !empty($data['vibration_path']) || !empty($data['temperature_c']) || !empty($data['rpm']);
@@ -145,8 +155,13 @@ class DiagnosticController extends Controller
         $diagnostic = Diagnostic::create($data);
 
         if ($data['status'] === 'submitted') {
-            AnalyzeDiagnosticJob::dispatch($diagnostic);
-            $msg = 'Diagnostic session created! Analysis queued for dual-tier ML processing in the background.';
+            if (config('queue.default') === 'sync') {
+                AnalyzeDiagnosticJob::dispatchSync($diagnostic);
+                $msg = 'Diagnostic session created! Analysis processed via synchronous ML pipeline.';
+            } else {
+                AnalyzeDiagnosticJob::dispatch($diagnostic);
+                $msg = 'Diagnostic session created! Analysis queued for dual-tier ML processing in the background.';
+            }
         } else {
             $msg = 'Diagnostic saved as draft. Add audio, vibration data, or telemetry to run analysis.';
         }
@@ -411,7 +426,14 @@ class DiagnosticController extends Controller
     ───────────────────────────────────────────── */
     public function exportDataset(): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $diagnostics = Auth::user()->diagnostics()->with('vehicle')->whereNotNull('ml_condition')->get();
+        $diagnostics = Auth::user()->diagnostics()
+            ->with('vehicle')
+            ->whereNotNull('ml_condition')
+            ->where(function ($q) {
+                $q->whereNull('vibration_source')
+                  ->orWhere('vibration_source', '!=', 'simulated');
+            })
+            ->get();
 
         $headers = [
             'Content-Type' => 'text/csv',
@@ -421,7 +443,7 @@ class DiagnosticController extends Controller
         return response()->stream(function () use ($diagnostics) {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, [
-                'diagnostic_id', 'vehicle', 'engine', 'peak_g', 'rms_g', 'crest_factor',
+                'diagnostic_id', 'vehicle', 'engine', 'vibration_source', 'peak_g', 'rms_g', 'crest_factor',
                 'temperature_c', 'rpm', 'voltage_v', 'current_ma', 'condition', 'confidence'
             ]);
 
@@ -434,6 +456,7 @@ class DiagnosticController extends Controller
                     $diag->id,
                     $diag->vehicle?->display_name ?? 'N/A',
                     $diag->vehicle?->engine_type ?? 'N/A',
+                    $diag->vibration_source ?? 'physical',
                     $diag->vibration_peak_g,
                     $diag->vibration_rms_g,
                     $crest,

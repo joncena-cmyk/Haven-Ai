@@ -69,6 +69,10 @@ class MlManagementController extends Controller
     {
         $diagnostics = Diagnostic::whereNotNull('ml_condition')
             ->where('status', 'completed')
+            ->where(function ($q) {
+                $q->whereNull('vibration_source')
+                  ->orWhere('vibration_source', '!=', 'simulated');
+            })
             ->limit(500)
             ->get();
 
@@ -122,6 +126,10 @@ class MlManagementController extends Controller
         $diagnostics = Diagnostic::with('vehicle')
             ->where('status', 'completed')
             ->whereNotNull('ml_condition')
+            ->where(function ($q) {
+                $q->whereNull('vibration_source')
+                  ->orWhere('vibration_source', '!=', 'simulated');
+            })
             ->orderBy('id', 'asc')
             ->get();
 
@@ -130,7 +138,7 @@ class MlManagementController extends Controller
         return response()->streamDownload(function () use ($diagnostics) {
             $out = fopen('php://output', 'w');
             fputcsv($out, [
-                'diagnostic_id', 'vehicle', 'peak_g', 'rms_g', 'crest_factor',
+                'diagnostic_id', 'vehicle', 'vibration_source', 'peak_g', 'rms_g', 'crest_factor',
                 'dominant_freq_hz', 'spectral_entropy', 'temperature_c', 'rpm',
                 'voltage_v', 'current_ma', 'condition', 'confidence', 'created_at',
             ]);
@@ -145,6 +153,7 @@ class MlManagementController extends Controller
                 fputcsv($out, [
                     $d->id,
                     $d->vehicle?->display_name ?? 'Vehicle #' . $d->vehicle_id,
+                    $d->vibration_source ?? 'physical',
                     $peak,
                     $rms,
                     $crest,

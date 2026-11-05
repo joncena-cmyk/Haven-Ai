@@ -56,15 +56,19 @@ class AnalyzeDiagnosticJob implements ShouldQueue
             Log::info("AnalyzeDiagnosticJob completed for Diagnostic #{$this->diagnostic->id}: Condition={$result['condition']}");
 
         } catch (\Throwable $e) {
-            Log::error("AnalyzeDiagnosticJob error for Diagnostic #{$this->diagnostic->id}: {$e->getMessage()}");
-            
-            $this->diagnostic->update([
-                'status'        => 'failed',
-                'ml_result_raw' => [
-                    'error'     => $e->getMessage(),
-                    'failed_at' => now()->toIso8601String(),
-                ],
-            ]);
+            $attempt = $this->attempts();
+            Log::error("AnalyzeDiagnosticJob error for Diagnostic #{$this->diagnostic->id} (Attempt {$attempt} of {$this->tries}): {$e->getMessage()}");
+
+            // Only mark failed if all retry attempts have been exhausted
+            if ($attempt >= $this->tries) {
+                $this->diagnostic->update([
+                    'status'        => 'failed',
+                    'ml_result_raw' => [
+                        'error'     => $e->getMessage(),
+                        'failed_at' => now()->toIso8601String(),
+                    ],
+                ]);
+            }
 
             throw $e;
         }
