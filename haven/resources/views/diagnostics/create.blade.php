@@ -5,7 +5,7 @@
     $diagnosticModelUid = $selectedVehicle?->sketchfab_uid;
 @endphp
 
-<script src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
+<script defer src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
 
 <div class="h-diag-studio-wrapper">
 

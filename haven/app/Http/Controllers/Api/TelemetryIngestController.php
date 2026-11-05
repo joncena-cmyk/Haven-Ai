@@ -459,44 +459,40 @@ class TelemetryIngestController extends Controller
         $vehicleId = $request->query('vehicle_id');
         $vehicle = $vehicleId ? Vehicle::where('user_id', $user->id)->find($vehicleId) : Vehicle::where('user_id', $user->id)->first();
 
+        // Release the session immediately so we do not block subsequent concurrent requests
+        if (session()->isStarted()) {
+            session()->save();
+        }
+
         return response()->stream(function () use ($user, $vehicle) {
             // Send initial ping event
             echo ": connected\n\n";
             if (ob_get_level() > 0) ob_flush();
             flush();
 
-            // Stream up to 25 bursts (or until client closes) to prevent infinite loop worker freeze
-            for ($i = 0; $i < 20; $i++) {
-                if (connection_aborted()) {
-                    break;
-                }
+            $cached = $vehicle
+                ? \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id)
+                : \Illuminate\Support\Facades\Cache::get('telemetry:live:user:' . $user->id);
 
-                $cached = $vehicle
-                    ? \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id)
-                    : \Illuminate\Support\Facades\Cache::get('telemetry:live:user:' . $user->id);
+            $historyKey = $vehicle ? ('telemetry:history:' . $vehicle->id) : ('telemetry:history:user:' . $user->id);
+            $history = \Illuminate\Support\Facades\Cache::get($historyKey, []);
 
-                $historyKey = $vehicle ? ('telemetry:history:' . $vehicle->id) : ('telemetry:history:user:' . $user->id);
-                $history = \Illuminate\Support\Facades\Cache::get($historyKey, []);
+            $payload = $cached ?: [
+                'online'          => false,
+                'last_seen_human' => 'Standby',
+                'vehicle_name'    => $vehicle?->display_name ?? 'Vehicle',
+                'temperature_c'   => null,
+                'rpm'             => 0,
+                'voltage_v'       => null,
+                'peak_g'          => null,
+            ];
+            $payload['history'] = $history;
 
-                $payload = $cached ?: [
-                    'online'          => false,
-                    'last_seen_human' => 'Standby',
-                    'vehicle_name'    => $vehicle?->display_name ?? 'Vehicle',
-                    'temperature_c'   => null,
-                    'rpm'             => 0,
-                    'voltage_v'       => null,
-                    'peak_g'          => null,
-                ];
-                $payload['history'] = $history;
+            echo "event: telemetry\n";
+            echo "data: " . json_encode($payload) . "\n\n";
 
-                echo "event: telemetry\n";
-                echo "data: " . json_encode($payload) . "\n\n";
-
-                if (ob_get_level() > 0) ob_flush();
-                flush();
-
-                sleep(2);
-            }
+            if (ob_get_level() > 0) ob_flush();
+            flush();
         }, 200, [
             'Content-Type'      => 'text/event-stream',
             'Cache-Control'     => 'no-cache, no-transform',

@@ -1,7 +1,7 @@
 <x-app-layout title="Diagnostics — HAVEN AI">
 
 {{-- Official Sketchfab Viewer API v1.12.1 --}}
-<script src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
+<script defer src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
 
 @php
     // All variables injected by index() controller:
