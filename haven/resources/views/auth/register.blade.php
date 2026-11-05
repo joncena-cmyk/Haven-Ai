@@ -98,7 +98,7 @@
                 </div>
 
                 {{-- Dynamic Requirements Checklist --}}
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem 0.5rem;font-size:0.72rem;margin-bottom:0.65rem;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem 0.5rem;font-size:0.72rem;">
                     <div id="crit-len" style="display:flex;align-items:center;gap:0.35rem;color:var(--h-text3);transition:color 0.2s;">
                         <span class="crit-icon" style="font-weight:700;min-width:12px;">○</span>
                         <span>8+ characters</span>
@@ -114,22 +114,6 @@
                     <div id="crit-sym" style="display:flex;align-items:center;gap:0.35rem;color:var(--h-text3);transition:color 0.2s;">
                         <span class="crit-icon" style="font-weight:700;min-width:12px;">○</span>
                         <span>Special symbol (!@#$)</span>
-                    </div>
-                </div>
-
-                {{-- Benchmark Guide (Weak / Medium / Strong) --}}
-                <div style="border-top:1px dashed var(--h-border);padding-top:0.5rem;font-size:0.68rem;color:var(--h-text3);display:flex;flex-direction:column;gap:0.25rem;">
-                    <div style="display:flex;align-items:center;gap:0.4rem;">
-                        <span style="font-weight:700;color:var(--h-red);min-width:56px;display:inline-flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--h-red);display:inline-block;"></span>Weak:</span>
-                        <span>Fewer than 8 characters or letters only</span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:0.4rem;">
-                        <span style="font-weight:700;color:var(--h-amber);min-width:56px;display:inline-flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--h-amber);display:inline-block;"></span>Medium:</span>
-                        <span>8+ chars with mix of letters &amp; numbers</span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:0.4rem;">
-                        <span style="font-weight:700;color:var(--h-green);min-width:56px;display:inline-flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--h-green);display:inline-block;"></span>Strong:</span>
-                        <span>8+ chars with mixed case, numbers &amp; symbols</span>
                     </div>
                 </div>
             </div>

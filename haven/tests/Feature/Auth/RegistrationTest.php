@@ -19,9 +19,7 @@ class RegistrationTest extends TestCase
         $response->assertSee('Upper &amp; lower case', false);
         $response->assertSee('At least 1 number');
         $response->assertSee('Special symbol (!@#$)');
-        $response->assertSee('Weak:');
-        $response->assertSee('Medium:');
-        $response->assertSee('Strong:');
+        $response->assertSee('Enter Password');
     }
 
     public function test_new_users_can_register(): void
