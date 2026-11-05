@@ -195,8 +195,8 @@
 
                 <div class="h-diag-sub-actions">
                     <button type="button" class="h-diag-sub-btn" onclick="openSampleUploadModal()">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        Upload WAV / CSV
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        Import Vibration CSV
                     </button>
                     <button type="button" class="h-diag-sub-btn" onclick="openManualTelemetryDrawer()">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
@@ -627,8 +627,8 @@
                     Stop Vibration
                 </button>
                 <button type="button" id="btn-open-file-modal" class="h-diag-btn-secondary" onclick="openSampleUploadModal()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Upload Offline Sample
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    Import Vibration CSV
                 </button>
             </div>
 
@@ -822,31 +822,27 @@
 </form>
 
 {{-- ═══════════════════════════════════════════════════════════════
-     MODAL: SAMPLE FILE UPLOAD (Offline WAV / Vibration CSV)
+     MODAL: VIBRATION CSV IMPORT (ESP32 ADXL345 Telemetry)
      ═══════════════════════════════════════════════════════════════ --}}
 <div id="modal-sample-upload" class="h-diag-modal-backdrop" style="display:none;" onclick="if(event.target===this) closeSampleUploadModal()">
     <div class="h-diag-modal-box">
         <div class="h-diag-modal-header">
-            <h3>Upload Offline Sample Telemetry</h3>
+            <h3>Import ADXL345 Vibration Data</h3>
             <button type="button" class="h-diag-modal-close" onclick="closeSampleUploadModal()">&times;</button>
         </div>
         <div class="h-diag-modal-body">
             <p style="font-size:0.82rem;color:#64748b;margin-bottom:1.25rem;">
-                Select test audio (.wav, .mp3, .webm) and ESP32 accelerometer (.csv, .json) to evaluate the ML model offline.
+                Attach external ESP32 ADXL345 accelerometer data (.csv or .json) to pair with the live acoustic engine recording.
             </p>
             <div class="h-diag-modal-group">
-                <label>Engine Acoustic Audio (WAV/MP3)</label>
-                <input type="file" id="modal_audio_input" accept=".wav,.mp3,.webm,.ogg,.m4a" class="h-diag-file-input">
-            </div>
-            <div class="h-diag-modal-group" style="margin-top:1rem;">
-                <label>Vibration Accelerometer Data (CSV/JSON)</label>
+                <label style="display:block;font-size:0.82rem;font-weight:700;color:var(--ds-text);margin-bottom:0.4rem;">Vibration Accelerometer Data (CSV/JSON)</label>
                 <input type="file" id="modal_vib_input" accept=".csv,.json,.txt" class="h-diag-file-input" onchange="previewModalVibration(this)">
                 <div id="modal-vib-summary" style="margin-top:0.5rem;font-size:0.75rem;color:#0284c7;display:none;"></div>
             </div>
         </div>
         <div class="h-diag-modal-footer">
             <button type="button" class="h-diag-btn-secondary" onclick="closeSampleUploadModal()">Cancel</button>
-            <button type="button" class="h-diag-btn-primary" onclick="applySampleUploads()">Attach to Session</button>
+            <button type="button" class="h-diag-btn-primary" onclick="applySampleUploads()">Attach Vibration CSV</button>
         </div>
     </div>
 </div>
@@ -2450,15 +2446,22 @@
 
 /* ── Modals & Drawers ── */
 .h-diag-modal-backdrop {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(15, 23, 42, 0.55);
-    backdrop-filter: blur(8px);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(15, 23, 42, 0.7) !important;
+    backdrop-filter: blur(8px) !important;
+    z-index: 99999 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 1.5rem !important;
+    margin: 0 !important;
+    overflow-y: auto !important;
 }
 .h-diag-modal-box {
     background: #ffffff;
@@ -2467,6 +2470,10 @@
     width: 100%;
     padding: 1.5rem;
     box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    margin: auto !important;
+    position: relative;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 .h-diag-modal-header {
     display: flex;
@@ -3142,7 +3149,7 @@
             drawOscilloscope();
         } catch (err) {
             console.warn('Microphone error:', err);
-            alert('Microphone permission required for live diagnostic audio capture. Alternatively, click "Upload Offline Sample".');
+            alert('Microphone permission required for live diagnostic audio capture. Please allow microphone access in your browser to record engine acoustic harmonics.');
         }
     };
 
@@ -3587,33 +3594,39 @@
     };
 
     window.applySampleUploads = function() {
-        const audioIn = document.getElementById('modal_audio_input');
         const vibIn = document.getElementById('modal_vib_input');
 
-        if (audioIn.files && audioIn.files[0]) {
-            document.getElementById('form_audio_file').files = audioIn.files;
-            document.getElementById('playback-duration-meta').textContent = audioIn.files[0].name;
-            document.getElementById('playback-strip').style.display = 'flex';
-            document.getElementById('tick-audio').classList.add('active');
-            document.getElementById('tick-audio').classList.add('completed');
-        }
-        if (vibIn.files && vibIn.files[0]) {
+        if (vibIn && vibIn.files && vibIn.files[0]) {
             document.getElementById('form_vibration_file').files = vibIn.files;
             document.getElementById('tick-vib').classList.add('active');
             document.getElementById('tick-vib').classList.add('completed');
+            document.getElementById('probe-vib-val').textContent = 'CSV Attached';
+
+            const vibStrip = document.getElementById('vibration-strip');
+            if (vibStrip) {
+                vibStrip.style.display = 'flex';
+                const meta = document.getElementById('vibration-meta');
+                if (meta) {
+                    meta.textContent = `✓ Ingested ${vibIn.files[0].name}`;
+                }
+            }
+
+            // If audio was already recorded, advance workflow to analyze
+            if (captureState === 'AUDIO_DONE' || captureState === 'RECORDING_VIBRATION') {
+                captureState = 'VIBRATION_DONE';
+                document.getElementById('btn-submit-session').disabled = false;
+                document.getElementById('hud-progress-pct').textContent = '90%';
+                document.getElementById('hud-progress-label').textContent = 'ALL SIGNALS CAPTURED · READY TO ANALYZE';
+                window.setDiagnosisFlowStep('analyze');
+
+                const masterBtn = document.getElementById('btn-master-action');
+                if (masterBtn) {
+                    const txt = masterBtn.querySelector('#master-btn-text');
+                    if (txt) txt.textContent = 'Run ML Diagnostics';
+                }
+            }
         }
         closeSampleUploadModal();
-        captureState = 'VIBRATION_DONE';
-        document.getElementById('btn-submit-session').disabled = false;
-        document.getElementById('hud-progress-pct').textContent = '90%';
-        document.getElementById('hud-progress-label').textContent = 'OFFLINE SAMPLES ATTACHED · READY';
-        window.setDiagnosisFlowStep('analyze');
-
-        const masterBtn = document.getElementById('btn-master-action');
-        if (masterBtn) {
-            const txt = masterBtn.querySelector('#master-btn-text');
-            if (txt) txt.textContent = 'Run ML Diagnostics';
-        }
     };
 
     window.saveManualTelemetry = function() {
