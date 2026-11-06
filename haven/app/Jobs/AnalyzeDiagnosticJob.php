@@ -45,13 +45,25 @@ class AnalyzeDiagnosticJob implements ShouldQueue
         try {
             $result = $ml->analyze($this->diagnostic);
 
-            $this->diagnostic->update([
+            $vibFeats = is_array($result['vibration_features'] ?? null) ? $result['vibration_features'] : [];
+            $updatePayload = [
                 'status'          => 'completed',
                 'ml_condition'    => $result['condition']    ?? 'normal',
                 'ml_confidence'   => $result['confidence']   ?? null,
                 'ml_result_raw'   => $result,
                 'ml_processed_at' => now(),
-            ]);
+            ];
+            if (isset($vibFeats['peak_g']) && is_numeric($vibFeats['peak_g']) && (float) $vibFeats['peak_g'] > 0) {
+                $updatePayload['vibration_peak_g'] = round((float) $vibFeats['peak_g'], 4);
+            }
+            if (isset($vibFeats['rms_g']) && is_numeric($vibFeats['rms_g']) && (float) $vibFeats['rms_g'] > 0) {
+                $updatePayload['vibration_rms_g'] = round((float) $vibFeats['rms_g'], 4);
+            }
+            if (empty($this->diagnostic->sample_rate_hz) && !empty($vibFeats['sample_rate_hz']) && (float) $vibFeats['sample_rate_hz'] > 0) {
+                $updatePayload['sample_rate_hz'] = (int) round((float) $vibFeats['sample_rate_hz']);
+            }
+
+            $this->diagnostic->update($updatePayload);
 
             Log::info("AnalyzeDiagnosticJob completed for Diagnostic #{$this->diagnostic->id}: Condition={$result['condition']}");
 

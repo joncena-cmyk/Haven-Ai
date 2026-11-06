@@ -42,7 +42,7 @@
                             <a href="{{ route('diagnostics.create', ['vehicle_id' => $v->id]) }}" class="h-diag-dropdown-item {{ $v->id == $selectedVehicle?->id ? 'is-active' : '' }}">
                                 <div class="h-diag-dropdown-item-left">
                                     <div class="h-diag-dropdown-v-icon">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
                                     </div>
                                     <div>
                                         <div class="h-diag-dropdown-v-name">{{ $v->display_name }}</div>
@@ -824,6 +824,17 @@
     <input type="hidden" name="rpm" id="form_rpm">
     <input type="hidden" name="voltage_v" id="form_voltage_v">
     <input type="hidden" name="current_ma" id="form_current_ma">
+    <input type="hidden" name="true_condition" id="form_true_condition">
+    <input type="hidden" name="session_id" id="form_session_id">
+    <input type="hidden" name="fault_detail" id="form_fault_detail">
+    <input type="hidden" name="target_rpm" id="form_target_rpm">
+    <input type="hidden" name="load_state" id="form_load_state">
+    <input type="hidden" name="sensor_position" id="form_sensor_position">
+    <input type="hidden" name="mic_position" id="form_mic_position">
+    <input type="hidden" name="operator" id="form_operator">
+    <input type="hidden" name="verified_by" id="form_verified_by">
+    <input type="hidden" name="sample_rate_hz" id="form_sample_rate_hz">
+    <input type="hidden" name="is_training_sample" id="form_is_training_sample" value="0">
 </form>
 
 {{-- ═══════════════════════════════════════════════════════════════
@@ -882,6 +893,63 @@
                 <div>
                     <label style="font-size:0.75rem;font-weight:600;color:#334155;">Current Draw (mA)</label>
                     <input type="number" step="10" id="man_curr" value="420" class="h-diag-file-input">
+                </div>
+            </div>
+
+            <hr style="border:none;border-top:1px solid var(--ds-border);margin:1.1rem 0;">
+            <p style="font-size:0.78rem;font-weight:700;color:var(--ds-text);margin-bottom:0.65rem;">
+                Ground-Truth Labeling &amp; Session Metadata (Optional for Training)
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                <div>
+                    <label style="font-size:0.72rem;font-weight:600;color:#334155;">True Engine Condition (Ground Truth)</label>
+                    <select id="man_true_condition" class="h-diag-file-input">
+                        <option value="">-- Unlabeled (Inference Only) --</option>
+                        <option value="normal">Normal Engine Operation</option>
+                        <option value="misfire">Engine Misfire</option>
+                        <option value="loose_component">Loose or Worn Component</option>
+                        <option value="valve_clearance">Improper Valve Clearance</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.72rem;font-weight:600;color:#334155;">Session ID</label>
+                    <input type="text" id="man_session_id" placeholder="e.g. SESS-2026-001" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="font-size:0.72rem;font-weight:600;color:#334155;">Target RPM</label>
+                    <input type="number" id="man_target_rpm" placeholder="e.g. 850" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="font-size:0.72rem;font-weight:600;color:#334155;">Load State</label>
+                    <input type="text" id="man_load_state" placeholder="e.g. Park / Neutral AC Off" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="font-size:0.72rem;font-weight:600;color:#334155;">Sensor Position</label>
+                    <input type="text" id="man_sensor_position" placeholder="e.g. Cylinder head cover" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="font-size:0.72rem;font-weight:600;color:#334155;">Mic Position</label>
+                    <input type="text" id="man_mic_position" placeholder="e.g. 15cm above valve cover" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="font-size:0.72rem;font-weight:600;color:#334155;">Operator</label>
+                    <input type="text" id="man_operator" placeholder="Operator name" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="font-size:0.72rem;font-weight:600;color:#334155;">Verified By</label>
+                    <input type="text" id="man_verified_by" placeholder="Mechanic / Verifier" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="font-size:0.72rem;font-weight:600;color:#334155;">Sample Rate (Hz)</label>
+                    <input type="number" id="man_sample_rate_hz" placeholder="e.g. 1000" class="h-diag-file-input">
+                </div>
+                <div style="display:flex;align-items:center;gap:0.45rem;padding-top:1.1rem;">
+                    <input type="checkbox" id="man_is_training_sample" value="1">
+                    <label for="man_is_training_sample" style="font-size:0.74rem;font-weight:700;color:#0284c7;cursor:pointer;">Include in ML Training Dataset</label>
+                </div>
+                <div style="grid-column:1 / -1;">
+                    <label style="font-size:0.72rem;font-weight:600;color:#334155;">Fault Detail / Verification Notes</label>
+                    <input type="text" id="man_fault_detail" placeholder="Specific mechanical fault observation..." class="h-diag-file-input">
                 </div>
             </div>
         </div>
@@ -3220,21 +3288,28 @@
         const skipVibBtn = document.getElementById('btn-skip-vib');
         if (skipVibBtn) skipVibBtn.style.display = 'inline-flex';
 
-        // Master CTA update to Vibration Capture
+        // Master CTA update: If no physical sensor attached, offer Audio-Only ML inference directly
+        const hasHardwareVib = !!latestDeviceAccel;
         const masterBtn = document.getElementById('btn-master-action');
         if (masterBtn) {
             const txt = masterBtn.querySelector('#master-btn-text');
-            if (txt) txt.textContent = 'Start Vibration Capture';
+            if (txt) {
+                txt.textContent = hasHardwareVib ? 'Start Vibration Capture' : 'Run ML Diagnostics (Audio Only)';
+            }
             const icon = masterBtn.querySelector('#master-btn-icon');
             if (icon) {
-                icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>';
+                icon.innerHTML = hasHardwareVib
+                    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>'
+                    : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
             }
         }
 
         // Overlay Guide
         const overlay = document.getElementById('canvas-overlay-text');
         if (overlay) {
-            overlay.innerHTML = 'Phase 1 Complete. Click <strong>"Start Vibration Capture"</strong> for 3-axis accelerometer data, or <strong>"Skip Vibration"</strong> for audio-only.';
+            overlay.innerHTML = hasHardwareVib
+                ? 'Phase 1 Complete. Click <strong>"Start Vibration Capture"</strong> for 3-axis accelerometer data, or <strong>"Skip Vibration"</strong> for audio-only.'
+                : 'Acoustic Capture Complete. Click <strong>"Run ML Diagnostics"</strong> for instant audio classification, or <strong>"Capture Vibration"</strong> to attach ESP32 sensor telemetry.';
             overlay.style.display = 'block';
         }
 
@@ -3411,6 +3486,17 @@
             }
         }
 
+        // Compute DC mean vector (x, y, z) to isolate AC dynamic mechanical vibration from 1.0G Earth gravity
+        let meanX = 0, meanY = 0, meanZ = 0;
+        for (let i = 0; i < vibrationSamples.length; i++) {
+            meanX += vibrationSamples[i].x;
+            meanY += vibrationSamples[i].y;
+            meanZ += vibrationSamples[i].z;
+        }
+        meanX /= vibrationSamples.length;
+        meanY /= vibrationSamples.length;
+        meanZ /= vibrationSamples.length;
+
         // Generate standard CSV: timestamp,x,y,z
         let csvContent = "timestamp,x,y,z\n";
         let sumSq = 0;
@@ -3418,7 +3504,10 @@
         for (let i = 0; i < vibrationSamples.length; i++) {
             const s = vibrationSamples[i];
             csvContent += `${s.t.toFixed(4)},${s.x.toFixed(4)},${s.y.toFixed(4)},${s.z.toFixed(4)}\n`;
-            const mag = Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z);
+            const dx = s.x - meanX;
+            const dy = s.y - meanY;
+            const dz = s.z - meanZ;
+            const mag = Math.sqrt(dx * dx + dy * dy + dz * dz);
             sumSq += (mag * mag);
             if (mag > peakMag) peakMag = mag;
         }
@@ -3645,7 +3734,13 @@
         } else if (captureState === 'RECORDING_AUDIO') {
             stopAudioRecording();
         } else if (captureState === 'AUDIO_DONE') {
-            startVibrationRecording();
+            if (latestDeviceAccel) {
+                startVibrationRecording();
+            } else {
+                // No physical accelerometer attached: skip vibration and submit audio diagnostic directly
+                skipVibrationCapture();
+                submitDiagnosticForm();
+            }
         } else if (captureState === 'RECORDING_VIBRATION') {
             stopVibrationRecording();
         } else {
@@ -3706,8 +3801,10 @@
         const file = input.files[0];
         const reader = new FileReader();
         reader.onload = function(e) {
-            const lines = e.target.result.split('\n').filter(l => l.trim().length > 0);
-            const count = Math.max(0, lines.length - 1);
+            const lines = e.target.result.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
+            const firstCol = lines.length > 0 ? lines[0].split(',')[0].trim() : '';
+            const hasHeader = firstCol.length > 0 && isNaN(Number(firstCol));
+            const count = Math.max(0, lines.length - (hasHeader ? 1 : 0));
             const summary = document.getElementById('modal-vib-summary');
             summary.style.display = 'block';
             summary.textContent = `✓ Loaded ${count} accelerometer samples from ${file.name}`;
@@ -3768,6 +3865,18 @@
         document.getElementById('form_voltage_v').value = volt;
         document.getElementById('form_current_ma').value = curr;
 
+        document.getElementById('form_true_condition').value = document.getElementById('man_true_condition')?.value || '';
+        document.getElementById('form_session_id').value = document.getElementById('man_session_id')?.value || '';
+        document.getElementById('form_fault_detail').value = document.getElementById('man_fault_detail')?.value || '';
+        document.getElementById('form_target_rpm').value = document.getElementById('man_target_rpm')?.value || '';
+        document.getElementById('form_load_state').value = document.getElementById('man_load_state')?.value || '';
+        document.getElementById('form_sensor_position').value = document.getElementById('man_sensor_position')?.value || '';
+        document.getElementById('form_mic_position').value = document.getElementById('man_mic_position')?.value || '';
+        document.getElementById('form_operator').value = document.getElementById('man_operator')?.value || '';
+        document.getElementById('form_verified_by').value = document.getElementById('man_verified_by')?.value || '';
+        document.getElementById('form_sample_rate_hz').value = document.getElementById('man_sample_rate_hz')?.value || '';
+        document.getElementById('form_is_training_sample').value = document.getElementById('man_is_training_sample')?.checked ? '1' : '0';
+
         document.getElementById('probe-temp-val').textContent = temp + '°C';
         document.getElementById('probe-rpm-val').textContent = rpm + ' RPM';
         document.getElementById('probe-volt-val').textContent = volt + ' V';
@@ -3780,6 +3889,35 @@
         document.getElementById('hud-progress-pct').textContent = '90%';
         document.getElementById('btn-submit-session').disabled = false;
     };
+
+    // Keep-alive heartbeat to prevent session expiration while in the studio
+    setInterval(() => {
+        fetch('{{ route('keep-alive') }}', { credentials: 'same-origin' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.csrf_token) {
+                    const meta = document.querySelector('meta[name="csrf-token"]');
+                    if (meta) meta.setAttribute('content', data.csrf_token);
+                    const formToken = document.querySelector('#haven-hidden-diag-form input[name="_token"]');
+                    if (formToken) formToken.value = data.csrf_token;
+                }
+            })
+            .catch(() => {});
+    }, 120000); // Every 2 minutes
+
+    function resetAnalyzeButtons() {
+        captureState = 'READY_TO_SUBMIT';
+        const masterBtn = document.getElementById('btn-master-action');
+        if (masterBtn) {
+            masterBtn.disabled = false;
+            const spinner = document.getElementById('master-btn-spinner');
+            if (spinner) spinner.style.display = 'none';
+            const txt = masterBtn.querySelector('#master-btn-text');
+            if (txt) txt.textContent = 'Analyze Diagnostic';
+        }
+        const submitBtn = document.getElementById('btn-submit-session');
+        if (submitBtn) submitBtn.disabled = false;
+    }
 
     // 8. 6-Stage AI Stepper Animation & Form Submission
     window.submitDiagnosticForm = function() {
@@ -3803,6 +3941,16 @@
 
         // Animate Pipeline Stages
         let step = 1;
+        let animationDone = false;
+        let submissionDone = false;
+        let redirectTargetUrl = null;
+
+        function checkCompletion() {
+            if (animationDone && submissionDone && redirectTargetUrl) {
+                window.location.href = redirectTargetUrl;
+            }
+        }
+
         function advanceStepper() {
             if (step <= 6) {
                 document.getElementById('stage-' + step).classList.add('active');
@@ -3816,13 +3964,96 @@
                     window.setDiagnosisFlowStep('results');
                 }
                 step++;
-                setTimeout(advanceStepper, 400);
+                setTimeout(advanceStepper, 350);
             } else {
-                // Submit actual Laravel form
-                form.submit();
+                animationDone = true;
+                checkCompletion();
             }
         }
         advanceStepper();
+
+        // Perform asynchronous submission with CSRF auto-recovery
+        const formData = new FormData(form);
+        const metaCsrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        if (metaCsrf) {
+            formData.set('_token', metaCsrf);
+            const tokenInp = form.querySelector('input[name="_token"]');
+            if (tokenInp) tokenInp.value = metaCsrf;
+        }
+
+        async function executeSubmission() {
+            try {
+                let res = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    }
+                });
+
+                // Auto-recover if session / CSRF expired (419)
+                if (res.status === 419) {
+                    try {
+                        const pingRes = await fetch('{{ route('keep-alive') }}', { credentials: 'same-origin' });
+                        if (pingRes.ok) {
+                            const pingData = await pingRes.json();
+                            if (pingData.csrf_token) {
+                                const meta = document.querySelector('meta[name="csrf-token"]');
+                                if (meta) meta.setAttribute('content', pingData.csrf_token);
+                                formData.set('_token', pingData.csrf_token);
+
+                                // Retry POST with refreshed token
+                                res = await fetch(form.action, {
+                                    method: 'POST',
+                                    body: formData,
+                                    headers: {
+                                        'Accept': 'application/json',
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                        'X-CSRF-TOKEN': pingData.csrf_token
+                                    }
+                                });
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('CSRF refresh failed', e);
+                    }
+                }
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.redirect_url) {
+                        redirectTargetUrl = data.redirect_url;
+                        submissionDone = true;
+                        checkCompletion();
+                        return;
+                    }
+                }
+
+                if (res.status === 419) {
+                    alert('Your session has expired. Please sign in again. Your recorded data remains in memory.');
+                    resetAnalyzeButtons();
+                    return;
+                }
+
+                if (res.status === 422) {
+                    const err = await res.json();
+                    const msg = err.message || (err.errors ? Object.values(err.errors).flat().join('\n') : 'Validation failed.');
+                    alert('Submission error: ' + msg);
+                    resetAnalyzeButtons();
+                    return;
+                }
+
+                // Fallback: standard submit if response didn't contain JSON redirect
+                form.submit();
+            } catch (err) {
+                console.warn('Fetch submission error, falling back to form.submit()', err);
+                form.submit();
+            }
+        }
+
+        executeSubmission();
     };
 
     // 9. Quick AI Assistant in Card
@@ -3897,8 +4128,11 @@
                         document.getElementById('probe-volt-val').textContent = data.voltage_v + ' V';
                         document.getElementById('gauge-voltage-num').textContent = data.voltage_v;
                     }
-                    if (data.peak_g) {
-                        document.getElementById('dark-peak-val').innerHTML = `${data.peak_g} <span style="font-size:1rem;color:#94a3b8;">g</span>`;
+                    if (data.peak_g !== null && data.peak_g !== undefined) {
+                        const fmtG = Number(data.peak_g).toFixed(3);
+                        document.getElementById('dark-peak-val').innerHTML = `${fmtG} <span style="font-size:1rem;color:#94a3b8;">g</span>`;
+                        const pVib = document.getElementById('probe-vib-val');
+                        if (pVib) pVib.textContent = fmtG + ' g';
                     }
                 }
             })

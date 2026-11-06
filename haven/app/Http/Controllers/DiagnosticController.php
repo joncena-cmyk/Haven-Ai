@@ -21,14 +21,25 @@ class DiagnosticController extends Controller
     ───────────────────────────────────────────── */
     public function index(Request $request): View
     {
-        $vehicles       = Auth::user()->vehicles()->orderBy('make')->get();
-        $selectedVid    = $request->query('vehicle_id') ?? $vehicles->first()?->id;
-        $selectedVehicle = $vehicles->firstWhere('id', $selectedVid) ?? $vehicles->first();
+        $vehicles    = Auth::user()->vehicles()->orderBy('make')->get();
+        $selectedVid = $request->query('vehicle_id');
 
         $query = Auth::user()->diagnostics()->with('vehicle')->latest();
-        if ($selectedVid) {
-            $query->where('vehicle_id', $selectedVid);
+
+        // If a specific vehicle ID is requested, filter by it; otherwise show all vehicles in history
+        if ($selectedVid && $selectedVid !== 'all') {
+            $selectedVehicle = $vehicles->firstWhere('id', $selectedVid);
+            if ($selectedVehicle) {
+                $query->where('vehicle_id', $selectedVehicle->id);
+            } else {
+                $selectedVid = 'all';
+                $selectedVehicle = null;
+            }
+        } else {
+            $selectedVid = 'all';
+            $selectedVehicle = null;
         }
+
         $diagnostics = $query->paginate(8)->withQueryString();
 
         // Per-vehicle stats
@@ -71,20 +82,31 @@ class DiagnosticController extends Controller
        STORE  POST /diagnostics
        Handles audio blob + vibration file upload.
     ───────────────────────────────────────────── */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $request->validate([
-            'vehicle_id'     => ['required', 'integer', 'exists:vehicles,id'],
-            'audio_blob'       => ['nullable', 'file', 'mimes:webm,ogg,wav,mp3,mp4', 'max:51200'], // 50 MB
-            'audio_file'       => ['nullable', 'file', 'mimes:webm,ogg,wav,mp3,mp4,m4a', 'max:51200'],
-            'vibration_file'   => ['nullable', 'file', 'mimes:csv,json,txt', 'max:5120'], // 5 MB
-            'vibration_source' => ['nullable', 'string', 'in:adxl345_live,device_sensor,csv_import,simulated,skipped'],
-            'notes'            => ['nullable', 'string', 'max:1000'],
-            'recording_mode' => ['nullable', 'string', 'in:idle,revving'],
-            'temperature_c'  => ['nullable', 'numeric', 'min:-40', 'max:200'],
-            'rpm'            => ['nullable', 'integer', 'min:0', 'max:12000'],
-            'voltage_v'      => ['nullable', 'numeric', 'min:0', 'max:50'],
-            'current_ma'     => ['nullable', 'numeric', 'min:0', 'max:50000'],
+            'vehicle_id'         => ['required', 'integer', 'exists:vehicles,id'],
+            'audio_blob'         => ['nullable', 'file', 'mimes:webm,ogg,wav,mp3,mp4', 'max:51200'], // 50 MB
+            'audio_file'         => ['nullable', 'file', 'mimes:webm,ogg,wav,mp3,mp4,m4a', 'max:51200'],
+            'vibration_file'     => ['nullable', 'file', 'mimes:csv,json,txt', 'max:5120'], // 5 MB
+            'vibration_source'   => ['nullable', 'string', 'in:adxl345_live,device_sensor,csv_import,simulated,skipped'],
+            'notes'              => ['nullable', 'string', 'max:1000'],
+            'recording_mode'     => ['nullable', 'string', 'in:idle,revving'],
+            'temperature_c'      => ['nullable', 'numeric', 'min:-40', 'max:200'],
+            'rpm'                => ['nullable', 'integer', 'min:0', 'max:12000'],
+            'voltage_v'          => ['nullable', 'numeric', 'min:0', 'max:50'],
+            'current_ma'         => ['nullable', 'numeric', 'min:0', 'max:50000'],
+            'true_condition'     => ['nullable', 'string', 'in:normal,misfire,loose_component,valve_clearance'],
+            'session_id'         => ['nullable', 'string', 'max:100'],
+            'fault_detail'       => ['nullable', 'string', 'max:2000'],
+            'target_rpm'         => ['nullable', 'integer', 'min:0', 'max:12000'],
+            'load_state'         => ['nullable', 'string', 'max:100'],
+            'sensor_position'    => ['nullable', 'string', 'max:150'],
+            'mic_position'       => ['nullable', 'string', 'max:150'],
+            'operator'           => ['nullable', 'string', 'max:150'],
+            'verified_by'        => ['nullable', 'string', 'max:150'],
+            'sample_rate_hz'     => ['nullable', 'integer', 'min:1', 'max:192000'],
+            'is_training_sample' => ['nullable', 'boolean'],
         ]);
 
         // Ensure vehicle belongs to user
@@ -92,21 +114,29 @@ class DiagnosticController extends Controller
                           ->where('user_id', Auth::id())
                           ->firstOrFail();
 
+        $trueCondition = $request->filled('true_condition') ? $request->input('true_condition') : null;
+
         $data = [
-            'user_id'        => Auth::id(),
-            'vehicle_id'     => $vehicle->id,
-            'notes'          => $request->notes,
-            'recording_mode' => $request->input('recording_mode', 'idle'),
-            'status'         => 'draft',
+            'user_id'            => Auth::id(),
+            'vehicle_id'         => $vehicle->id,
+            'notes'              => $request->notes,
+            'recording_mode'     => $request->input('recording_mode', 'idle'),
+            'status'             => 'draft',
+            'true_condition'     => $trueCondition,
+            'session_id'         => $request->input('session_id'),
+            'fault_detail'       => $request->input('fault_detail'),
+            'target_rpm'         => $request->filled('target_rpm') ? (int) $request->input('target_rpm') : null,
+            'load_state'         => $request->input('load_state'),
+            'sensor_position'    => $request->input('sensor_position'),
+            'mic_position'       => $request->input('mic_position'),
+            'operator'           => $request->input('operator'),
+            'verified_by'        => $request->input('verified_by'),
+            'sample_rate_hz'     => $request->filled('sample_rate_hz') ? (int) $request->input('sample_rate_hz') : null,
+            'is_training_sample' => $request->boolean('is_training_sample') && !empty($trueCondition),
         ];
 
         if ($request->filled('temperature_c')) $data['temperature_c'] = $request->temperature_c;
-        if ($request->filled('rpm')) {
-            $data['rpm'] = $request->rpm;
-        } else {
-            // Calibrate default reference RPM based on recording mode if not provided by hardware sensor
-            $data['rpm'] = ($data['recording_mode'] === 'revving') ? 2200 : 800;
-        }
+        if ($request->filled('rpm'))           $data['rpm']           = $request->rpm;
         if ($request->filled('voltage_v'))     $data['voltage_v']     = $request->voltage_v;
         if ($request->filled('current_ma'))    $data['current_ma']    = $request->current_ma;
 
@@ -135,11 +165,14 @@ class DiagnosticController extends Controller
                 $vibrationSource = 'csv_import';
             }
 
-            // Parse sample count and peak/RMS from CSV if provided
-            [$sampleCount, $peakG, $rmsG] = $this->parseVibrationSummary($vib->getRealPath(), $vib->getClientOriginalExtension());
+            // Parse sample count, peak/RMS, and inferred sample rate from CSV if provided
+            [$sampleCount, $peakG, $rmsG, $inferredRateHz] = $this->parseVibrationSummary($vib->getRealPath(), $vib->getClientOriginalExtension());
             $data['vibration_sample_count'] = $sampleCount;
             $data['vibration_peak_g']       = $peakG;
             $data['vibration_rms_g']        = $rmsG;
+            if (empty($data['sample_rate_hz']) && !is_null($inferredRateHz)) {
+                $data['sample_rate_hz'] = $inferredRateHz;
+            }
         } elseif ($vibrationSource === 'skipped') {
             $data['vibration_path'] = null;
         }
@@ -155,7 +188,7 @@ class DiagnosticController extends Controller
         $diagnostic = Diagnostic::create($data);
 
         if ($data['status'] === 'submitted') {
-            if (config('queue.default') === 'sync') {
+            if (config('queue.default') === 'sync' || !app()->environment('production')) {
                 AnalyzeDiagnosticJob::dispatchSync($diagnostic);
                 $msg = 'Diagnostic session created! Analysis processed via synchronous ML pipeline.';
             } else {
@@ -164,6 +197,15 @@ class DiagnosticController extends Controller
             }
         } else {
             $msg = 'Diagnostic saved as draft. Add audio, vibration data, or telemetry to run analysis.';
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'redirect_url' => route('diagnostics.show', $diagnostic),
+                'diagnostic_id' => $diagnostic->id,
+            ]);
         }
 
         return redirect()->route('diagnostics.show', $diagnostic)->with('success', $msg);
@@ -287,8 +329,8 @@ class DiagnosticController extends Controller
         // Mark as processing
         $diagnostic->update(['status' => 'processing']);
 
-        // Synchronous fallback if requested or if sync queue driver
-        if ($request->has('sync') || config('queue.default') === 'sync') {
+        // Synchronous fallback if requested or if sync queue driver or local environment
+        if ($request->has('sync') || config('queue.default') === 'sync' || !app()->environment('production')) {
             try {
                 $result = $ml->analyze($diagnostic);
 
@@ -422,13 +464,65 @@ class DiagnosticController extends Controller
     }
 
     /* ─────────────────────────────────────────────
+       UPDATE LABEL  PATCH /diagnostics/{diagnostic}/label
+       Saves ground-truth label and session metadata without modifying ml_condition.
+    ───────────────────────────────────────────── */
+    public function updateLabel(Request $request, Diagnostic $diagnostic): RedirectResponse|\Illuminate\Http\JsonResponse
+    {
+        $this->authorizeOwner($diagnostic);
+
+        $validated = $request->validate([
+            'true_condition'     => ['nullable', 'string', 'in:normal,misfire,loose_component,valve_clearance'],
+            'session_id'         => ['nullable', 'string', 'max:100'],
+            'fault_detail'       => ['nullable', 'string', 'max:2000'],
+            'target_rpm'         => ['nullable', 'integer', 'min:0', 'max:12000'],
+            'load_state'         => ['nullable', 'string', 'max:100'],
+            'sensor_position'    => ['nullable', 'string', 'max:150'],
+            'mic_position'       => ['nullable', 'string', 'max:150'],
+            'operator'           => ['nullable', 'string', 'max:150'],
+            'verified_by'        => ['nullable', 'string', 'max:150'],
+            'sample_rate_hz'     => ['nullable', 'integer', 'min:1', 'max:192000'],
+            'is_training_sample' => ['nullable', 'boolean'],
+        ]);
+
+        $trueCondition = !empty($validated['true_condition']) ? $validated['true_condition'] : null;
+
+        $diagnostic->update([
+            'true_condition'     => $trueCondition,
+            'session_id'         => $validated['session_id'] ?? null,
+            'fault_detail'       => $validated['fault_detail'] ?? null,
+            'target_rpm'         => $validated['target_rpm'] ?? null,
+            'load_state'         => $validated['load_state'] ?? null,
+            'sensor_position'    => $validated['sensor_position'] ?? null,
+            'mic_position'       => $validated['mic_position'] ?? null,
+            'operator'           => $validated['operator'] ?? null,
+            'verified_by'        => $validated['verified_by'] ?? null,
+            'sample_rate_hz'     => $validated['sample_rate_hz'] ?? null,
+            'is_training_sample' => $request->boolean('is_training_sample') && !empty($trueCondition),
+        ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message'    => 'Ground-truth label and session metadata saved.',
+                'diagnostic' => $diagnostic->fresh(),
+            ]);
+        }
+
+        return redirect()
+            ->route('diagnostics.show', $diagnostic)
+            ->with('status', 'Ground-truth label and session metadata saved.');
+    }
+
+    /* ─────────────────────────────────────────────
        EXPORT DATASET  GET /diagnostics/export/dataset
     ───────────────────────────────────────────── */
     public function exportDataset(): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $diagnostics = Auth::user()->diagnostics()
             ->with('vehicle')
-            ->whereNotNull('ml_condition')
+            ->where('is_training_sample', true)
+            ->whereNotNull('true_condition')
+            ->whereIn('true_condition', Diagnostic::TRAINING_CONDITIONS)
             ->where(function ($q) {
                 $q->whereNull('vibration_source')
                   ->orWhere('vibration_source', '!=', 'simulated');
@@ -443,8 +537,11 @@ class DiagnosticController extends Controller
         return response()->stream(function () use ($diagnostics) {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, [
-                'diagnostic_id', 'vehicle', 'engine', 'vibration_source', 'peak_g', 'rms_g', 'crest_factor',
-                'temperature_c', 'rpm', 'voltage_v', 'current_ma', 'condition', 'confidence'
+                'diagnostic_id', 'session_id', 'vehicle', 'engine', 'vibration_source',
+                'sample_rate_hz', 'peak_g', 'rms_g', 'crest_factor',
+                'temperature_c', 'rpm', 'target_rpm', 'load_state',
+                'sensor_position', 'mic_position', 'operator', 'verified_by',
+                'voltage_v', 'current_ma', 'true_condition', 'fault_detail',
             ]);
 
             foreach ($diagnostics as $diag) {
@@ -454,18 +551,26 @@ class DiagnosticController extends Controller
 
                 fputcsv($handle, [
                     $diag->id,
+                    $diag->session_id,
                     $diag->vehicle?->display_name ?? 'N/A',
                     $diag->vehicle?->engine_type ?? 'N/A',
                     $diag->vibration_source ?? 'physical',
+                    $diag->sample_rate_hz,
                     $diag->vibration_peak_g,
                     $diag->vibration_rms_g,
                     $crest,
                     $diag->temperature_c,
                     $diag->rpm,
+                    $diag->target_rpm,
+                    $diag->load_state,
+                    $diag->sensor_position,
+                    $diag->mic_position,
+                    $diag->operator,
+                    $diag->verified_by,
                     $diag->voltage_v,
                     $diag->current_ma,
-                    $diag->ml_condition,
-                    $diag->ml_confidence,
+                    $diag->true_condition,
+                    $diag->fault_detail,
                 ]);
             }
             fclose($handle);
@@ -482,41 +587,118 @@ class DiagnosticController extends Controller
     }
 
     /**
-     * Parse a vibration CSV/JSON file and return [sampleCount, peakG, rmsG].
-     * Expected CSV columns: timestamp, x, y, z  (or just: timestamp, magnitude)
+     * Parse a vibration CSV/JSON file and return [sampleCount, peakG, rmsG, inferredRateHz].
+     * Dynamic vibration cancels the static 1G gravity/tilt vector (AC dynamic oscillation).
+     * Expected CSV columns: timestamp/t_us, x, y, z  (or just: timestamp, magnitude)
      */
     private function parseVibrationSummary(string $filePath, string $ext): array
     {
+        $inferredRateHz = null;
         try {
             if (strtolower($ext) === 'json') {
                 $json    = json_decode(file_get_contents($filePath), true) ?? [];
                 $samples = is_array($json) ? $json : [];
-                $mags    = array_map(fn($s) => (float) ($s['magnitude'] ?? $s['z'] ?? 0), $samples);
-            } else {
-                // CSV: skip header
-                $lines   = array_filter(array_map('trim', file($filePath)));
-                array_shift($lines); // header row
-                $mags = [];
-                foreach ($lines as $line) {
-                    $cols = str_getcsv($line);
-                    // Use magnitude column if present, else compute from x,y,z
-                    if (count($cols) >= 4) {
-                        $mags[] = sqrt(($cols[1] ** 2) + ($cols[2] ** 2) + ($cols[3] ** 2));
-                    } elseif (count($cols) >= 2) {
-                        $mags[] = abs((float) $cols[1]);
+                $xyz = [];
+                $scalars = [];
+                foreach ($samples as $s) {
+                    if (is_array($s) && isset($s['x'], $s['y'], $s['z'])) {
+                        $xyz[] = [(float) $s['x'], (float) $s['y'], (float) $s['z']];
+                    } elseif (is_array($s) && (isset($s['magnitude']) || isset($s['z']))) {
+                        $scalars[] = (float) ($s['magnitude'] ?? $s['z']);
+                    } elseif (is_numeric($s)) {
+                        $scalars[] = (float) $s;
                     }
+                }
+                // Remove static gravity/DC exactly like the CSV path below.
+                $mags = [];
+                if (!empty($xyz)) {
+                    $n  = count($xyz);
+                    $mx = array_sum(array_column($xyz, 0)) / $n;
+                    $my = array_sum(array_column($xyz, 1)) / $n;
+                    $mz = array_sum(array_column($xyz, 2)) / $n;
+                    foreach ($xyz as [$x, $y, $z]) {
+                        $mags[] = sqrt((($x - $mx) ** 2) + (($y - $my) ** 2) + (($z - $mz) ** 2));
+                    }
+                } elseif (!empty($scalars)) {
+                    $mean = array_sum($scalars) / count($scalars);
+                    $mags = array_map(fn($v) => abs($v - $mean), $scalars);
+                }
+            } else {
+                // CSV: skip comment lines (#) and non-numeric header rows
+                $lines = array_filter(array_map('trim', file($filePath)));
+                $rows  = [];
+                $tVals = [];
+                $isMicrosHeader = false;
+
+                foreach ($lines as $line) {
+                    if ($line === '' || str_starts_with($line, '#')) {
+                        continue;
+                    }
+                    $cols = str_getcsv($line);
+                    if (empty($cols)) {
+                        continue;
+                    }
+                    $firstCol = strtolower(trim((string) $cols[0]));
+                    if (!is_numeric($firstCol)) {
+                        if (str_contains($firstCol, 't_us') || str_contains($firstCol, 'micros')) {
+                            $isMicrosHeader = true;
+                        }
+                        continue;
+                    }
+
+                    $tVals[] = (float) $cols[0];
+                    if (count($cols) >= 4) {
+                        $rows[] = [(float)$cols[1], (float)$cols[2], (float)$cols[3]];
+                    } elseif (count($cols) >= 2) {
+                        $rows[] = [(float)$cols[1]];
+                    }
+                }
+
+                if (empty($rows)) return [0, null, null, null];
+
+                $count = count($rows);
+                if (count($tVals) >= 10) {
+                    $span = $tVals[count($tVals) - 1] - $tVals[0];
+                    if ($span > 0) {
+                        if ($isMicrosHeader || $span > 1e5) {
+                            $rate = ($count - 1) / ($span / 1e6);
+                        } else {
+                            $rate = ($count - 1) / $span;
+                        }
+                        if ($rate >= 10 && $rate <= 50000) {
+                            $inferredRateHz = (int) round($rate);
+                        }
+                    }
+                }
+
+                if (count($rows[0]) >= 3) {
+                    // Compute DC mean vector (x, y, z) to cancel static 1.0G Earth gravity vector
+                    $meanX = array_sum(array_column($rows, 0)) / $count;
+                    $meanY = array_sum(array_column($rows, 1)) / $count;
+                    $meanZ = array_sum(array_column($rows, 2)) / $count;
+
+                    $mags = [];
+                    foreach ($rows as $r) {
+                        $dx = $r[0] - $meanX;
+                        $dy = $r[1] - $meanY;
+                        $dz = $r[2] - $meanZ;
+                        $mags[] = sqrt(($dx ** 2) + ($dy ** 2) + ($dz ** 2));
+                    }
+                } else {
+                    $mean = array_sum(array_column($rows, 0)) / $count;
+                    $mags = array_map(fn($r) => abs($r[0] - $mean), $rows);
                 }
             }
 
-            if (empty($mags)) return [0, null, null];
+            if (empty($mags)) return [0, null, null, $inferredRateHz];
 
             $count  = count($mags);
             $peakG  = round(max($mags), 4);
             $rmsG   = round(sqrt(array_sum(array_map(fn($v) => $v ** 2, $mags)) / $count), 4);
 
-            return [$count, $peakG, $rmsG];
+            return [$count, $peakG, $rmsG, $inferredRateHz];
         } catch (\Throwable) {
-            return [0, null, null];
+            return [0, null, null, null];
         }
     }
 }

@@ -67,7 +67,8 @@
             @foreach($vehicles as $vehicle)
                 @php
                     $livePacket = \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id);
-                    $isOnline = is_array($livePacket) && !empty($livePacket['received_at']) && \Carbon\Carbon::parse($livePacket['received_at'])->diffInSeconds(now()) <= 15;
+                    $liveTs = is_array($livePacket) ? ($livePacket['timestamp'] ?? $livePacket['received_at'] ?? null) : null;
+                    $isOnline = !empty($livePacket['online']) && !empty($liveTs) && abs(\Carbon\Carbon::parse($liveTs)->diffInSeconds(now())) <= 15;
                     $latestDiag = $vehicle->diagnostics->first();
                     $diagCount = $vehicle->diagnostics_count ?? 0;
                     $isNew = $vehicle->created_at && $vehicle->created_at->diffInDays(now()) <= 7;

@@ -76,4 +76,17 @@ class AdminConsoleTest extends TestCase
         $this->actingAs($user)->get('/dashboard')->assertRedirect(route('login'));
         $this->assertDatabaseHas('audit_logs', ['event' => 'auth.login_blocked_suspended']);
     }
+
+    public function test_admin_can_view_ml_management_dashboard_with_model_meta(): void
+    {
+        $admin = Admin::factory()->create();
+
+        $this->actingAs($admin, 'admin')
+            ->get(route('admin.ml.index'))
+            ->assertOk()
+            ->assertSee('Machine Learning &amp; Signal Processing Engine', false)
+            ->assertSee('Global Random Forest Feature Weights')
+            ->assertSee('Confusion Matrix')
+            ->assertSee('Evaluation Scheme:');
+    }
 }

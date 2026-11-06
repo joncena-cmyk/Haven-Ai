@@ -1,13 +1,17 @@
 <x-app-layout title="Diagnostic #{{ $diagnostic->id }} — Executive Cockpit">
 
+<script defer src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
+
 @php
     $vehicle = $diagnostic->vehicle;
+    $diagnosticModelUid = $vehicle?->sketchfab_uid;
     $canon = \App\Models\Diagnostic::canonicalCondition($diagnostic->ml_condition ?? 'normal');
     $condColor = match($canon) {
         'normal'          => ['bg'=>'#ecfdf5', 'border'=>'#a7f3d0', 'label'=>'#059669', 'icon'=>'#10b981', 'badge'=>'h-badge-green', 'chip'=>'normal'],
         'valve_clearance' => ['bg'=>'#fef2f2', 'border'=>'#fecaca', 'label'=>'#dc2626', 'icon'=>'#ef4444', 'badge'=>'h-badge-red',   'chip'=>'danger'],
         'misfire'         => ['bg'=>'#fffbeb', 'border'=>'#fde68a', 'label'=>'#d97706', 'icon'=>'#f59e0b', 'badge'=>'h-badge-amber', 'chip'=>'warning'],
         'loose_component' => ['bg'=>'#fffbeb', 'border'=>'#fde68a', 'label'=>'#d97706', 'icon'=>'#f59e0b', 'badge'=>'h-badge-amber', 'chip'=>'warning'],
+        'ambient_noise'   => ['bg'=>'#fef3c7', 'border'=>'#fcd34d', 'label'=>'#b45309', 'icon'=>'#d97706', 'badge'=>'h-badge-amber', 'chip'=>'warning'],
         default           => ['bg'=>'#f8fafc', 'border'=>'#e2e8f0', 'label'=>'#0284c7', 'icon'=>'#0284c7', 'badge'=>'h-badge-teal',  'chip'=>'normal'],
     };
     $rawResult   = $diagnostic->ml_result_raw ?? [];
@@ -28,7 +32,7 @@
                 <div class="h-diag-vehicle-icon">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="1" y="3" width="15" height="13"></rect>
-                        <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
                         <circle cx="5.5" cy="18.5" r="2.5"></circle>
                         <circle cx="18.5" cy="18.5" r="2.5"></circle>
                     </svg>
@@ -46,8 +50,13 @@
             {{-- 360° Perspective View Switcher Mode --}}
             <button type="button" class="h-diag-mode-pill" id="view-mode-btn" onclick="toggleVehiclePerspective()" title="Toggle View Angle">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg>
-                <span id="view-mode-label">360° Studio View</span>
+                <span id="view-mode-label">{{ $diagnosticModelUid ? '360° 3D Studio' : '360° Studio View' }}</span>
             </button>
+            @if($diagnosticModelUid)
+                <button type="button" class="h-diag-mode-pill" id="view-dimension-btn" onclick="toggle3dDimension()" title="Toggle 3D Model / 2D Schematic">
+                    <span id="view-dimension-label" style="font-weight:700;color:var(--ds-blue);">3D MODEL</span>
+                </button>
+            @endif
         </div>
 
         <div class="h-diag-topbar-right">
@@ -139,6 +148,22 @@
         </div>
     @endif
 
+    @if($canon === 'ambient_noise')
+        <div class="h-flash" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);color:var(--ds-text);margin-bottom:1rem;border-radius:12px;padding:0.9rem 1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+                <span style="font-size:1.4rem;">⚠️</span>
+                <div>
+                    <div style="font-weight:700;font-size:0.88rem;color:#b45309;">AMBIENT ENVIRONMENTAL NOISE DETECTED (NO ENGINE COUPLED)</div>
+                    <div style="font-size:0.78rem;color:#64748b;">No internal combustion acoustic harmonics or mechanical block vibration (0.00g) were recognized. Recording was captured in open air or crowd noise away from an engine.</div>
+                </div>
+            </div>
+            <a href="{{ route('diagnostics.create', ['vehicle_id' => $diagnostic->vehicle_id]) }}" class="h-diag-btn-primary" style="padding:0.42rem 0.85rem;font-size:0.75rem;height:auto;white-space:nowrap;display:inline-flex;align-items:center;gap:0.4rem;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 4v6h6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10"/></svg>
+                Re-Capture at Engine Bay
+            </a>
+        </div>
+    @endif
+
     {{-- ═══════════════════════════════════════════════════════════════
          2. MAIN DIAGNOSTIC HERO AREA (3D Vehicle + HUD Overlay)
          ═══════════════════════════════════════════════════════════════ --}}
@@ -212,8 +237,20 @@
         </div>
 
         {{-- Center/Right: 3D Vehicle Stage with Glowing Pinpoint Fault Location --}}
-        <div class="h-diag-stage-viewport" id="stage-viewport">
-            <div class="h-diag-car-wrap" id="car-stage-wrap">
+        <div class="h-diag-stage-viewport" id="stage-viewport" style="position:relative;">
+            @if($diagnosticModelUid)
+                <div id="diagnostic-sketchfab-stage" style="position:absolute;inset:0;width:100%;height:100%;z-index:10;border-radius:14px;overflow:hidden;">
+                    <iframe
+                        id="diagnostic-sketchfab-frame"
+                        title="Interactive 3D vehicle viewer"
+                        style="width:100%;height:100%;border:0;display:block;"
+                        allow="autoplay; fullscreen; xr-spatial-tracking"
+                        allowfullscreen>
+                    </iframe>
+                </div>
+            @endif
+
+            <div class="h-diag-car-wrap" id="car-stage-wrap" style="{{ $diagnosticModelUid ? 'display:none;' : '' }}">
                 <svg class="h-diag-car-svg" viewBox="0 0 740 380" preserveAspectRatio="xMidYMid meet">
                     <defs>
                         <linearGradient id="bodySilverGrad" x1="0%" y1="0%" x2="100%" y2="80%">
@@ -703,6 +740,94 @@
 
         </div>
     @endif
+
+    {{-- ═══════════════════════════════════════════════════════════════
+         3C. GROUND-TRUTH LABELING & SESSION METADATA (ML DATASET CURATION)
+         ═══════════════════════════════════════════════════════════════ --}}
+    <div class="h-card" style="padding:1.35rem 1.45rem;background:var(--h-surface, #ffffff);border:1px solid var(--h-border, #e2e8f0);border-radius:14px;margin-bottom:1.5rem;box-shadow:var(--h-card-shadow, 0 4px 20px rgba(15,23,42,0.04));">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+            <div>
+                <h3 style="font-size:0.95rem;font-weight:700;color:var(--h-text, #0f172a);margin:0;">
+                    Ground-Truth Verification &amp; Session Metadata
+                </h3>
+                <p style="font-size:0.75rem;color:var(--h-text3, #64748b);margin:0.2rem 0 0;">
+                    Model prediction (<code class="h-mono">{{ $diagnostic->ml_condition ?? 'none' }}</code>) is never used as a training label. Set verified ground truth below to include this session in dataset export &amp; retraining.
+                </p>
+            </div>
+            <div>
+                @if($diagnostic->is_training_sample && $diagnostic->true_condition)
+                    <span class="h-badge h-badge-green" style="font-size:0.7rem;">VERIFIED TRAINING SAMPLE · {{ strtoupper($diagnostic->true_condition) }}</span>
+                @elseif($diagnostic->true_condition)
+                    <span class="h-badge h-badge-teal" style="font-size:0.7rem;">LABELED · EXCLUDED FROM TRAINING</span>
+                @else
+                    <span class="h-badge h-badge-gray" style="font-size:0.7rem;">UNLABELED SESSION</span>
+                @endif
+            </div>
+        </div>
+
+        <form method="POST" action="{{ route('diagnostics.label.update', $diagnostic) }}">
+            @csrf
+            @method('PATCH')
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.85rem;">
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">True Condition (Ground Truth)</label>
+                    <select name="true_condition" class="h-diag-file-input" style="width:100%;">
+                        <option value="">-- Unlabeled --</option>
+                        <option value="normal" @selected($diagnostic->true_condition === 'normal')>Normal Engine Operation (normal)</option>
+                        <option value="misfire" @selected($diagnostic->true_condition === 'misfire')>Engine Misfire (misfire)</option>
+                        <option value="loose_component" @selected($diagnostic->true_condition === 'loose_component')>Loose or Worn Component (loose_component)</option>
+                        <option value="valve_clearance" @selected($diagnostic->true_condition === 'valve_clearance')>Improper Valve Clearance (valve_clearance)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Session ID</label>
+                    <input type="text" name="session_id" value="{{ old('session_id', $diagnostic->session_id) }}" placeholder="e.g. SESS-2026-001" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Target RPM</label>
+                    <input type="number" name="target_rpm" value="{{ old('target_rpm', $diagnostic->target_rpm) }}" placeholder="e.g. 850" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Load State</label>
+                    <input type="text" name="load_state" value="{{ old('load_state', $diagnostic->load_state) }}" placeholder="e.g. Park / Neutral, AC Off" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Sensor Position</label>
+                    <input type="text" name="sensor_position" value="{{ old('sensor_position', $diagnostic->sensor_position) }}" placeholder="e.g. Cylinder head bolt #2" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Microphone Position</label>
+                    <input type="text" name="mic_position" value="{{ old('mic_position', $diagnostic->mic_position) }}" placeholder="e.g. 15cm above valve cover" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Operator</label>
+                    <input type="text" name="operator" value="{{ old('operator', $diagnostic->operator) }}" placeholder="Operator name" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Verified By</label>
+                    <input type="text" name="verified_by" value="{{ old('verified_by', $diagnostic->verified_by) }}" placeholder="Certifying mechanic" class="h-diag-file-input">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Sample Rate (Hz)</label>
+                    <input type="number" name="sample_rate_hz" value="{{ old('sample_rate_hz', $diagnostic->sample_rate_hz) }}" placeholder="e.g. 1000" class="h-diag-file-input">
+                </div>
+                <div style="grid-column:1 / -1;">
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Fault Detail / Mechanical Verification Notes</label>
+                    <textarea name="fault_detail" rows="2" placeholder="Document physical inspection findings (e.g. Cylinder 3 coil unplugged, intake lash 0.35mm)..." class="h-diag-file-input" style="width:100%;">{{ old('fault_detail', $diagnostic->fault_detail) }}</textarea>
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-top:1rem;padding-top:0.85rem;border-top:1px solid var(--h-border, #e2e8f0);">
+                <label style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.8rem;font-weight:700;color:var(--h-text, #0f172a);cursor:pointer;">
+                    <input type="checkbox" name="is_training_sample" value="1" @checked($diagnostic->is_training_sample) style="accent-color:#0284c7;width:16px;height:16px;">
+                    <span>Mark as verified training sample (<code class="h-mono">is_training_sample = true</code>)</span>
+                </label>
+                <button type="submit" class="h-diag-btn-primary" style="padding:0.5rem 1.1rem;font-size:0.8rem;">
+                    Save Ground-Truth Label
+                </button>
+            </div>
+        </form>
+    </div>
 
     {{-- ═══════════════════════════════════════════════════════════════
          4. DETAILED RECOMMENDATIONS & COPILOT CONSOLE
@@ -1840,25 +1965,127 @@ function escapeHtml(t) {
     return div.innerHTML;
 }
 
+</script>
+@endif
+
+<script>
+const diagnosticModelUid = @json($diagnosticModelUid);
+let diagnosticSketchfabApi = null;
+let diagnosticViewerReady = false;
+let diagnosticViewDimension = diagnosticModelUid ? '3d' : '2d';
+
+function initDiagnosticSketchfab() {
+    const iframe = document.getElementById('diagnostic-sketchfab-frame');
+    const stage = document.getElementById('diagnostic-sketchfab-stage');
+    if (!diagnosticModelUid || !iframe || !stage) return;
+
+    const embedParams = new URLSearchParams({
+        autostart: '1',
+        transparent: '1',
+        ui_controls: '0',
+        ui_infos: '0',
+        ui_watermark: '0',
+        ui_help: '0',
+        ui_settings: '0',
+        ui_annotations: '0',
+        ui_theme: 'dark'
+    });
+    iframe.src = `https://sketchfab.com/models/${diagnosticModelUid}/embed?${embedParams.toString()}`;
+
+    let attempts = 0;
+    function attachClient() {
+        if (!window.Sketchfab) {
+            attempts++;
+            if (attempts < 50) setTimeout(attachClient, 200);
+            return;
+        }
+        const client = new window.Sketchfab(iframe);
+        client.init(diagnosticModelUid, {
+            success: function(api) {
+                diagnosticSketchfabApi = api;
+                api.start();
+                api.addEventListener('viewerready', function() {
+                    diagnosticViewerReady = true;
+                    // Initial perspective
+                    api.setCameraLookAt([0, -3.8, 1.4], [0, 0, 0.4], 0.45);
+                });
+            },
+            error: function() {
+                diagnosticSketchfabApi = null;
+            },
+            autostart: 1,
+            transparent: 1,
+            ui_controls: 0,
+            ui_infos: 0,
+            ui_watermark: 0,
+            ui_help: 0,
+            ui_settings: 0,
+            ui_annotations: 0
+        });
+    }
+    attachClient();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (diagnosticModelUid) {
+        initDiagnosticSketchfab();
+    }
+});
+
+window.toggle3dDimension = function() {
+    if (!diagnosticModelUid) return;
+    const stage3d = document.getElementById('diagnostic-sketchfab-stage');
+    const stage2d = document.getElementById('car-stage-wrap');
+    const label = document.getElementById('view-dimension-label');
+    
+    diagnosticViewDimension = (diagnosticViewDimension === '3d') ? '2d' : '3d';
+    if (stage3d) stage3d.style.display = (diagnosticViewDimension === '3d') ? 'block' : 'none';
+    if (stage2d) stage2d.style.display = (diagnosticViewDimension === '2d') ? 'block' : 'none';
+    if (label) label.textContent = (diagnosticViewDimension === '3d') ? '3D MODEL' : '2D SCHEMATIC';
+};
+
 let currentZoom = 1;
 window.zoomVehicle = function(factor) {
-    currentZoom *= factor;
-    currentZoom = Math.min(1.4, Math.max(0.8, currentZoom));
-    const car = document.getElementById('car-stage-wrap');
-    if (car) car.style.transform = `scale(${currentZoom})`;
+    if (diagnosticSketchfabApi && diagnosticViewDimension === '3d') {
+        diagnosticSketchfabApi.getCameraLookAt(function(err, camera) {
+            if (err || !camera) return;
+            const scale = factor > 1 ? 0.85 : 1.15;
+            const eye = camera.position.map(function(val, idx) {
+                return val * scale + camera.target[idx] * (1 - scale);
+            });
+            diagnosticSketchfabApi.setCameraLookAt(eye, camera.target, 0.35);
+        });
+    } else {
+        currentZoom *= factor;
+        currentZoom = Math.min(1.4, Math.max(0.8, currentZoom));
+        const car = document.getElementById('car-stage-wrap');
+        if (car) car.style.transform = `scale(${currentZoom})`;
+    }
 };
 
 let currentPerspective = 0;
 window.toggleVehiclePerspective = function() {
     currentPerspective = (currentPerspective + 1) % 4;
     const angles = ['360° Studio View', 'Front Powertrain View', 'Acoustic Bay View', 'Undercarriage View'];
-    const transforms = ['rotate(0deg)', 'rotate(4deg) scale(1.05)', 'rotate(-3deg) scale(1.03)', 'rotate(0deg) scale(0.95)'];
-    document.getElementById('view-mode-label').textContent = angles[currentPerspective];
-    const car = document.getElementById('car-stage-wrap');
-    if (car) car.style.transform = transforms[currentPerspective];
+    const lbl = document.getElementById('view-mode-label');
+    if (lbl) lbl.textContent = angles[currentPerspective];
+    
+    if (diagnosticSketchfabApi && diagnosticViewDimension === '3d') {
+        const cameraPositions = [
+            [[0, -3.8, 1.4], [0, 0, 0.4]],       // 360 Studio (isometric)
+            [[0, -2.4, 0.8], [0, 0.8, 0.5]],     // Front powertrain
+            [[-1.8, -1.2, 1.2], [0, 0.5, 0.4]],  // Acoustic Bay
+            [[0, -0.1, -2.2], [0, 0, 0.2]],      // Undercarriage
+        ];
+        const [eye, target] = cameraPositions[currentPerspective];
+        diagnosticSketchfabApi.setCameraLookAt(eye, target, 0.45);
+    } else {
+        const car = document.getElementById('car-stage-wrap');
+        const transforms = ['rotate(0deg)', 'rotate(4deg) scale(1.05)', 'rotate(-3deg) scale(1.03)', 'rotate(0deg) scale(0.95)'];
+        if (car) car.style.transform = transforms[currentPerspective];
+    }
 };
 </script>
-@endif
 
 @if(in_array($diagnostic->status, ['submitted', 'processing']))
 <script>

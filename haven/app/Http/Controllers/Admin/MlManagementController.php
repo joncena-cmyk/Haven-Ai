@@ -21,12 +21,12 @@ class MlManagementController extends Controller
     {
         $mlInfo = $mlService->getHealthAndInfo();
 
-        // Database class balance for thesis 4 fault classes
+        // Database class balance for thesis 4 fault classes (strictly verified ground-truth training samples)
         $classCounts = [
-            'normal'          => Diagnostic::where('ml_condition', 'normal')->count(),
-            'misfire'         => Diagnostic::where('ml_condition', 'misfire')->count(),
-            'loose_component' => Diagnostic::where('ml_condition', 'loose_component')->count(),
-            'valve_clearance' => Diagnostic::where('ml_condition', 'valve_clearance')->count(),
+            'normal'          => Diagnostic::where('is_training_sample', true)->where('true_condition', 'normal')->count(),
+            'misfire'         => Diagnostic::where('is_training_sample', true)->where('true_condition', 'misfire')->count(),
+            'loose_component' => Diagnostic::where('is_training_sample', true)->where('true_condition', 'loose_component')->count(),
+            'valve_clearance' => Diagnostic::where('is_training_sample', true)->where('true_condition', 'valve_clearance')->count(),
         ];
         $totalSessions = Diagnostic::count();
         $labeledCount = array_sum($classCounts);
@@ -67,8 +67,9 @@ class MlManagementController extends Controller
      */
     public function retrain(Request $request, MlBackendService $mlService): RedirectResponse
     {
-        $diagnostics = Diagnostic::whereNotNull('ml_condition')
-            ->where('status', 'completed')
+        $diagnostics = Diagnostic::where('is_training_sample', true)
+            ->whereNotNull('true_condition')
+            ->whereIn('true_condition', Diagnostic::TRAINING_CONDITIONS)
             ->where(function ($q) {
                 $q->whereNull('vibration_source')
                   ->orWhere('vibration_source', '!=', 'simulated');
@@ -81,21 +82,22 @@ class MlManagementController extends Controller
             $raw = is_array($d->ml_result_raw) ? $d->ml_result_raw : [];
             $audioFeat = $raw['audio_features'] ?? [];
             $vibFeat   = $raw['vibration_features'] ?? [];
-            $peakG     = (float) ($d->vibration_peak_g ?? $vibFeat['peak_g'] ?? 1.2);
-            $rmsG      = (float) ($d->vibration_rms_g ?? $vibFeat['rms_g'] ?? ($peakG * 0.3));
-            $crest     = $rmsG > 0 ? round($peakG / $rmsG, 4) : (float) ($vibFeat['crest_factor'] ?? 3.0);
+            $peakG     = $vibFeat['peak_g'] ?? $d->vibration_peak_g ?? null;
+            $rmsG      = $vibFeat['rms_g'] ?? $d->vibration_rms_g ?? null;
+            $crest     = $vibFeat['crest_factor'] ?? (($rmsG !== null && $rmsG > 0 && $peakG !== null)
+                ? round($peakG / $rmsG, 4)
+                : null);
 
             $records[] = array_merge($audioFeat, $vibFeat, [
-                'condition'        => Diagnostic::canonicalCondition($d->ml_condition),
+                'session_id'       => $d->session_id ?? ('diag_' . $d->id),
+                'vehicle_id'       => $d->vehicle_id !== null ? (string) $d->vehicle_id : null,
+                'true_condition'   => $d->true_condition,
+                'condition'        => $d->true_condition,
                 'peak_g'           => $peakG,
                 'rms_g'            => $rmsG,
                 'crest_factor'     => $crest,
-                'dominant_freq_hz' => (float) ($vibFeat['dominant_freq_hz'] ?? ($d->rpm ? ($d->rpm / 60.0) : 25.0)),
-                'spectral_entropy' => (float) ($vibFeat['spectral_entropy'] ?? 0.35),
-                'temperature_c'    => (float) ($d->temperature_c ?? 85.0),
-                'rpm'              => (float) ($d->rpm ?? 800.0),
-                'voltage_v'        => (float) ($d->voltage_v ?? 13.8),
-                'current_ma'       => (float) ($d->current_ma ?? 400.0),
+                'dominant_freq_hz' => $vibFeat['dominant_freq_hz'] ?? null,
+                'spectral_entropy' => $vibFeat['spectral_entropy'] ?? null,
             ]);
         }
 
@@ -124,8 +126,9 @@ class MlManagementController extends Controller
     public function exportDataset(): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $diagnostics = Diagnostic::with('vehicle')
-            ->where('status', 'completed')
-            ->whereNotNull('ml_condition')
+            ->where('is_training_sample', true)
+            ->whereNotNull('true_condition')
+            ->whereIn('true_condition', Diagnostic::TRAINING_CONDITIONS)
             ->where(function ($q) {
                 $q->whereNull('vibration_source')
                   ->orWhere('vibration_source', '!=', 'simulated');
@@ -138,22 +141,26 @@ class MlManagementController extends Controller
         return response()->streamDownload(function () use ($diagnostics) {
             $out = fopen('php://output', 'w');
             fputcsv($out, [
-                'diagnostic_id', 'vehicle', 'vibration_source', 'peak_g', 'rms_g', 'crest_factor',
-                'dominant_freq_hz', 'spectral_entropy', 'temperature_c', 'rpm',
-                'voltage_v', 'current_ma', 'condition', 'confidence', 'created_at',
+                'diagnostic_id', 'session_id', 'vehicle', 'vibration_source', 'sample_rate_hz',
+                'peak_g', 'rms_g', 'crest_factor',
+                'dominant_freq_hz', 'spectral_entropy', 'temperature_c', 'rpm', 'target_rpm',
+                'load_state', 'sensor_position', 'mic_position', 'operator', 'verified_by',
+                'voltage_v', 'current_ma', 'true_condition', 'fault_detail', 'created_at',
             ]);
 
             foreach ($diagnostics as $d) {
                 $raw     = is_array($d->ml_result_raw) ? $d->ml_result_raw : [];
                 $vibFeat = $raw['vibration_features'] ?? [];
-                $peak    = $d->vibration_peak_g ?? $vibFeat['peak_g'] ?? null;
-                $rms     = $d->vibration_rms_g ?? $vibFeat['rms_g'] ?? null;
-                $crest   = ($rms > 0 && $peak > 0) ? round($peak / $rms, 3) : ($vibFeat['crest_factor'] ?? null);
+                $peak    = $vibFeat['peak_g'] ?? $d->vibration_peak_g ?? null;
+                $rms     = $vibFeat['rms_g'] ?? $d->vibration_rms_g ?? null;
+                $crest   = $vibFeat['crest_factor'] ?? (($rms > 0 && $peak > 0) ? round($peak / $rms, 3) : null);
 
                 fputcsv($out, [
                     $d->id,
+                    $d->session_id,
                     $d->vehicle?->display_name ?? 'Vehicle #' . $d->vehicle_id,
                     $d->vibration_source ?? 'physical',
+                    $d->sample_rate_hz,
                     $peak,
                     $rms,
                     $crest,
@@ -161,10 +168,16 @@ class MlManagementController extends Controller
                     $vibFeat['spectral_entropy'] ?? null,
                     $d->temperature_c,
                     $d->rpm,
+                    $d->target_rpm,
+                    $d->load_state,
+                    $d->sensor_position,
+                    $d->mic_position,
+                    $d->operator,
+                    $d->verified_by,
                     $d->voltage_v,
                     $d->current_ma,
-                    Diagnostic::canonicalCondition($d->ml_condition),
-                    $d->ml_confidence,
+                    $d->true_condition,
+                    $d->fault_detail,
                     $d->created_at?->toISOString(),
                 ]);
             }

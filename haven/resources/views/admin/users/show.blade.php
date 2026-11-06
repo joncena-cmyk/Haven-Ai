@@ -1,16 +1,31 @@
 <x-admin-layout title="Admin User Detail">
-    <div style="margin-bottom:1rem;">
-        <a href="{{ route('admin.users.index') }}" style="font-size:0.78rem;color:var(--h-teal);text-decoration:none;">&larr; All users</a>
-        <h1 style="font-size:1.35rem;font-weight:800;color:var(--h-text);margin:0.3rem 0 0;">{{ $user->name }}</h1>
-        <p style="font-size:0.8rem;color:var(--h-text3);margin:0.2rem 0 0;">
-            {{ $user->email }} &middot; Driver account &middot;
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+        <div>
+            <a href="{{ route('admin.users.index') }}" style="font-size:0.78rem;color:var(--h-teal);text-decoration:none;">&larr; All users</a>
+            <h1 style="font-size:1.35rem;font-weight:800;color:var(--h-text);margin:0.3rem 0 0;">{{ $user->name }}</h1>
+            <p style="font-size:0.8rem;color:var(--h-text3);margin:0.2rem 0 0;">
+                {{ $user->email }} &middot; Driver account &middot;
+                @if($user->isSuspended())
+                    <span style="color:var(--h-red);">Suspended {{ $user->suspended_at->diffForHumans() }}</span>
+                @else
+                    <span style="color:var(--h-green);">Active</span>
+                @endif
+                &middot; Joined {{ $user->created_at?->format('M d, Y') }}
+            </p>
+        </div>
+        <div>
             @if($user->isSuspended())
-                <span style="color:var(--h-red);">Suspended {{ $user->suspended_at->diffForHumans() }}</span>
+                <form method="POST" action="{{ route('admin.users.unsuspend', $user) }}" style="display:inline;">
+                    @csrf
+                    <button type="submit" class="haven-action-btn haven-action-btn-secondary" style="font-size:0.76rem;padding:0.4rem 0.85rem;">Reinstate Account</button>
+                </form>
             @else
-                <span style="color:var(--h-green);">Active</span>
+                <form method="POST" action="{{ route('admin.users.suspend', $user) }}" style="display:inline;" onsubmit="return confirm('Suspend {{ $user->email }}? They will be signed out immediately.');">
+                    @csrf
+                    <button type="submit" class="haven-action-btn haven-action-btn-secondary" style="font-size:0.76rem;padding:0.4rem 0.85rem;color:var(--h-red);">Suspend Account</button>
+                </form>
             @endif
-            &middot; Joined {{ $user->created_at?->format('M d, Y') }}
-        </p>
+        </div>
     </div>
 
     @include('admin.partials.tabs')

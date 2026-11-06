@@ -41,3 +41,8 @@ venv/
 .venv/
 ENV/
 *.log
+
+# Firmware secrets & local recordings
+**/secrets.h
+recordings/
+.pytest_cache/

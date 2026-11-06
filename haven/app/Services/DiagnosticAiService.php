@@ -148,6 +148,35 @@ class DiagnosticAiService
                     ],
                 ];
 
+            case 'ambient_noise':
+            case 'no_engine':
+            case 'environmental_noise':
+                return [
+                    'condition' => 'Ambient / Environmental Noise (No Engine Detected)',
+                    'safety_status' => 'INVALID CAPTURE · ENGINE NOT DETECTED',
+                    'safety_color' => 'amber',
+                    'drive_safety' => 'No vehicle powertrain was coupled to this recording. The captured audio reflects ambient crowd or environmental noise rather than a running vehicle powertrain.',
+                    'urgency' => 'Re-capture Diagnostic With Microphone at Engine Bay',
+                    'summary' => "HAVEN AI acoustic and vibrational analysis detected ambient background noise without internal combustion engine harmonics or mechanical block vibration (0.00g RMS). The recording was taken away from an operating vehicle.",
+                    'probable_causes' => [
+                        "Diagnostic was started in an open area, crowd, or room without an operating engine nearby.",
+                        "Vehicle engine was turned off or idling too far from the recording device.",
+                        "ESP32 ADXL345 accelerometer was not physically mounted to the engine block.",
+                    ],
+                    'action_checklist' => [
+                        "1. Open vehicle hood and hold microphone within 0.5 meters of the engine block / intake manifold.",
+                        "2. Start vehicle and allow it to idle at operating temperature (750–900 RPM).",
+                        "3. Firmly attach the ESP32 ADXL345 vibration sensor to an engine metal bracket or cylinder head.",
+                        "4. Avoid loud public crowds, heavy traffic, or background talking during recording.",
+                    ],
+                    'cost_estimate' => '$0.00 (Re-test with device near engine bay)',
+                    'prompt_suggestions' => [
+                        "Where should I place my phone or mic to record the engine?",
+                        "How do I attach the ESP32 vibration sensor to the car?",
+                        "What sound does an engine make compared to crowd noise?",
+                    ],
+                ];
+
             default: // normal
                 return [
                     'condition' => 'Normal Engine Operation (Baseline Idling & Revving)',

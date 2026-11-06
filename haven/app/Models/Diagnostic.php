@@ -56,19 +56,40 @@ class Diagnostic extends Model
         'ml_confidence',
         'ml_result_raw',
         'ml_processed_at',
+        'true_condition',
+        'session_id',
+        'fault_detail',
+        'target_rpm',
+        'load_state',
+        'sensor_position',
+        'mic_position',
+        'operator',
+        'verified_by',
+        'sample_rate_hz',
+        'is_training_sample',
     ];
 
     protected $casts = [
-        'ml_result_raw'    => 'array',
-        'ml_processed_at'  => 'datetime',
-        'vibration_peak_g' => 'float',
-        'vibration_rms_g'  => 'float',
-        'temperature_c'    => 'float',
-        'rpm'              => 'integer',
-        'voltage_v'        => 'float',
-        'current_ma'       => 'float',
-        'sensor_data'      => 'array',
-        'ml_confidence'    => 'float',
+        'ml_result_raw'      => 'array',
+        'ml_processed_at'    => 'datetime',
+        'vibration_peak_g'   => 'float',
+        'vibration_rms_g'    => 'float',
+        'temperature_c'      => 'float',
+        'rpm'                => 'integer',
+        'voltage_v'          => 'float',
+        'current_ma'         => 'float',
+        'sensor_data'        => 'array',
+        'ml_confidence'      => 'float',
+        'target_rpm'         => 'integer',
+        'sample_rate_hz'     => 'integer',
+        'is_training_sample' => 'boolean',
+    ];
+
+    public const TRAINING_CONDITIONS = [
+        'normal',
+        'misfire',
+        'loose_component',
+        'valve_clearance',
     ];
 
     public function hasMultiSensor(): bool
@@ -234,15 +255,26 @@ class Diagnostic extends Model
             'border'    => 'rgba(239,68,68,0.25)',
             'status'    => 'MECHANICAL WEAR · ADJUSTMENT REQUIRED',
         ],
+        'ambient_noise' => [
+            'key'       => 'ambient_noise',
+            'label'     => 'Ambient / Environmental Noise',
+            'sub_label' => 'No Engine Acoustic or Vibrational Signature Detected',
+            'badge'     => 'h-badge-amber',
+            'color'     => '#f59e0b',
+            'bg'        => 'var(--h-amber-bg)',
+            'border'    => 'rgba(245,158,11,0.25)',
+            'status'    => 'INVALID CAPTURE · ENGINE NOT DETECTED',
+        ],
     ];
 
     /**
-     * Normalize condition key to the 4 canonical capstone classes.
+     * Normalize condition key to the canonical capstone classes.
      */
     public static function canonicalCondition(?string $raw): string
     {
         $raw = strtolower(trim((string) $raw));
         return match ($raw) {
+            'ambient_noise', 'ambient', 'no_engine', 'environmental_noise', 'crowd_noise' => 'ambient_noise',
             'misfiring', 'misfire'                           => 'misfire',
             'idling_rough', 'rough_idle', 'loose_component' => 'loose_component',
             'knocking', 'knock', 'valve_clearance'          => 'valve_clearance',
@@ -285,5 +317,16 @@ class Diagnostic extends Model
     {
         $key = self::canonicalCondition($this->ml_condition);
         return self::CONDITIONS[$key] ?? self::CONDITIONS['normal'];
+    }
+
+    /**
+     * Ground-truth condition label (distinct from ML prediction).
+     */
+    public function getTrueConditionLabelAttribute(): ?string
+    {
+        if (empty($this->true_condition)) {
+            return null;
+        }
+        return self::CONDITIONS[$this->true_condition]['label'] ?? ucfirst(str_replace('_', ' ', $this->true_condition));
     }
 }

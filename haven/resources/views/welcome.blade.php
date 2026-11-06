@@ -647,7 +647,7 @@
                 </div>
                 <div>
                     <div class="hero-strip-label" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Vibration Peak</div>
-                    <div id="h-vib" class="h-mono hero-strip-val" style="font-size:1.35rem;font-weight:700;">@auth --.- <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">m/s²</span> @else 1.14 <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">m/s²</span> @endauth</div>
+                    <div id="h-vib" class="h-mono hero-strip-val" style="font-size:1.35rem;font-weight:700;">@auth --.- <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">g</span> @else 0.12 <span class="hero-strip-unit" style="font-size:0.75rem;color:#94a3b8;">g</span> @endauth</div>
                 </div>
                 <div>
                     <div class="hero-strip-label" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.2rem;">Bus Voltage</div>
@@ -760,9 +760,6 @@
                 </div>
             </div>
         </div>
-
-    </div>
-</section>
 
     </div>
 </section>
@@ -1148,7 +1145,7 @@ function pollTelemetry() {
 
                 if (hTemp && data.temperature_c !== null) hTemp.textContent = Number(data.temperature_c).toFixed(1) + ' °C';
                 if (hRpm  && data.rpm !== null) hRpm.innerHTML = Number(data.rpm).toLocaleString() + ' <span style="font-size:0.75rem;color:var(--h-muted);">RPM</span>';
-                if (hVib  && data.peak_g !== null) hVib.innerHTML = Number(data.peak_g).toFixed(2) + ' <span style="font-size:0.75rem;color:var(--h-muted);">m/s²</span>';
+                if (hVib  && data.peak_g !== null) hVib.innerHTML = Number(data.peak_g).toFixed(3) + ' <span style="font-size:0.75rem;color:var(--h-muted);">g</span>';
                 if (hVolt && data.voltage_v !== null) hVolt.innerHTML = Number(data.voltage_v).toFixed(2) + ' <span style="font-size:0.75rem;color:var(--h-muted);">V</span>';
                 if (hAud  && data.audio_rms !== null) hAud.innerHTML = Math.round(data.audio_rms).toLocaleString() + ' <span style="font-size:0.75rem;color:var(--h-muted);">RMS</span>';
 

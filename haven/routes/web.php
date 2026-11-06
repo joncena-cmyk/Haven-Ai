@@ -42,6 +42,15 @@ Route::get('/dashboard', function () {
 
 Route::middleware(['auth:web'])->group(function () {
 
+    // Session keep-alive ping & CSRF token refresh
+    Route::get('keep-alive', function () {
+        return response()->json([
+            'status' => 'alive',
+            'csrf_token' => csrf_token(),
+            'user_id' => auth()->id(),
+        ]);
+    })->name('keep-alive');
+
     // Global AI Assistant (Authenticated & Rate-Limited per user)
     Route::post('ai/ask', [\App\Http\Controllers\AiAssistantController::class, 'ask'])
          ->middleware(['throttle:ai-ask'])
@@ -74,6 +83,8 @@ Route::middleware(['auth:web'])->group(function () {
          ->name('diagnostics.export.dataset');
     Route::resource('diagnostics', DiagnosticController::class)
          ->only(['index', 'create', 'store', 'show', 'destroy']);
+    Route::patch('diagnostics/{diagnostic}/label', [DiagnosticController::class, 'updateLabel'])
+         ->name('diagnostics.label.update');
 
     // Stage 5 & 8 — ML Analysis, Status & AI Copilot
     Route::post('diagnostics/{diagnostic}/analyze', [DiagnosticController::class, 'analyze'])

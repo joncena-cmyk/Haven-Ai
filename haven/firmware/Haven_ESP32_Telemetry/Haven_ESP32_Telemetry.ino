@@ -11,15 +11,38 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
-// ── 1. CONFIGURE THESE (Overridable via NVS Captive Portal http://192.168.4.1/config) ──
+#if __has_include("secrets.h")
+  #include "secrets.h"
+#endif
+
+#ifndef HAVEN_WIFI_SSID
+  #define HAVEN_WIFI_SSID ""
+#endif
+#ifndef HAVEN_WIFI_PASS
+  #define HAVEN_WIFI_PASS ""
+#endif
+#ifndef HAVEN_SERVER_URL
+  #define HAVEN_SERVER_URL "http://192.168.1.100:8000/api/v1/telemetry/ingest"
+#endif
+#ifndef HAVEN_PING_URL
+  #define HAVEN_PING_URL "http://192.168.1.100:8000/api/v1/telemetry/ping"
+#endif
+#ifndef HAVEN_DEVICE_KEY
+  #define HAVEN_DEVICE_KEY ""
+#endif
+#ifndef HAVEN_VEHICLE_ID
+  #define HAVEN_VEHICLE_ID 1
+#endif
+
+// ── 1. CONFIGURE VIA secrets.h OR NVS CAPTIVE PORTAL (http://192.168.4.1/config) ──
 Preferences prefs;
 WebServer portalServer(80);
-char ssid[64]       = "YOUR_WIFI_SSID";       // ← Change or configure via AP portal
-char password[64]   = "YOUR_WIFI_PASSWORD";   // ← Change or configure via AP portal
-char serverUrl[128] = "http://192.168.254.106:8000/api/v1/telemetry/ingest";
-char pingUrl[128]   = "http://192.168.254.106:8000/api/v1/telemetry/ping";
-char deviceKey[64]  = "hvn_dev_cde1c79d141a9cdcb064d3ef4b9e63f2";
-const int vehicleId = 1;
+char ssid[64]       = HAVEN_WIFI_SSID;
+char password[64]   = HAVEN_WIFI_PASS;
+char serverUrl[128] = HAVEN_SERVER_URL;
+char pingUrl[128]   = HAVEN_PING_URL;
+char deviceKey[64]  = HAVEN_DEVICE_KEY;
+const int vehicleId = HAVEN_VEHICLE_ID;
 // ────────────────────────────────────────────────────────────
 
 // ── 2. SENSOR PIN ASSIGNMENTS & 100Hz RING BUFFER ───────────

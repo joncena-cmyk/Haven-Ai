@@ -14,6 +14,7 @@
         'misfire'         => ['icon'=>'#f59e0b','chip'=>'warning', 'label'=>'var(--ds-amber)'],
         'loose_component' => ['icon'=>'#f59e0b','chip'=>'warning', 'label'=>'var(--ds-amber)'],
         'valve_clearance' => ['icon'=>'#ef4444','chip'=>'danger',  'label'=>'var(--ds-red)'],
+        'ambient_noise'   => ['icon'=>'#f59e0b','chip'=>'warning', 'label'=>'var(--ds-amber)'],
         default           => ['icon'=>'#0284c7','chip'=>'normal',  'label'=>'var(--ds-blue)'],
     };
 @endphp
@@ -35,7 +36,7 @@
                         </svg>
                     </div>
                     <span id="active-vehicle-name" class="h-diag-pill-title">
-                        {{ $selectedVehicle?->display_name ?? 'Select Vehicle' }}
+                        {{ $selectedVehicle?->display_name ?? 'All Vehicles (Fleet)' }}
                     </span>
                     @if($selectedVehicle)
                         <span class="h-diag-vehicle-year">
@@ -48,9 +49,23 @@
                 {{-- Vehicle Dropdown Panel --}}
                 <div id="vehicle-menu" class="h-diag-dropdown-menu" style="display:none;">
                     <div class="h-diag-dropdown-header">
-                        Your Vehicles
+                        Vehicle Fleet Filter
                     </div>
                     <div class="h-diag-dropdown-scroll">
+                        <a href="{{ route('diagnostics.index', ['vehicle_id' => 'all']) }}" class="h-diag-dropdown-item {{ $selectedVid === 'all' ? 'is-active' : '' }}">
+                            <div class="h-diag-dropdown-item-left">
+                                <div class="h-diag-dropdown-v-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                                </div>
+                                <div>
+                                    <div class="h-diag-dropdown-v-name">All Fleet (All Vehicles)</div>
+                                    <div class="h-diag-dropdown-v-meta">Complete Multi-Vehicle Diagnostic History</div>
+                                </div>
+                            </div>
+                            <div class="h-diag-dropdown-v-stat">
+                                {{ $total }} sessions
+                            </div>
+                        </a>
                         @forelse($vehicles as $v)
                             <a href="{{ route('diagnostics.index', ['vehicle_id' => $v->id]) }}" class="h-diag-dropdown-item {{ $v->id == $selectedVid ? 'is-active' : '' }}">
                                 <div class="h-diag-dropdown-item-left">
@@ -198,7 +213,7 @@
 
             {{-- Master CTA: Start Diagnostic --}}
             <div class="h-diag-hud-cta-wrap">
-                <a href="{{ route('diagnostics.create', ['vehicle_id' => $selectedVid]) }}" class="h-diag-cta-btn">
+                <a href="{{ route('diagnostics.create', ($selectedVehicle && $selectedVid !== 'all') ? ['vehicle_id' => $selectedVehicle->id] : []) }}" class="h-diag-cta-btn">
                     <span class="h-diag-cta-glow"></span>
                     <span class="h-diag-cta-icon">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
@@ -759,9 +774,9 @@
                 <div class="h-diag-no-sessions-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                 </div>
-                <h3>No Sessions Yet for {{ $selectedVehicle?->display_name ?? 'this vehicle' }}</h3>
+                <h3>No Sessions Yet{{ $selectedVehicle ? (' for ' . $selectedVehicle->display_name) : '' }}</h3>
                 <p>Start a new diagnostic to record engine audio and vibration data.</p>
-                <a href="{{ route('diagnostics.create', ['vehicle_id' => $selectedVid]) }}" class="h-diag-btn-primary">
+                <a href="{{ route('diagnostics.create', ($selectedVehicle && $selectedVid !== 'all') ? ['vehicle_id' => $selectedVehicle->id] : []) }}" class="h-diag-btn-primary">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     <span>Start First Diagnostic</span>
                 </a>
@@ -776,6 +791,7 @@
                         'misfire'         => ['dot'=>'#f59e0b','chip'=>'is-warning','icon-txt'=>'#f59e0b'],
                         'loose_component' => ['dot'=>'#f59e0b','chip'=>'is-warning','icon-txt'=>'#f59e0b'],
                         'valve_clearance' => ['dot'=>'#ef4444','chip'=>'is-danger','icon-txt'=>'#ef4444'],
+                        'ambient_noise'   => ['dot'=>'#f59e0b','chip'=>'is-warning','icon-txt'=>'#f59e0b'],
                         default           => ['dot'=>'#0284c7','chip'=>'is-info','icon-txt'=>'#0284c7'],
                     };
                 @endphp
@@ -914,13 +930,18 @@
                         </div>
                     @endforeach
                 </div>
-                <div class="h-diag-status-callout">
-                    <strong>📡 Hardware Stream Target:</strong>
-                    @if($selectedVehicle)
-                        Your ESP32 publishes diagnostics to <code>{{ url('/api/v1/telemetry') }}</code> with vehicle token.
-                    @else
-                        Register a vehicle first to bind your ESP32 telemetry hardware.
-                    @endif
+                <div class="h-diag-status-callout" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+                    <div>
+                        <strong>📡 Hardware Stream Target:</strong>
+                        @if($selectedVehicle)
+                            Your ESP32 publishes diagnostics to <code>{{ url('/api/v1/telemetry') }}</code> with vehicle token.
+                        @else
+                            Register a vehicle first to bind your ESP32 telemetry hardware.
+                        @endif
+                    </div>
+                    <button type="button" onclick="document.getElementById('iot-modal').style.display='none';if(typeof openEsp32WebSerialModal==='function')openEsp32WebSerialModal();" style="background:#0284c7;color:#fff;border:none;padding:0.4rem 0.8rem;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:0.35rem;">
+                        ⚡ Pair Wi-Fi (USB)
+                    </button>
                 </div>
             </div>
 

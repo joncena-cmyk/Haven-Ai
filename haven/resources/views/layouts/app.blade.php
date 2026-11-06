@@ -156,6 +156,7 @@
         (function() {
             const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
             let idleTimer = null;
+            let lastKeepAlivePing = Date.now();
 
             function triggerAutoLogout() {
                 // If a logout form is present on page, submit it cleanly
@@ -179,6 +180,20 @@
             function resetIdleTimer() {
                 if (idleTimer) clearTimeout(idleTimer);
                 idleTimer = setTimeout(triggerAutoLogout, INACTIVITY_LIMIT_MS);
+
+                // Keep session and CSRF in sync if user is active (throttled to every 2.5 min)
+                const now = Date.now();
+                if (now - lastKeepAlivePing > 2.5 * 60 * 1000) {
+                    lastKeepAlivePing = now;
+                    fetch('{{ route('keep-alive') }}', { credentials: 'same-origin' })
+                        .then(r => r.json())
+                        .then(d => {
+                            if (d && d.csrf_token) {
+                                document.querySelector('meta[name="csrf-token"]')?.setAttribute('content', d.csrf_token);
+                            }
+                        })
+                        .catch(() => {});
+                }
             }
 
             // User activity events: mousemove, keydown, click, scroll, touch

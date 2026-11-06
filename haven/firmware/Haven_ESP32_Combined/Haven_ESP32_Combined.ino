@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <WebServer.h>
+#include <DNSServer.h>
 #include <HTTPClient.h>
 #include <Wire.h>
 #include <Adafruit_MPU6050.h>
@@ -10,28 +11,64 @@
 #include <driver/i2s.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
+#include <esp_timer.h>
 #include <math.h>
+#include "accel_driver.h"
+
+#if __has_include("secrets.h")
+  #include "secrets.h"
+#endif
+
+#ifndef HAVEN_WIFI_SSID
+  #define HAVEN_WIFI_SSID ""
+#endif
+#ifndef HAVEN_WIFI_PASS
+  #define HAVEN_WIFI_PASS ""
+#endif
+#ifndef HAVEN_SERVER_URL
+  #define HAVEN_SERVER_URL "http://192.168.1.100:8000/api/v1/telemetry/ingest"
+#endif
+#ifndef HAVEN_DEVICE_KEY
+  #define HAVEN_DEVICE_KEY ""
+#endif
+#ifndef HAVEN_VEHICLE_ID
+  #define HAVEN_VEHICLE_ID 1
+#endif
+#ifndef HAVEN_AP_SSID
+  #define HAVEN_AP_SSID "HAVEN_AI_LOCAL"
+#endif
+#ifndef HAVEN_AP_PASS
+  #define HAVEN_AP_PASS ""
+#endif
+
+// Set to 1 to boot directly into 921600-baud LOGGER mode (no Wi-Fi),
+// or leave 0 and send "LOGGER\n" over Serial to switch at runtime.
+#ifndef HAVEN_DEFAULT_LOGGER_MODE
+  #define HAVEN_DEFAULT_LOGGER_MODE 0
+#endif
 
 // ============================================================
-// HAVEN AI - ESP32 FIVE SENSOR DAQ & AUTOMOTIVE INGEST NODE
+// HAVEN AI - ESP32 FIVE SENSOR DAQ & HIGH-RATE SERIAL LOGGER
 // Complies with ISO/SAE 21434 Hardware Key Authentication
-// With NVS Preferences & Captive Portal Provisioning (192.168.4.1)
+// Credentials loaded from NVS Preferences or git-ignored secrets.h
 // ============================================================
 
 Preferences prefs;
 
-// ── 1. NETWORK & HAVEN CONFIGURATION (Fallbacks stored in flash) ──
-char wifiSSID[64]      = "GFiber_FC756";
-char wifiPassword[64]  = "4C34FA60";
-char havenServerUrl[128] = "http://192.168.254.106:8000/api/v1/telemetry/ingest";
-char havenDeviceKey[64] = "hvn_dev_cde1c79d141a9cdcb064d3ef4b9e63f2";
-int  vehicleId         = 1;
+// ── 1. NETWORK & HAVEN CONFIGURATION (Loaded from NVS / secrets.h) ──
+char wifiSSID[64]        = HAVEN_WIFI_SSID;
+char wifiPassword[64]    = HAVEN_WIFI_PASS;
+char havenServerUrl[128] = HAVEN_SERVER_URL;
+char havenDeviceKey[64]  = HAVEN_DEVICE_KEY;
+int  vehicleId           = HAVEN_VEHICLE_ID;
 
 // Standalone fallback AP for mobile provisioning: http://192.168.4.1/config
-const char* apSSID     = "HAVEN_AI_LOCAL";
-const char* apPassword = "haven1234";
+const char* apSSID     = HAVEN_AP_SSID;
+const char* apPassword = HAVEN_AP_PASS;
 
 WebServer server(80);
+DNSServer dnsServer;
+const byte DNS_PORT = 53;
 
 // ── 2. GPIO PIN ASSIGNMENTS ─────────────────────────────────
 #define TEMP_PIN 4
@@ -44,13 +81,21 @@ WebServer server(80);
 #define MIC_WS   19
 #define MIC_SD   5
 
-// ── 3. SENSOR OBJECTS ───────────────────────────────────────
+// ── 3. SENSOR OBJECTS (Swappable Accelerometer Driver Layer) ──
 OneWire oneWire(TEMP_PIN);
 DallasTemperature tempSensor(&oneWire);
 int ds18DeviceCount = 0;
 
-Adafruit_MPU6050 mpu;
+// Default I2C MPU6050 driver; swap with `Adxl345SpiDriver accelHw(CS_PIN);` for SPI ADXL345
+Mpu6050I2cDriver accelHw(MPU_SDA, MPU_SCL);
+IAccelDriver* accelDriver = &accelHw;
 bool mpuReady = false;
+
+// High-rate LOGGER mode state (target 1000 Hz, 921600 baud, no Wi-Fi)
+bool loggerModeActive = (HAVEN_DEFAULT_LOGGER_MODE != 0);
+const uint32_t LOGGER_BAUD_RATE = 921600;
+const int64_t  LOGGER_TARGET_PERIOD_US = 1000; // 1000 Hz target
+int64_t nextLoggerSampleUs = 0;
 
 Adafruit_INA219 ina219(0x40);
 bool inaReady = false;
@@ -189,7 +234,7 @@ void postTelemetryToHaven() {
   if (!mpuDetected) {
     mpuReady = false;
   } else if (!mpuReady) {
-    mpuReady = mpu.begin(0x68, &Wire);
+    mpuReady = accelDriver->begin(false);
   }
 
   bool inaDetected = probeI2C(0x40);
@@ -201,13 +246,20 @@ void postTelemetryToHaven() {
 
   bool ds18Plugged = (!isnan(temperature) && ds18DeviceCount > 0);
 
-  // Compute window Peak G, RMS G, and Crest Factor across the 100Hz ring buffer
+  // Compute window Peak G, RMS G, and Crest Factor across the 100Hz ring buffer.
+  // The raw magnitude includes ~1 g of static gravity, so subtract the window mean first;
+  // otherwise a sensor resting on a table reports ~1.0 g peak/RMS.
   int sampleCount = vibBufferFull ? VIB_BUFFER_SIZE : vibBufferIdx;
+  float meanMag = 0.0f;
   if (mpuReady && sampleCount > 0) {
+    double sum = 0;
+    for (int i = 0; i < sampleCount; i++) sum += vibBuffer[i];
+    meanMag = (float)(sum / sampleCount);
+
     double sumSq = 0;
     float maxG = 0;
     for (int i = 0; i < sampleCount; i++) {
-      float v = vibBuffer[i];
+      float v = fabsf(vibBuffer[i] - meanMag);
       if (v > maxG) maxG = v;
       sumSq += (double)v * (double)v;
     }
@@ -215,9 +267,9 @@ void postTelemetryToHaven() {
     windowRmsG  = sqrt(sumSq / sampleCount);
     windowCrestFactor = (windowRmsG > 0.001f) ? (windowPeakG / windowRmsG) : 0.0f;
   } else {
-    windowPeakG = accelMagnitude;
-    windowRmsG  = accelMagnitude * 0.707f;
-    windowCrestFactor = 1.414f;
+    windowPeakG = 0.0f;
+    windowRmsG  = 0.0f;
+    windowCrestFactor = 0.0f;
   }
 
   HTTPClient http;
@@ -260,14 +312,15 @@ void postTelemetryToHaven() {
   }
   
   if (mpuReady) {
-    doc["peak_g"]       = round(windowPeakG * 100.0) / 100.0;
+    doc["peak_g"]       = round(windowPeakG * 1000.0) / 1000.0;
     doc["rms_g"]        = round(windowRmsG * 1000.0) / 1000.0;
     doc["crest_factor"] = round(windowCrestFactor * 100.0) / 100.0;
     JsonArray samplesArr = doc.createNestedArray("samples");
     int countToSend = (sampleCount > 64) ? 64 : sampleCount;
     for (int i = 0; i < countToSend; i++) {
       int idx = (vibBufferIdx - countToSend + i + VIB_BUFFER_SIZE) % VIB_BUFFER_SIZE;
-      samplesArr.add(round(vibBuffer[idx] * 1000.0) / 1000.0);
+      // Send gravity-removed dynamic magnitude, consistent with peak_g / rms_g above.
+      samplesArr.add(round((vibBuffer[idx] - meanMag) * 1000.0) / 1000.0);
     }
   } else {
     doc["peak_g"] = nullptr;
@@ -364,56 +417,367 @@ void handleData() {
 // ============================================================
 // CAPTIVE PORTAL & WEB PROVISIONING (http://192.168.4.1/config)
 // ============================================================
+
+// Escape user-controlled text (SSIDs, URLs) before inserting it into HTML.
+String htmlEscape(const String& in) {
+  String out;
+  out.reserve(in.length() + 16);
+  for (size_t i = 0; i < in.length(); i++) {
+    char c = in[i];
+    switch (c) {
+      case '&':  out += "&amp;";  break;
+      case '<':  out += "&lt;";   break;
+      case '>':  out += "&gt;";   break;
+      case '"':  out += "&quot;"; break;
+      case '\'': out += "&#39;";  break;
+      default:   out += c;        break;
+    }
+  }
+  return out;
+}
+
+// Bounded copy that always NUL-terminates (strncpy does not when the source is too long).
+void copyBounded(char* dst, size_t dstSize, const char* src) {
+  if (!dst || dstSize == 0) return;
+  strlcpy(dst, src ? src : "", dstSize);
+}
+
+void handleScanWifi() {
+  int n = WiFi.scanNetworks();
+  // 25 networks x (32-char SSID + keys/overhead) needs ~3 KB of ArduinoJson pool.
+  DynamicJsonDocument doc(4096);
+  JsonArray arr = doc.createNestedArray("networks");
+  for (int i = 0; i < n && i < 25; i++) {
+    JsonObject net = arr.createNestedObject();
+    net["ssid"] = WiFi.SSID(i);
+    net["rssi"] = WiFi.RSSI(i);
+    net["secure"] = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+  }
+  WiFi.scanDelete();
+  String json;
+  serializeJson(doc, json);
+  server.send(200, "application/json", json);
+}
+
+void handleCaptivePortalRedirect() {
+  String host = server.hostHeader();
+  String apIp = WiFi.softAPIP().toString();
+  String staIp = WiFi.localIP().toString();
+  // Only hijack requests from captive-portal probes on the hotspot. Requests that already
+  // target one of our own IPs (AP or home-network STA) get the config page directly;
+  // redirecting STA clients to 192.168.4.1 would send them to an unreachable address.
+  if (host.indexOf(apIp) < 0 && (staIp == "0.0.0.0" || host.indexOf(staIp) < 0)) {
+    server.sendHeader("Location", "http://" + apIp + "/config", true);
+    server.send(302, "text/plain", "");
+    return;
+  }
+  handleConfig();
+}
+
 void handleConfig() {
-  String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<title>HAVEN AI — ESP32 DAQ Provisioning</title>";
-  html += "<style>body{font-family:system-ui,-apple-system,sans-serif;background:#090d16;color:#e2e8f0;padding:1.5rem;max-width:480px;margin:auto}";
-  html += "h1{color:#38bdf8;font-size:1.25rem;margin-bottom:0.25rem}";
-  html += ".sub{color:#94a3b8;font-size:0.8rem;margin-bottom:1.5rem}";
-  html += "label{display:block;font-size:0.75rem;font-weight:700;color:#94a3b8;margin:0.75rem 0 0.25rem;text-transform:uppercase;letter-spacing:0.05em}";
-  html += "input{width:100%;padding:0.7rem;background:#131c2e;border:1px solid #1e293b;border-radius:8px;color:#fff;font-size:0.9rem;box-sizing:border-box}";
-  html += "button{width:100%;margin-top:1.5rem;padding:0.8rem;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.95rem;cursor:pointer}";
-  html += ".card{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:1.25rem}";
-  html += "</style></head><body>";
-  html += "<h1>HAVEN AI Node Setup</h1><div class='sub'>ISO/SAE 21434 IoT Provisioning Portal</div>";
+  bool isConn = (WiFi.status() == WL_CONNECTED);
+  String localIp = isConn ? WiFi.localIP().toString() : "Not connected";
+
+  String html = "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>";
+  html += "<title>HAVEN AI — ESP32 DAQ Setup</title>";
+  html += "<style>";
+  html += "*{box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;background:#090d16;color:#e2e8f0;margin:0;padding:1.5rem;display:flex;justify-content:center}";
+  html += ".box{max-width:480px;width:100%}";
+  html += ".head{display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem}";
+  html += ".icon{width:38px;height:38px;border-radius:10px;background:rgba(14,165,233,0.15);border:1px solid rgba(14,165,233,0.3);display:flex;align-items:center;justify-content:center;color:#38bdf8;font-size:1rem;font-weight:700}";
+  html += "h1{color:#f8fafc;font-size:1.15rem;margin:0 0 0.15rem;font-weight:700}";
+  html += ".sub{color:#94a3b8;font-size:0.75rem;margin:0}";
+  html += ".badge{display:inline-block;padding:0.3rem 0.65rem;border-radius:6px;font-size:0.72rem;font-weight:700;margin-bottom:1rem;font-family:monospace}";
+  html += ".b-green{background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3)}";
+  html += ".b-amber{background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3)}";
+  html += ".card{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:1.25rem;box-shadow:0 12px 32px rgba(0,0,0,0.5)}";
+  html += "label{display:block;font-size:0.72rem;font-weight:700;color:#94a3b8;margin:0.85rem 0 0.3rem;text-transform:uppercase;letter-spacing:0.04em}";
+  html += "input,select{width:100%;padding:0.65rem;background:#131c2e;border:1px solid #334155;border-radius:8px;color:#fff;font-size:0.88rem;outline:none}";
+  html += "input:focus,select:focus{border-color:#0284c7}";
+  html += ".btn{width:100%;margin-top:1.25rem;padding:0.75rem;background:linear-gradient(135deg,#0284c7,#0ea5e9);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.9rem;cursor:pointer}";
+  html += ".btn-sec{width:auto;padding:0.35rem 0.65rem;background:#1e293b;color:#38bdf8;border:1px solid #334155;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer}";
+  html += ".hint{font-size:0.68rem;color:#64748b;margin-top:0.25rem}";
+  html += "</style></head><body><div class='box'>";
+  html += "<div class='head'><div class='icon'>HV</div><div><h1>HAVEN AI Node Setup</h1><div class='sub'>ISO/SAE 21434 Hardware Auto-Provisioning</div></div></div>";
+
+  if (isConn) {
+    html += "<div class='badge b-green'>CONNECTED: " + htmlEscape(wifiSSID) + " (" + localIp + ")</div>";
+  } else {
+    html += "<div class='badge b-amber'>STANDALONE HOTSPOT (192.168.4.1)</div>";
+  }
+
   html += "<form class='card' method='POST' action='/save'>";
-  html += "<label>Wi-Fi SSID</label><input name='ssid' value='" + String(wifiSSID) + "' required>";
-  html += "<label>Wi-Fi Password</label><input name='pass' type='password' value='" + String(wifiPassword) + "'>";
-  html += "<label>Haven Server URL</label><input name='server' value='" + String(havenServerUrl) + "' required>";
-  html += "<label>Device Key</label><input name='key' value='" + String(havenDeviceKey) + "' required>";
-  html += "<button type='submit'>Save & Reconnect</button>";
-  html += "</form></body></html>";
+  html += "<div style='display:flex;justify-content:space-between;align-items:center;'>";
+  html += "<label style='margin:0'>Wi-Fi Network (SSID)</label>";
+  html += "<button type='button' class='btn-sec' onclick='scanNetworks()'>Scan Networks</button>";
+  html += "</div>";
+  html += "<div id='scan-box' style='display:none;margin-top:0.35rem;'>";
+  html += "<select id='scan-select' onchange='if(this.value){document.getElementById(\"ssid-input\").value=this.value;}'></select>";
+  html += "</div>";
+  html += "<input id='ssid-input' name='ssid' value='" + htmlEscape(wifiSSID) + "' placeholder='e.g. MyWiFi-2.4G' required maxlength='32' style='margin-top:0.35rem'>";
+  html += "<label>Wi-Fi Password</label>";
+  // Never echo the stored password: the setup hotspot is open, so anyone nearby could read it.
+  html += "<input name='pass' type='password' value='' maxlength='63' placeholder='" + String(strlen(wifiPassword) > 0 ? "Saved (leave blank to keep)" : "Leave blank if open network") + "'>";
+  html += "<label>Haven Server URL</label>";
+  html += "<input name='server' value='" + htmlEscape(havenServerUrl) + "' required maxlength='127'>";
+  html += "<div class='hint'>Laptop IP on this Wi-Fi (e.g. http://192.168.1.50:8000/api/v1/telemetry/ingest)</div>";
+  html += "<label>Device Key</label>";
+  // Never echo the stored device key for the same reason.
+  html += "<input name='key' value='' maxlength='63' placeholder='" + String(strlen(havenDeviceKey) > 0 ? "Saved (leave blank to keep)" : "hvn_dev_...") + "'" + String(strlen(havenDeviceKey) > 0 ? "" : " required") + ">";
+  html += "<label>Vehicle ID</label>";
+  html += "<input name='vehicle_id' type='number' min='1' value='" + String(vehicleId) + "' required>";
+  html += "<button class='btn' type='submit'>Save & Reconnect</button>";
+  html += "</form>";
+
+  html += "<script>";
+  html += "function scanNetworks(){";
+  html += "var sb=document.getElementById('scan-box');var ss=document.getElementById('scan-select');";
+  html += "ss.innerHTML='<option>Scanning...</option>';sb.style.display='block';";
+  html += "fetch('/scan').then(function(r){return r.json()}).then(function(d){";
+  html += "ss.innerHTML='';";
+  html += "if(!d.networks||!d.networks.length){var e=document.createElement('option');e.textContent='No networks found';ss.appendChild(e);return;}";
+  html += "var f=document.createElement('option');f.value='';f.textContent='-- Select Found Wi-Fi --';ss.appendChild(f);";
+  // Build options via DOM APIs so SSIDs containing quotes or tags cannot inject markup.
+  html += "d.networks.forEach(function(n){if(!n.ssid)return;var o=document.createElement('option');o.value=n.ssid;o.textContent=n.ssid+' ('+n.rssi+' dBm)'+(n.secure?' [secured]':'');ss.appendChild(o);});";
+  html += "}).catch(function(){ss.innerHTML='<option>Scan failed</option>';});";
+  html += "}";
+  html += "</script>";
+  html += "</div></body></html>";
+
   server.send(200, "text/html", html);
 }
 
 void handleSave() {
-  if (server.hasArg("ssid")) strncpy(wifiSSID, server.arg("ssid").c_str(), sizeof(wifiSSID));
-  if (server.hasArg("pass")) strncpy(wifiPassword, server.arg("pass").c_str(), sizeof(wifiPassword));
-  if (server.hasArg("server")) strncpy(havenServerUrl, server.arg("server").c_str(), sizeof(havenServerUrl));
-  if (server.hasArg("key")) strncpy(havenDeviceKey, server.arg("key").c_str(), sizeof(havenDeviceKey));
+  String newSsid = server.hasArg("ssid") ? server.arg("ssid") : String(wifiSSID);
+  newSsid.trim();
+  bool ssidChanged = (newSsid != String(wifiSSID));
+  copyBounded(wifiSSID, sizeof(wifiSSID), newSsid.c_str());
+
+  // Blank password = keep the saved one, unless the SSID changed (then it is an open network).
+  String newPass = server.hasArg("pass") ? server.arg("pass") : String("");
+  if (newPass.length() > 0) {
+    copyBounded(wifiPassword, sizeof(wifiPassword), newPass.c_str());
+  } else if (ssidChanged) {
+    wifiPassword[0] = '\0';
+  }
+
+  if (server.hasArg("server") && server.arg("server").length() > 0) {
+    copyBounded(havenServerUrl, sizeof(havenServerUrl), server.arg("server").c_str());
+  }
+  // Blank key = keep the saved key.
+  if (server.hasArg("key") && server.arg("key").length() > 0) {
+    copyBounded(havenDeviceKey, sizeof(havenDeviceKey), server.arg("key").c_str());
+  }
+  if (server.hasArg("vehicle_id")) {
+    long vid = server.arg("vehicle_id").toInt();
+    if (vid > 0) vehicleId = (int)vid;
+  }
 
   prefs.begin("haven", false);
   prefs.putString("ssid", wifiSSID);
   prefs.putString("pass", wifiPassword);
   prefs.putString("server", havenServerUrl);
   prefs.putString("key", havenDeviceKey);
+  prefs.putInt("vid", vehicleId);
   prefs.end();
 
   String html = "<!DOCTYPE html><html><body style='background:#090d16;color:#4ade80;font-family:sans-serif;padding:2rem;text-align:center;'>";
-  html += "<h2>Credentials Saved!</h2><p style='color:#94a3b8;'>Rebooting ESP32 and connecting to " + String(wifiSSID) + "...</p></body></html>";
+  html += "<h2>Credentials Saved!</h2><p style='color:#94a3b8;'>Rebooting ESP32 and connecting to " + htmlEscape(wifiSSID) + "...</p></body></html>";
   server.send(200, "text/html", html);
   delay(1000);
   ESP.restart();
 }
 
 // ============================================================
+// HIGH-RATE SERIAL LOGGER MODE (Phase 3: 1000 Hz, 921600 Baud, No Wi-Fi)
+// ============================================================
+void enterLoggerMode() {
+  loggerModeActive = true;
+
+  // Shut down HTTP server and Wi-Fi completely to eliminate radio/ISR jitter
+  server.stop();
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+  btStop();
+
+  Serial.flush();
+  Serial.updateBaudRate(LOGGER_BAUD_RATE);
+  delay(50);
+
+  mpuReady = accelDriver->begin(true);
+
+  // Measure actual achieved sample rate over a 200-sample hardware-timed calibration burst
+  const int kCalibSamples = 200;
+  float tx = 0.0f, ty = 0.0f, tz = 0.0f;
+  int64_t tStartUs = esp_timer_get_time();
+  int64_t nextUs = tStartUs;
+  int validReads = 0;
+
+  for (int i = 0; i < kCalibSamples; i++) {
+    while (esp_timer_get_time() < nextUs) {
+      // Tight hardware timer poll
+    }
+    if (accelDriver->readSampleG(tx, ty, tz)) {
+      validReads++;
+    }
+    nextUs += LOGGER_TARGET_PERIOD_US;
+  }
+  int64_t elapsedUs = esp_timer_get_time() - tStartUs;
+  float achievedHz = (elapsedUs > 0) ? (1000000.0f * (float)kCalibSamples / (float)elapsedUs) : 0.0f;
+
+  Serial.println();
+  Serial.printf(
+    "# HAVEN_LOGGER_V1 SENSOR=%s RANGE_G=%d DLPF_HZ=%d TARGET_RATE_HZ=%d ACHIEVED_RATE_HZ=%.1f VALID_READS=%d/%d\n",
+    accelDriver->sensorName(),
+    accelDriver->rangeG(),
+    accelDriver->bandwidthHz(),
+    (int)(1000000 / LOGGER_TARGET_PERIOD_US),
+    achievedHz,
+    validReads,
+    kCalibSamples
+  );
+  Serial.println("t_us,ax,ay,az");
+
+  nextLoggerSampleUs = esp_timer_get_time();
+}
+
+void checkSerialModeCommand() {
+  while (Serial.available() > 0) {
+    String raw = Serial.readStringUntil('\n');
+    raw.trim();
+    if (raw.length() == 0) continue;
+
+    String upper = raw;
+    upper.toUpperCase();
+
+    if (upper == "LOGGER" && !loggerModeActive) {
+      enterLoggerMode();
+      return;
+    } else if (upper == "LIVE" && loggerModeActive) {
+      ESP.restart();
+      return;
+    } else if (upper == "PING") {
+      Serial.println("PONG:HAVEN_ESP32_NODE");
+      return;
+    } else if (upper == "SCAN_WIFI") {
+      int n = WiFi.scanNetworks();
+      DynamicJsonDocument doc(4096);
+      JsonArray arr = doc.createNestedArray("networks");
+      for (int i = 0; i < n && i < 20; i++) {
+        JsonObject item = arr.createNestedObject();
+        item["ssid"] = WiFi.SSID(i);
+        item["rssi"] = WiFi.RSSI(i);
+      }
+      WiFi.scanDelete();
+      Serial.print("WIFI_LIST:");
+      serializeJson(doc, Serial);
+      Serial.println();
+      return;
+    } else if (upper.startsWith("SET_CONFIG:")) {
+      String jsonStr = raw.substring(11);
+      StaticJsonDocument<768> doc;
+      DeserializationError err = deserializeJson(doc, jsonStr);
+      if (err) {
+        Serial.println("ERR:INVALID_JSON");
+        return;
+      }
+      const char* newSsid = doc["ssid"] | "";
+      if (strlen(newSsid) == 0) {
+        Serial.println("ERR:MISSING_SSID");
+        return;
+      }
+      copyBounded(wifiSSID, sizeof(wifiSSID), newSsid);
+      copyBounded(wifiPassword, sizeof(wifiPassword), doc["pass"] | "");
+      if (doc.containsKey("server")) {
+        copyBounded(havenServerUrl, sizeof(havenServerUrl), doc["server"] | "");
+      }
+      if (doc.containsKey("key")) {
+        copyBounded(havenDeviceKey, sizeof(havenDeviceKey), doc["key"] | "");
+      }
+      int newVid = doc["vehicle_id"] | vehicleId;
+      if (newVid > 0) vehicleId = newVid;
+
+      prefs.begin("haven", false);
+      prefs.putString("ssid", wifiSSID);
+      prefs.putString("pass", wifiPassword);
+      prefs.putString("server", havenServerUrl);
+      prefs.putString("key", havenDeviceKey);
+      prefs.putInt("vid", vehicleId);
+      prefs.end();
+
+      Serial.println("OK:SAVED");
+      delay(400);
+      ESP.restart();
+      return;
+    } else if (upper == "GET_CONFIG") {
+      StaticJsonDocument<256> doc;
+      doc["device"] = "HAVEN_ESP32_NODE";
+      doc["ssid"] = wifiSSID;
+      doc["server"] = havenServerUrl;
+      doc["key_set"] = (strlen(havenDeviceKey) > 0);
+      doc["vehicle_id"] = vehicleId;
+      doc["connected"] = (WiFi.status() == WL_CONNECTED);
+      doc["ip"] = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : "";
+      Serial.print("CONFIG:");
+      serializeJson(doc, Serial);
+      Serial.println();
+      return;
+    }
+  }
+}
+
+void runLoggerLoop() {
+  int64_t nowUs = esp_timer_get_time();
+  if (nowUs < nextLoggerSampleUs) {
+    return;
+  }
+  nextLoggerSampleUs += LOGGER_TARGET_PERIOD_US;
+  if (nowUs - nextLoggerSampleUs > LOGGER_TARGET_PERIOD_US * 4) {
+    nextLoggerSampleUs = nowUs + LOGGER_TARGET_PERIOD_US;
+  }
+
+  float ax = 0.0f, ay = 0.0f, az = 0.0f;
+  if (accelDriver->readSampleG(ax, ay, az)) {
+    char lineBuf[64];
+    int len = snprintf(lineBuf, sizeof(lineBuf), "%lld,%.5f,%.5f,%.5f\n", (long long)nowUs, ax, ay, az);
+    if (len > 0) {
+      Serial.write((const uint8_t*)lineBuf, (size_t)len);
+    }
+  }
+
+  if (Serial.available() > 0) {
+    checkSerialModeCommand();
+  }
+}
+
+// ============================================================
 // SETUP
 // ============================================================
 void setup() {
-  Serial.begin(115200);
-  delay(1000);
+  // Default RX buffer (256 B) is smaller than a full SET_CONFIG line and overflows while
+  // the loop is blocked in an HTTP POST. Must be set before Serial.begin().
+  Serial.setRxBufferSize(1024);
+  Serial.begin(loggerModeActive ? LOGGER_BAUD_RATE : 115200);
+  delay(500);
+
+  // Check if host recorder sent "LOGGER" command during boot window
+  unsigned long bootWait = millis();
+  while (millis() - bootWait < 500) {
+    if (Serial.available() > 0) {
+      checkSerialModeCommand();
+      if (loggerModeActive) return;
+    }
+    delay(10);
+  }
+
+  if (loggerModeActive) {
+    enterLoggerMode();
+    return;
+  }
+
   Serial.println("\n=============================================");
   Serial.println("  HAVEN AI — 5-Sensor Automotive Node v2.5");
+  Serial.println("  Send 'LOGGER' over Serial for 1000Hz CSV mode");
   Serial.println("=============================================");
 
   // Load custom Wi-Fi & Haven configurations from NVS if provisioned
@@ -423,6 +787,9 @@ void setup() {
     prefs.getString("pass", wifiPassword, sizeof(wifiPassword));
     prefs.getString("server", havenServerUrl, sizeof(havenServerUrl));
     prefs.getString("key", havenDeviceKey, sizeof(havenDeviceKey));
+    if (prefs.isKey("vid")) {
+      vehicleId = prefs.getInt("vid", vehicleId);
+    }
     Serial.println("[PREFS] Loaded custom Wi-Fi & Haven endpoint credentials from NVS!");
   }
   prefs.end();
@@ -441,18 +808,13 @@ void setup() {
   }
   tempSensor.requestTemperatures();
 
-  // I2C: MPU6050 & INA219
-  Wire.begin(MPU_SDA, MPU_SCL);
-  Wire.setClock(100000);
-
-  mpuReady = mpu.begin(0x68, &Wire);
+  // Initialize Accelerometer Driver (widest DLPF, ±8g, 400 kHz I2C)
+  mpuReady = accelDriver->begin(false);
   if (mpuReady) {
-    mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
-    mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-    mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-    Serial.println("[OK] MPU6050 accelerometer initialized.");
+    Serial.printf("[OK] %s accelerometer initialized (±%dg, %d Hz BW).\n",
+                  accelDriver->sensorName(), accelDriver->rangeG(), accelDriver->bandwidthHz());
   } else {
-    Serial.println("[WARN] MPU6050 not detected.");
+    Serial.println("[WARN] Accelerometer not detected.");
   }
 
   inaReady = ina219.begin(&Wire);
@@ -473,17 +835,34 @@ void setup() {
 
   // Connect to Wi-Fi (so it can reach Haven on laptop)
   WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP(apSSID, apPassword);
+  if (strlen(apPassword) >= 8) {
+    WiFi.softAP(apSSID, apPassword);
+  } else {
+    WiFi.softAP(apSSID);
+  }
   Serial.printf("[AP] Local Hotspot started: %s (IP: %s)\n", apSSID, WiFi.softAPIP().toString().c_str());
 
-  Serial.printf("[STA] Connecting to your Wi-Fi: %s ...\n", wifiSSID);
-  WiFi.begin(wifiSSID, wifiPassword);
+  // Start Captive Portal DNS Server (redirects all DNS queries to SoftAP IP 192.168.4.1)
+  dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+  dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 25) {
-    delay(400);
-    Serial.print(".");
-    attempts++;
+  if (strlen(wifiSSID) > 0) {
+    Serial.printf("[STA] Connecting to Wi-Fi: %s ...\n", wifiSSID);
+    WiFi.begin(wifiSSID, wifiPassword);
+
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 25) {
+      delay(400);
+      Serial.print(".");
+      attempts++;
+      // Stay responsive to USB provisioning (SET_CONFIG / LOGGER) while the old Wi-Fi fails.
+      if (Serial.available() > 0) {
+        checkSerialModeCommand();
+        if (loggerModeActive) return;
+      }
+    }
+  } else {
+    Serial.println("[STA] No Wi-Fi SSID configured. Provision via http://192.168.4.1/config or secrets.h.");
   }
 
   if (WiFi.status() == WL_CONNECTED) {
@@ -497,7 +876,13 @@ void setup() {
   server.on("/", handleConfig);
   server.on("/config", handleConfig);
   server.on("/save", HTTP_POST, handleSave);
+  server.on("/scan", handleScanWifi);
   server.on("/data", handleData);
+  server.on("/generate_204", handleConfig);
+  server.on("/hotspot-detect.html", handleConfig);
+  server.on("/ncsi.txt", handleConfig);
+  server.on("/connecttest.txt", handleConfig);
+  server.onNotFound(handleCaptivePortalRedirect);
   server.begin();
 
   lastRPM = millis();
@@ -507,6 +892,19 @@ void setup() {
 // MAIN LOOP
 // ============================================================
 void loop() {
+  if (loggerModeActive) {
+    runLoggerLoop();
+    return;
+  }
+
+  // Handle Captive Portal DNS queries
+  dnsServer.processNextRequest();
+
+  if (Serial.available() > 0) {
+    checkSerialModeCommand();
+    if (loggerModeActive) return;
+  }
+
   server.handleClient();
   unsigned long now = millis();
 
@@ -542,15 +940,10 @@ void loop() {
     lastRPM = now;
   }
 
-  // 3. Read MPU6050 (Strict 100Hz non-blocking sampling loop: 10ms interval)
+  // 3. Read Accelerometer (100Hz non-blocking sampling loop for Live-Check mode)
   if (now - lastMPU >= 10) {
     lastMPU = now;
-    if (mpuReady) {
-      sensors_event_t a, g, t;
-      mpu.getEvent(&a, &g, &t);
-      accelX = a.acceleration.x / 9.80665f;
-      accelY = a.acceleration.y / 9.80665f;
-      accelZ = a.acceleration.z / 9.80665f;
+    if (mpuReady && accelDriver->readSampleG(accelX, accelY, accelZ)) {
       accelMagnitude = sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ);
 
       vibBuffer[vibBufferIdx] = accelMagnitude;
@@ -559,7 +952,7 @@ void loop() {
         vibBufferFull = true;
       }
     } else if (now % 1000 < 10 && probeI2C(0x68)) {
-      mpuReady = mpu.begin(0x68, &Wire);
+      mpuReady = accelDriver->begin(false);
     }
   }
 

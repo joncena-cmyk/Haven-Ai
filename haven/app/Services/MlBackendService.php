@@ -18,11 +18,13 @@ class MlBackendService
 {
     private string $baseUrl;
     private int    $timeoutSec;
+    private string $apiSecret;
 
     public function __construct()
     {
         $this->baseUrl    = rtrim(config('services.ml_backend.url', 'http://localhost:8001'), '/');
         $this->timeoutSec = (int) config('services.ml_backend.timeout', 30);
+        $this->apiSecret  = (string) config('services.ml_backend.secret', '');
     }
 
     /* ─────────────────────────────────────────────
@@ -56,10 +58,10 @@ class MlBackendService
                 'url'          => $this->baseUrl,
                 'mode'         => 'rule_based_fallback',
                 'model_loaded' => !empty($localMeta),
-                'model'        => array_merge([
+                'model'        => $this->normalizeModelMetadata(array_merge([
                     'type'        => !empty($localMeta) ? 'trained_sklearn_on_disk' : 'fallback_heuristics',
                     'description' => 'FastAPI ML server is offline. Built-in multi-sensor fallback heuristic classifier is active (trained model.pkl ready on disk).',
-                ], $localMeta),
+                ], $localMeta)),
                 'classes'      => ['normal', 'misfire', 'loose_component', 'valve_clearance'],
             ];
         }
@@ -67,9 +69,13 @@ class MlBackendService
         try {
             $health = Http::timeout(3)->get("{$this->baseUrl}/health")->json() ?? [];
             $info   = Http::timeout(3)->get("{$this->baseUrl}/info")->json() ?? [];
-            if (empty($info['model']['confusion_matrix']) && !empty($localMeta)) {
-                $info['model'] = array_merge($localMeta, $info['model'] ?? []);
+            $remoteModel = is_array($info['model'] ?? null) ? $info['model'] : [];
+            if (isset($remoteModel['meta']) && is_array($remoteModel['meta'])) {
+                $nestedMeta = $remoteModel['meta'];
+                unset($remoteModel['meta']);
+                $remoteModel = array_merge($nestedMeta, $remoteModel);
             }
+            $info['model'] = $this->normalizeModelMetadata(array_merge($localMeta, $remoteModel));
 
             return array_merge([
                 'online' => true,
@@ -81,9 +87,67 @@ class MlBackendService
                 'status' => 'error',
                 'error'  => $e->getMessage(),
                 'url'    => $this->baseUrl,
-                'model'  => $localMeta,
+                'model'  => $this->normalizeModelMetadata($localMeta),
             ];
         }
+    }
+
+    /**
+     * Normalize model metadata structure so Blade views and API consumers
+     * receive consistent feature_importances, per_class_metrics, and sample counts.
+     */
+    private function normalizeModelMetadata(array $meta): array
+    {
+        if (isset($meta['meta']) && is_array($meta['meta'])) {
+            $nested = $meta['meta'];
+            unset($meta['meta']);
+            $meta = array_merge($nested, $meta);
+        }
+
+        // Normalize feature_importances: support both list-of-dicts and associative map
+        if (!empty($meta['feature_importances']) && is_array($meta['feature_importances'])) {
+            $normalizedImps = [];
+            foreach ($meta['feature_importances'] as $key => $val) {
+                if (is_array($val) && isset($val['feature'])) {
+                    $normalizedImps[(string) $val['feature']] = (float) ($val['importance'] ?? 0.0);
+                } elseif (is_string($key) && is_numeric($val)) {
+                    $normalizedImps[$key] = (float) $val;
+                }
+            }
+            if (!empty($normalizedImps)) {
+                $meta['feature_importances_list'] = $meta['feature_importances'];
+                $meta['feature_importances'] = $normalizedImps;
+            }
+        }
+
+        // Normalize per_class_metrics so both 'f1' and 'f1_score' keys exist
+        if (!empty($meta['per_class_metrics']) && is_array($meta['per_class_metrics'])) {
+            foreach ($meta['per_class_metrics'] as $cls => $metrics) {
+                if (is_array($metrics)) {
+                    $f1 = (float) ($metrics['f1_score'] ?? $metrics['f1'] ?? 0.0);
+                    $meta['per_class_metrics'][$cls]['f1']       = $f1;
+                    $meta['per_class_metrics'][$cls]['f1_score'] = $f1;
+                }
+            }
+        }
+
+        // Compute test_samples and train_samples from confusion matrix / n_samples when omitted
+        if (!isset($meta['test_samples']) && !empty($meta['confusion_matrix']) && is_array($meta['confusion_matrix'])) {
+            $cmSum = 0;
+            foreach ($meta['confusion_matrix'] as $row) {
+                if (is_array($row)) {
+                    $cmSum += array_sum($row);
+                }
+            }
+            if ($cmSum > 0) {
+                $meta['test_samples'] = $cmSum;
+                if (isset($meta['n_samples']) && (int) $meta['n_samples'] >= $cmSum) {
+                    $meta['train_samples'] = max(0, (int) $meta['n_samples'] - $cmSum);
+                }
+            }
+        }
+
+        return $meta;
     }
 
     /**
@@ -162,11 +226,13 @@ class MlBackendService
         }
 
         try {
-            $response = Http::timeout(90)->post("{$this->baseUrl}/train", [
-                'records'             => $records,
-                'augment_synthetic'   => $augmentSynthetic,
-                'synthetic_per_class' => $syntheticPerClass,
-            ]);
+            $response = Http::timeout(90)
+                ->withHeaders(['X-ML-API-Secret' => $this->apiSecret])
+                ->post("{$this->baseUrl}/train", [
+                    'records'             => $records,
+                    'augment_synthetic'   => $augmentSynthetic,
+                    'synthetic_per_class' => $syntheticPerClass,
+                ]);
 
             if ($response->successful()) {
                 $json = $response->json() ?? [];
@@ -207,7 +273,9 @@ class MlBackendService
         }
 
         try {
-            $request = Http::timeout($this->timeoutSec)->asMultipart();
+            $request = Http::timeout($this->timeoutSec)
+                ->withHeaders(['X-ML-API-Secret' => $this->apiSecret])
+                ->asMultipart();
 
             // Attach audio file if present (resolve from private disk first, fallback to public)
             if ($diagnostic->hasAudio()) {
@@ -254,6 +322,12 @@ class MlBackendService
             if (!empty($diagnostic->recording_mode)) {
                 $params[] = ['name' => 'recording_mode', 'contents' => (string) $diagnostic->recording_mode];
             }
+            if (!empty($diagnostic->vibration_source)) {
+                $params[] = ['name' => 'vibration_source', 'contents' => (string) $diagnostic->vibration_source];
+            }
+            if (!is_null($diagnostic->sample_rate_hz)) {
+                $params[] = ['name' => 'sample_rate_hz', 'contents' => (string) $diagnostic->sample_rate_hz];
+            }
 
             $response = $request->post("{$this->baseUrl}/analyze", $params);
 
@@ -294,7 +368,9 @@ class MlBackendService
         $mode    = $diagnostic->recording_mode ?? 'idle';
 
         // Rule-based mock using stored vibration & hardware sensor stats
-        [$condition, $confidence, $topClasses, $sensorWarnings] = $this->mockRules($peakG, $rmsG, $crest, $tempC, $rpm, $voltage, $mode);
+        [$condition, $confidence, $topClasses, $sensorWarnings] = $this->mockRules(
+            $peakG, $rmsG, $crest, $tempC, $rpm, $voltage, $mode, $diagnostic->vibration_source
+        );
 
         $featuresUsed = ['peak_g', 'rms_g', 'crest_factor'];
         if (!is_null($tempC))   $featuresUsed[] = 'ds18b20_temperature';
@@ -348,6 +424,35 @@ class MlBackendService
     private function mockExplainability(string $condition, float $peakG, float $rmsG, float $crest, float $domHz, ?float $tempC, ?int $rpm): array
     {
         $contributions = [];
+
+        if ($condition === 'ambient_noise') {
+            $contributions[] = [
+                'feature' => 'mechanical_coupling',
+                'label' => 'Engine Block Mechanical Coupling',
+                'value' => round($rmsG, 2),
+                'unit' => 'g RMS',
+                'impact_pct' => 45.0,
+                'explanation' => "0.00g mechanical vibration confirms sensor was uncoupled from an operating internal combustion engine.",
+            ];
+            $contributions[] = [
+                'feature' => 'ambient_acoustic_profile',
+                'label' => 'Acoustic Combustion Cadence',
+                'value' => 0,
+                'unit' => 'orders',
+                'impact_pct' => 35.0,
+                'explanation' => "Microphone signal contains diffuse ambient/crowd noise without periodic cylinder firing harmonics.",
+            ];
+            $contributions[] = [
+                'feature' => 'hardware_telemetry',
+                'label' => 'Powertrain Operating Telemetry',
+                'value' => 0,
+                'unit' => 'sensors',
+                'impact_pct' => 20.0,
+                'explanation' => "No active engine coolant thermal signature (>45°C) or alternator bus voltage (>12.2V) verified.",
+            ];
+            return $contributions;
+        }
+
         if ($condition === 'valve_clearance') {
             $contributions[] = [
                 'feature' => 'crest_factor',
@@ -379,16 +484,16 @@ class MlBackendService
                 'label' => 'Torque Dip Shockwave',
                 'value' => round($peakG, 2),
                 'unit' => 'g',
-                'impact_pct' => 40.0,
+                'impact_pct' => 42.0,
                 'explanation' => "Rotational deceleration shock ({$peakG}g) during combustion dropout strokes.",
             ];
             $contributions[] = [
-                'feature' => 'rpm',
-                'label' => 'Engine Speed Jitter',
-                'value' => (int)($rpm ?? 750),
-                'unit' => 'RPM',
-                'impact_pct' => 34.0,
-                'explanation' => "Unmetered idle speed stumble and cyclic torque deficit.",
+                'feature' => 'crest_factor',
+                'label' => 'Cyclic Impulse Crest Factor',
+                'value' => round($crest, 2),
+                'unit' => 'ratio',
+                'impact_pct' => 32.0,
+                'explanation' => "Intermittent torque deficit spikes relative to baseline RMS energy.",
             ];
             $contributions[] = [
                 'feature' => 'dominant_freq_hz',
@@ -429,7 +534,7 @@ class MlBackendService
                 'label' => 'Healthy Baseline RMS',
                 'value' => round($rmsG, 3),
                 'unit' => 'g',
-                'impact_pct' => 38.0,
+                'impact_pct' => 40.0,
                 'explanation' => "Vibration levels ({$rmsG}g) remain comfortably within factory baseline envelope.",
             ];
             $contributions[] = [
@@ -437,24 +542,46 @@ class MlBackendService
                 'label' => 'Stable Crest Factor',
                 'value' => round($crest, 2),
                 'unit' => 'ratio',
-                'impact_pct' => 32.0,
+                'impact_pct' => 34.0,
                 'explanation' => "Harmonic waveform confirms smooth engine balance without abnormal impact shocks.",
             ];
             $contributions[] = [
-                'feature' => 'temperature_c',
-                'label' => 'Coolant Operating Range',
-                'value' => round((float)($tempC ?? 89.0), 1),
-                'unit' => '°C',
-                'impact_pct' => 30.0,
-                'explanation' => "Thermal profile operates cleanly within manufacturer target operating window.",
+                'feature' => 'peak_g',
+                'label' => 'Gravity-Removed Peak Acceleration',
+                'value' => round($peakG, 3),
+                'unit' => 'g',
+                'impact_pct' => 26.0,
+                'explanation' => "Peak dynamic acceleration ({$peakG}g) shows no abnormal cylinder head shockwaves.",
             ];
         }
 
         return $contributions;
     }
 
-    private function mockRules(float $peakG, float $rmsG, float $crest, ?float $tempC, ?int $rpm, ?float $voltage, string $mode = 'idle'): array
+    private function mockRules(float $peakG, float $rmsG, float $crest, ?float $tempC, ?int $rpm, ?float $voltage, string $mode = 'idle', ?string $vibrationSource = null): array
     {
+        // ── Engine Presence & Ambient Noise Filter ──
+        // An active ICE engine physically produces measurable mechanical vibration (at least 0.04g RMS / 0.08g Peak)
+        // when physically coupled to the engine block via real hardware accelerometer (device_sensor or csv_import),
+        // or operating engine coolant temperature (>45°C), or alternator charging (>12.2V), or active RPM (>=300).
+        // Browser-simulated synthetic vibration (synthetic JS math) does NOT represent physical engine block coupling.
+        $isHardwareVibration  = (in_array($vibrationSource, ['adxl345_live', 'device_sensor', 'csv_import'], true) || (is_null($vibrationSource) && $rmsG > 0.04));
+        $hasMechanicalCoupling = $isHardwareVibration && ($peakG >= 0.08 || $rmsG >= 0.04);
+        $hasActiveTelemetry   = (!is_null($tempC) && $tempC >= 45.0) || (!is_null($voltage) && $voltage >= 12.2) || (!is_null($rpm) && $rpm >= 300);
+
+        if (!$hasMechanicalCoupling && !$hasActiveTelemetry) {
+            $gateWarning = "SIGNAL GATE: No physical engine block vibration (hardware uncoupled) or operating telemetry detected. Ambient noise filter engaged.";
+            return [
+                'ambient_noise',
+                0.95,
+                [
+                    ['condition' => 'ambient_noise', 'confidence' => 0.95],
+                    ['condition' => 'normal', 'confidence' => 0.05],
+                ],
+                [$gateWarning],
+            ];
+        }
+
         // 4 Thesis-Approved Engine Fault Classes (UMak CET Capstone Scope)
         $classes = ['normal', 'misfire', 'loose_component', 'valve_clearance'];
         $scores  = array_fill_keys($classes, 0.0);
@@ -481,21 +608,21 @@ class MlBackendService
         }
 
         // 1. Improper Valve Clearance: Sharp metallic impact clicking at 0.5x RPM (high Crest Factor, impulsive G spikes)
-        if ($crest > 4.2 || $peakG > 3.6) {
+        if ($crest > 4.0 || $peakG > 1.8) {
             $scores['valve_clearance'] += 0.65;
-        } elseif ($crest > 3.5 && $peakG > 2.4) {
+        } elseif ($crest > 3.5 && $peakG > 1.25) {
             $scores['valve_clearance'] += 0.35;
         }
 
         // 2. Engine Misfire: Combustion dropout every 720 deg crank rotation, erratic RPM lurch, cyclic torque dips
-        if ($crest > 2.8 && $crest <= 4.2 && $peakG > 1.6 && $peakG < 3.5) {
+        if ($crest > 2.5 && $crest <= 4.2 && $peakG > 0.65 && $peakG < 1.9) {
             $scores['misfire'] += 0.45;
         }
 
         // 3. Loose or Worn Component Vibration: High continuous baseline RMS G, mount degradation
-        if ($rmsG > 0.40 && $crest < 3.4) {
+        if ($rmsG > 0.30 && $crest < 3.0) {
             $scores['loose_component'] += 0.50;
-        } elseif ($rmsG > 0.30 && $peakG > 1.8) {
+        } elseif ($rmsG > 0.26 && $peakG > 0.65) {
             $scores['loose_component'] += 0.30;
         }
 
@@ -506,10 +633,10 @@ class MlBackendService
             }
         }
 
-        // 4. Normal Engine Operation: Baseline reading within healthy envelope (calibrated for Idle vs Revving mode)
+        // 4. Normal Engine Operation: Gravity-removed baseline reading within healthy envelope (Idle vs Revving mode)
         $isRevving = ($mode === 'revving');
-        $normalPeakLimit = $isRevving ? 2.2 : 1.8;
-        $normalRmsLimit  = $isRevving ? 0.45 : 0.35;
+        $normalPeakLimit = $isRevving ? 0.85 : 0.55;
+        $normalRmsLimit  = $isRevving ? 0.28 : 0.22;
 
         if ($peakG <= $normalPeakLimit && $rmsG <= $normalRmsLimit && $crest <= 3.6) {
             $scores['normal'] += 0.50;

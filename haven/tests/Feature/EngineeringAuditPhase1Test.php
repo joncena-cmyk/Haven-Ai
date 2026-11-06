@@ -102,6 +102,8 @@ class EngineeringAuditPhase1Test extends TestCase
             'status'                 => 'completed',
             'ml_condition'           => 'knocking',
             'ml_confidence'          => 0.94,
+            'true_condition'         => 'valve_clearance',
+            'is_training_sample'     => true,
         ]);
 
         // Simulated record
@@ -117,6 +119,8 @@ class EngineeringAuditPhase1Test extends TestCase
             'status'                 => 'completed',
             'ml_condition'           => 'normal',
             'ml_confidence'          => 0.91,
+            'true_condition'         => 'normal',
+            'is_training_sample'     => true,
         ]);
 
         // 1. User Dataset Export

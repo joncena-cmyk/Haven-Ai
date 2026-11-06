@@ -220,7 +220,7 @@ class VehicleController extends Controller
             'temp_max_c'      => 'nullable|numeric|min:50|max:150',
             'rpm_max'         => 'nullable|integer|min:500|max:10000',
             'voltage_min_v'   => 'nullable|numeric|min:8|max:16',
-            'vibration_max'   => 'nullable|numeric|min:1|max:50',
+            'vibration_max'   => 'nullable|numeric|min:0.1|max:50',
         ]);
 
         // Only keep non-null values

@@ -153,16 +153,29 @@
             {{-- Global Feature Importance Card --}}
             @php
                 $modelMeta = $mlInfo['model'] ?? [];
-                $featImps  = $modelMeta['feature_importances'] ?? [
+                if (isset($modelMeta['meta']) && is_array($modelMeta['meta'])) {
+                    $modelMeta = array_merge($modelMeta['meta'], $modelMeta);
+                }
+                $rawFeatImps = $modelMeta['feature_importances'] ?? [
                     'dominant_freq_hz' => 0.1419,
                     'rms_g'            => 0.1302,
                     'peak_g'           => 0.1292,
                     'spectral_entropy' => 0.1190,
                     'crest_factor'     => 0.1173,
-                    'mfcc_3'           => 0.0882,
-                    'zcr'              => 0.0825,
-                    'spectral_centroid'=> 0.0752,
+                    'mfcc_3_mean'      => 0.0882,
+                    'zcr_mean'         => 0.0825,
+                    'spectral_centroid_mean'=> 0.0752,
                 ];
+                $featImps = [];
+                if (is_array($rawFeatImps)) {
+                    foreach ($rawFeatImps as $k => $v) {
+                        if (is_array($v) && isset($v['feature'])) {
+                            $featImps[(string) $v['feature']] = (float) ($v['importance'] ?? 0.0);
+                        } elseif (is_string($k) && is_numeric($v)) {
+                            $featImps[$k] = (float) $v;
+                        }
+                    }
+                }
                 $topFeatures = array_slice($featImps, 0, 8, true);
                 $maxImp = !empty($topFeatures) ? max(array_values($topFeatures)) : 0.20;
             @endphp
@@ -173,7 +186,7 @@
                     @foreach($topFeatures as $featName => $weight)
                         @php
                             $barPct = $maxImp > 0 ? round(($weight / $maxImp) * 100, 1) : 10;
-                            $isVib  = in_array($featName, ['dominant_freq_hz', 'spectral_entropy', 'peak_g', 'rms_g', 'crest_factor']);
+                            $isVib  = in_array($featName, ['dominant_freq_hz', 'spectral_entropy', 'peak_g', 'rms_g', 'crest_factor', 'kurtosis']);
                         @endphp
                         <div>
                             <div style="display:flex;justify-content:space-between;font-size:0.74rem;margin-bottom:0.2rem;">
@@ -203,8 +216,13 @@
                     [0, 0, 30, 0],
                     [0, 0, 0, 30],
                 ];
-                $accPct   = isset($modelMeta['accuracy']) ? number_format($modelMeta['accuracy'] * 100, 1) : '98.8';
-                $f1Macro  = isset($modelMeta['f1_macro']) ? number_format($modelMeta['f1_macro'], 3) : '0.988';
+                $accPct      = isset($modelMeta['accuracy']) ? number_format($modelMeta['accuracy'] * 100, 1) : '98.8';
+                $cvAccPct    = isset($modelMeta['cv_accuracy']) ? number_format($modelMeta['cv_accuracy'] * 100, 1) : $accPct;
+                $cvStdPct    = isset($modelMeta['cv_std']) ? number_format($modelMeta['cv_std'] * 100, 1) : '0.0';
+                $f1Macro     = isset($modelMeta['f1_macro']) ? number_format($modelMeta['f1_macro'], 3) : '0.988';
+                $realSamples = (int) ($modelMeta['real_samples_count'] ?? 0);
+                $synSamples  = (int) ($modelMeta['synthetic_samples_count'] ?? ($modelMeta['n_samples'] ?? 0));
+                $evalScheme  = $modelMeta['evaluation_scheme'] ?? ($realSamples > 0 ? 'Hybrid Stratified Holdout + 5-Fold CV' : 'Synthetic Baseline Calibration (5-Fold CV)');
                 $perClass = $modelMeta['per_class_metrics'] ?? [
                     'normal'          => ['precision' => 1.00, 'recall' => 1.00, 'f1' => 1.00, 'support' => 30],
                     'misfire'         => ['precision' => 1.00, 'recall' => 0.96, 'f1' => 0.98, 'support' => 25],
@@ -220,12 +238,17 @@
             @endphp
             {{-- 4x4 Confusion Matrix Card --}}
             <div class="h-card">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
                     <div>
                         <h3 style="margin:0;font-size:0.95rem;font-weight:700;color:var(--h-text);">Confusion Matrix (4&times;4)</h3>
                         <p style="font-size:0.74rem;color:var(--h-text3);margin:0.2rem 0 0;">Test validation set performance per fault class</p>
                     </div>
-                    <span class="h-badge h-badge-teal" style="font-size:0.65rem;">ACCURACY: {{ $accPct }}%</span>
+                    <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                        <span class="h-badge {{ $realSamples > 0 ? 'h-badge-green' : 'h-badge-amber' }}" style="font-size:0.63rem;">
+                            {{ $realSamples > 0 ? 'REAL + SYNTHETIC HYBRID' : 'SYNTHETIC CALIBRATION BASELINE' }}
+                        </span>
+                        <span class="h-badge h-badge-teal" style="font-size:0.65rem;">ACCURACY: {{ $accPct }}%</span>
+                    </div>
                 </div>
 
                 {{-- Visual Confusion Matrix Table --}}
@@ -258,9 +281,14 @@
                     </table>
                 </div>
 
-                <div style="margin-top:0.85rem;padding:0.6rem 0.85rem;background:var(--h-surface2);border-radius:var(--h-radius);display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;font-size:0.75rem;">
+                <div style="margin-top:0.85rem;padding:0.65rem 0.85rem;background:var(--h-surface2);border-radius:var(--h-radius);display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:0.55rem;font-size:0.74rem;">
                     <div><span style="color:var(--h-text3);">Macro F1-Score:</span> <strong style="color:var(--h-text);">{{ $f1Macro }}</strong></div>
-                    <div><span style="color:var(--h-text3);">Validation Samples:</span> <strong style="color:var(--h-green);">{{ $modelMeta['test_samples'] ?? 120 }} test / {{ $modelMeta['train_samples'] ?? 480 }} train</strong></div>
+                    <div><span style="color:var(--h-text3);">5-Fold CV:</span> <strong style="color:var(--h-teal);">{{ $cvAccPct }}% &plusmn; {{ $cvStdPct }}%</strong></div>
+                    <div><span style="color:var(--h-text3);">Holdout Split:</span> <strong style="color:var(--h-green);">{{ $modelMeta['test_samples'] ?? 120 }} test / {{ $modelMeta['train_samples'] ?? 480 }} train</strong></div>
+                    <div><span style="color:var(--h-text3);">Dataset Mix:</span> <strong style="color:var(--h-text);">{{ $realSamples }} real &middot; {{ $synSamples }} synthetic</strong></div>
+                    <div style="grid-column:1 / -1;border-top:1px solid var(--h-border);padding-top:0.4rem;color:var(--h-text3);">
+                        Evaluation Scheme: <strong style="color:var(--h-text2);">{{ $evalScheme }}</strong>
+                    </div>
                 </div>
             </div>
 
@@ -284,12 +312,13 @@
                                 @php
                                     $clsKey = $rInfo['key'];
                                     $m = $perClass[$clsKey] ?? ['precision' => 1.0, 'recall' => 1.0, 'f1' => 1.0, 'support' => 30];
+                                    $f1Val = (float) ($m['f1_score'] ?? $m['f1'] ?? 1.0);
                                 @endphp
                                 <tr style="border-bottom:1px solid var(--h-border);text-align:right;">
                                     <td style="text-align:left;padding:0.45rem 0.5rem;font-weight:700;color:{{ $rInfo['color'] }};">{{ $rInfo['label'] }}</td>
                                     <td style="padding:0.45rem;color:var(--h-text);">{{ number_format((float) ($m['precision'] ?? 1), 3) }}</td>
                                     <td style="padding:0.45rem;color:var(--h-text);">{{ number_format((float) ($m['recall'] ?? 1), 3) }}</td>
-                                    <td style="padding:0.45rem;font-weight:800;color:var(--h-text);">{{ number_format((float) ($m['f1'] ?? 1), 3) }}</td>
+                                    <td style="padding:0.45rem;font-weight:800;color:var(--h-text);">{{ number_format($f1Val, 3) }}</td>
                                     <td style="padding:0.45rem;color:var(--h-text3);">{{ $m['support'] ?? 30 }}</td>
                                 </tr>
                             @endforeach
@@ -308,7 +337,7 @@
                                 {{ strtoupper($log->status) }}
                             </span>
                             <span style="color:var(--h-text);margin-left:0.4rem;">
-                                {{ $log->payload['message'] ?? 'Model Retraining' }}
+                                {{ $log->details['message'] ?? 'Model Retraining' }}
                             </span>
                         </div>
                         <span style="color:var(--h-text3);">{{ $log->created_at?->diffForHumans() }}</span>

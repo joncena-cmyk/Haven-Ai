@@ -23,6 +23,13 @@
         <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
             <span style="font-size:0.75rem;color:var(--h-text3);">Sync: <strong id="val-last-sync" class="h-mono" style="color:var(--h-text2);">Standby</strong></span>
             
+            {{-- WebSerial 1-Click Wi-Fi Config Button --}}
+            <button type="button" id="btn-webserial-config" onclick="openEsp32WebSerialModal()" 
+                    class="h-telemetry-info-btn" style="border-color:rgba(14,165,233,0.4);background:rgba(14,165,233,0.1);color:#38bdf8;" title="Pair & Configure ESP32 Wi-Fi over USB with 1-click">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+                <span>Pair Wi-Fi (USB)</span>
+            </button>
+
             {{-- Live Rolling Waveform Toggle --}}
             <button type="button" id="btn-toggle-chart" onclick="toggleRollingChart()" class="h-telemetry-info-btn">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -89,7 +96,7 @@
             </div>
             <div style="display:flex;align-items:baseline;gap:0.25rem;">
                 <span id="val-vib" class="h-mono" style="font-size:1.6rem;font-weight:700;color:var(--h-text);">--</span>
-                <span style="font-size:0.75rem;color:var(--h-text3);font-weight:600;">m/s²</span>
+                <span style="font-size:0.75rem;color:var(--h-text3);font-weight:600;">g</span>
             </div>
             <div style="height:4px;background:var(--h-surface3);border-radius:2px;margin-top:0.5rem;overflow:hidden;">
                 <div id="bar-vib" style="height:100%;width:0%;background:#0284c7;transition:width 0.3s ease;"></div>
@@ -189,7 +196,7 @@
                     <span id="detail-badge-mpu6050" class="h-badge" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:var(--h-green-bg);color:var(--h-green);border:1px solid var(--h-green);">CONNECTED</span>
                 </div>
                 <div class="h-mono" style="font-size:0.7rem;color:var(--h-teal);margin-bottom:0.2rem;">I2C: D21 (SDA) / D22 (SCL)</div>
-                <div style="font-size:0.68rem;color:var(--h-text2);" id="detail-hint-mpu6050">Earth gravity detected (~9.8 m/s²). Tap board to test.</div>
+                <div style="font-size:0.68rem;color:var(--h-text2);" id="detail-hint-mpu6050">Dynamic vibration (gravity removed). ~0 g at rest; tap board to test.</div>
             </div>
 
             {{-- Detail 3: INA219 --}}
@@ -223,6 +230,128 @@
             </div>
 
         </div>
+    </div>
+</div>
+
+{{-- WebSerial 1-Click ESP32 Wi-Fi Setup Modal --}}
+@php
+    $userVehicles = auth()->check() ? auth()->user()->vehicles()->select('id', 'make', 'model', 'year', 'device_key')->get() : collect();
+@endphp
+<div id="esp32-webserial-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);z-index:99999;align-items:center;justify-content:center;padding:1.25rem;" onclick="if(event.target===this)closeEsp32WebSerialModal()">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:14px;max-width:540px;width:100%;padding:1.5rem;box-shadow:0 24px 48px rgba(0,0,0,0.6);color:#f1f5f9;position:relative;max-height:90vh;overflow-y:auto;">
+        
+        {{-- Close button --}}
+        <button type="button" onclick="closeEsp32WebSerialModal()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:#94a3b8;font-size:1.5rem;cursor:pointer;line-height:1;padding:0.2rem;" aria-label="Close">&times;</button>
+
+        {{-- Header --}}
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(14,165,233,0.15);border:1px solid rgba(14,165,233,0.3);display:flex;align-items:center;justify-content:center;color:#38bdf8;flex-shrink:0;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+            </div>
+            <div>
+                <h3 style="font-size:1.1rem;font-weight:700;color:#f8fafc;margin:0 0 0.15rem;">ESP32 Wi-Fi Auto-Provisioning</h3>
+                <p style="font-size:0.75rem;color:#94a3b8;margin:0;">1-Click WebSerial USB link or Hotspot setup</p>
+            </div>
+        </div>
+
+        {{-- Mode Switch / Tabs --}}
+        <div style="display:flex;gap:0.4rem;background:#1e293b;padding:0.25rem;border-radius:8px;margin-bottom:1.2rem;">
+            <button type="button" id="tab-webserial" onclick="switchProvisionTab('usb')" style="flex:1;padding:0.5rem;border-radius:6px;border:none;background:#0ea5e9;color:#fff;font-weight:600;font-size:0.8rem;cursor:pointer;">⚡ WebSerial USB (1-Click)</button>
+            <button type="button" id="tab-hotspot" onclick="switchProvisionTab('hotspot')" style="flex:1;padding:0.5rem;border-radius:6px;border:none;background:transparent;color:#94a3b8;font-weight:600;font-size:0.8rem;cursor:pointer;">📶 Wi-Fi Hotspot (Solution A)</button>
+        </div>
+
+        {{-- Tab 1: WebSerial Form --}}
+        <div id="view-webserial">
+            <div id="webserial-browser-warn" style="display:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;padding:0.6rem 0.8rem;border-radius:8px;font-size:0.75rem;margin-bottom:1rem;">
+                ⚠️ WebSerial is not supported in this browser. Please use <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>, or use the <strong>Wi-Fi Hotspot (Solution A)</strong> tab.
+            </div>
+
+            <div style="font-size:0.75rem;color:#94a3b8;margin-bottom:1rem;line-height:1.4;">
+                Plug your ESP32 into this laptop via USB cable, enter local Wi-Fi credentials, then click <strong>"Flash Wi-Fi to ESP32 over USB"</strong>.
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:0.85rem;">
+                {{-- Vehicle selection --}}
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:#94a3b8;margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Target Vehicle</label>
+                    <select id="ws-vehicle-select" onchange="onWsVehicleChange(this)" style="width:100%;padding:0.6rem;background:#131c2e;border:1px solid #334155;border-radius:8px;color:#f8fafc;font-size:0.85rem;outline:none;">
+                        @forelse($userVehicles as $v)
+                            <option value="{{ $v->id }}" data-key="{{ $v->device_key }}">{{ $v->year }} {{ $v->make }} {{ $v->model }} (ID: {{ $v->id }})</option>
+                        @empty
+                            <option value="1" data-key="">Default Vehicle (ID: 1)</option>
+                        @endforelse
+                    </select>
+                </div>
+
+                {{-- Wi-Fi SSID --}}
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+                        <label style="font-size:0.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;margin:0;">Wi-Fi Network (SSID)</label>
+                        <button type="button" onclick="scanWifiOverUsb()" id="btn-scan-usb" style="background:none;border:none;color:#38bdf8;font-size:0.72rem;cursor:pointer;padding:0;text-decoration:underline;">Scan Nearby Networks (via USB)</button>
+                    </div>
+                    <input type="text" id="ws-wifi-ssid" placeholder="e.g. MyWiFi-2.4G" style="width:100%;padding:0.6rem;background:#131c2e;border:1px solid #334155;border-radius:8px;color:#f8fafc;font-size:0.85rem;box-sizing:border-box;outline:none;">
+                    <select id="ws-scanned-select" style="display:none;width:100%;margin-top:0.35rem;padding:0.5rem;background:#131c2e;border:1px solid #0284c7;border-radius:8px;color:#38bdf8;font-size:0.8rem;outline:none;" onchange="if(this.value){document.getElementById('ws-wifi-ssid').value=this.value;}">
+                        <option value="">-- Select from scanned networks --</option>
+                    </select>
+                </div>
+
+                {{-- Wi-Fi Password --}}
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:#94a3b8;margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Wi-Fi Password</label>
+                    <div style="position:relative;">
+                        <input type="password" id="ws-wifi-pass" placeholder="Wi-Fi Password (leave blank if open)" style="width:100%;padding:0.6rem;padding-right:3rem;background:#131c2e;border:1px solid #334155;border-radius:8px;color:#f8fafc;font-size:0.85rem;box-sizing:border-box;outline:none;">
+                        <button type="button" onclick="togglePassVisibility('ws-wifi-pass', this)" style="position:absolute;right:0.6rem;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;font-size:0.72rem;font-weight:600;">SHOW</button>
+                    </div>
+                </div>
+
+                {{-- Haven Ingest Server URL --}}
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:#94a3b8;margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Haven Ingest Server URL</label>
+                    <input type="text" id="ws-server-url" value="" style="width:100%;padding:0.6rem;background:#131c2e;border:1px solid #334155;border-radius:8px;color:#f8fafc;font-size:0.82rem;box-sizing:border-box;font-family:monospace;outline:none;">
+                    <div id="ws-ip-tip" style="font-size:0.68rem;color:#f59e0b;margin-top:0.25rem;"></div>
+                </div>
+
+                {{-- Device Key --}}
+                <div>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:#94a3b8;margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Device Key (X-Haven-Device-Key)</label>
+                    <input type="text" id="ws-device-key" value="{{ $userVehicles->first()?->device_key ?? '' }}" style="width:100%;padding:0.6rem;background:#131c2e;border:1px solid #334155;border-radius:8px;color:#f8fafc;font-size:0.82rem;box-sizing:border-box;font-family:monospace;outline:none;">
+                </div>
+
+                {{-- Status / Logs Output --}}
+                <div id="ws-status-box" style="display:none;padding:0.65rem 0.85rem;border-radius:8px;font-size:0.75rem;font-family:monospace;line-height:1.4;"></div>
+
+                {{-- Action Button --}}
+                <button type="button" id="btn-flash-usb" onclick="flashWebSerial()" style="width:100%;padding:0.8rem;background:linear-gradient(135deg,#0284c7,#0ea5e9);border:none;border-radius:8px;color:#fff;font-weight:700;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.5rem;box-shadow:0 4px 15px rgba(2,132,199,0.35);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <span>Flash Wi-Fi to ESP32 over USB</span>
+                </button>
+            </div>
+        </div>
+
+        {{-- Tab 2: Hotspot (Solution A) Instructions --}}
+        <div id="view-hotspot" style="display:none;">
+            <div style="background:#131c2e;border:1px solid #1e293b;border-radius:10px;padding:1rem;margin-bottom:1rem;">
+                <div style="font-weight:700;color:#38bdf8;font-size:0.85rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.4rem;">
+                    <span>📶</span> Solution A: Direct Mobile & Laptop Captive Hotspot
+                </div>
+                <p style="font-size:0.78rem;color:#cbd5e1;line-height:1.5;margin:0 0 0.8rem;">
+                    If you don't have a USB cable or are using your smartphone, the ESP32 acts as an autonomous Wi-Fi Access Point with an automatic captive portal:
+                </p>
+                <ol style="font-size:0.75rem;color:#94a3b8;padding-left:1.2rem;margin:0;line-height:1.6;">
+                    <li>Power your ESP32 (car 12V adapter, battery pack, or phone charger).</li>
+                    <li>Open Wi-Fi settings on your phone or laptop and connect to:
+                        <br><strong style="color:#f8fafc;font-family:monospace;">HAVEN_AI_LOCAL</strong> (No password needed).</li>
+                    <li>A popup setup screen will open automatically. If not, open your browser to:
+                        <br><a href="http://192.168.4.1/config" target="_blank" style="color:#38bdf8;font-family:monospace;">http://192.168.4.1/config</a></li>
+                    <li>Select or type the new Wi-Fi name, enter the password, and click <strong>"Save & Reconnect"</strong>.</li>
+                    <li>The ESP32 saves to internal NVS Flash, restarts, and links back to Haven AI!</li>
+                </ol>
+            </div>
+            <div style="text-align:right;">
+                <button type="button" onclick="closeEsp32WebSerialModal()" style="padding:0.5rem 1rem;background:#334155;border:none;border-radius:6px;color:#fff;font-size:0.8rem;cursor:pointer;">Close</button>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -331,6 +460,279 @@ function toggleHardwareInfo() {
         panel.style.display = 'none';
         txt.innerText = 'More Info';
         icon.innerText = '▾';
+    }
+}
+
+function openEsp32WebSerialModal() {
+    const modal = document.getElementById('esp32-webserial-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    // Auto-detect browser WebSerial support
+    const warn = document.getElementById('webserial-browser-warn');
+    const flashBtn = document.getElementById('btn-flash-usb');
+    const scanBtn = document.getElementById('btn-scan-usb');
+    if (!('serial' in navigator)) {
+        if (warn) warn.style.display = 'block';
+        if (flashBtn) flashBtn.disabled = true;
+        if (scanBtn) scanBtn.disabled = true;
+    } else {
+        if (warn) warn.style.display = 'none';
+        if (flashBtn) flashBtn.disabled = false;
+        if (scanBtn) scanBtn.disabled = false;
+    }
+
+    // Auto-fill Server URL based on current host
+    const serverInput = document.getElementById('ws-server-url');
+    const tip = document.getElementById('ws-ip-tip');
+    if (serverInput && !serverInput.value) {
+        const host = window.location.hostname;
+        const port = window.location.port ? ':' + window.location.port : '';
+        serverInput.value = window.location.protocol + '//' + host + port + '/api/v1/telemetry/ingest';
+        if (host === 'localhost' || host === '127.0.0.1') {
+            if (tip) {
+                tip.innerHTML = '⚠️ Note: Since ESP32 connects via Wi-Fi, replace <code>' + host + '</code> with your laptop\'s Wi-Fi IP (e.g. <code>http://192.168.1.50:8000/...</code>) so the ESP32 can reach it.';
+            }
+        }
+    }
+}
+
+function closeEsp32WebSerialModal() {
+    const modal = document.getElementById('esp32-webserial-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function switchProvisionTab(mode) {
+    const vUsb = document.getElementById('view-webserial');
+    const vHotspot = document.getElementById('view-hotspot');
+    const tUsb = document.getElementById('tab-webserial');
+    const tHotspot = document.getElementById('tab-hotspot');
+
+    if (mode === 'usb') {
+        if (vUsb) vUsb.style.display = 'block';
+        if (vHotspot) vHotspot.style.display = 'none';
+        if (tUsb) { tUsb.style.background = '#0ea5e9'; tUsb.style.color = '#fff'; }
+        if (tHotspot) { tHotspot.style.background = 'transparent'; tHotspot.style.color = '#94a3b8'; }
+    } else {
+        if (vUsb) vUsb.style.display = 'none';
+        if (vHotspot) vHotspot.style.display = 'block';
+        if (tHotspot) { tHotspot.style.background = '#0ea5e9'; tHotspot.style.color = '#fff'; }
+        if (tUsb) { tUsb.style.background = 'transparent'; tUsb.style.color = '#94a3b8'; }
+    }
+}
+
+function togglePassVisibility(id, btn) {
+    const input = document.getElementById(id);
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerText = 'HIDE';
+    } else {
+        input.type = 'password';
+        btn.innerText = 'SHOW';
+    }
+}
+
+function onWsVehicleChange(select) {
+    const opt = select.options[select.selectedIndex];
+    const key = opt.getAttribute('data-key') || '';
+    const keyInput = document.getElementById('ws-device-key');
+    if (keyInput) keyInput.value = key;
+}
+
+function setWsStatus(type, msg) {
+    const box = document.getElementById('ws-status-box');
+    if (!box) return;
+    box.style.display = 'block';
+    if (type === 'info') {
+        box.style.background = 'rgba(14,165,233,0.12)';
+        box.style.border = '1px solid rgba(14,165,233,0.3)';
+        box.style.color = '#38bdf8';
+    } else if (type === 'success') {
+        box.style.background = 'rgba(34,197,94,0.12)';
+        box.style.border = '1px solid rgba(34,197,94,0.3)';
+        box.style.color = '#4ade80';
+    } else if (type === 'error') {
+        box.style.background = 'rgba(239,68,68,0.12)';
+        box.style.border = '1px solid rgba(239,68,68,0.3)';
+        box.style.color = '#f87171';
+    }
+    box.innerText = msg;
+}
+
+/**
+ * Open the ESP32 serial port, wait out the auto-reset that most DevKits perform
+ * when the port is opened (DTR/RTS toggle), send `command`, and read lines until
+ * `matcher(line)` returns a truthy value or `timeoutMs` elapses.
+ * The port is ALWAYS released and closed, even on timeout or error.
+ */
+async function esp32SerialTransaction(command, matcher, timeoutMs, onStatus) {
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    let reader = null;
+    let writer = null;
+    let timer = null;
+
+    try {
+        // Release reset lines so the board can boot, then wait for setup() to start.
+        try { await port.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch (_) {}
+        if (onStatus) onStatus('Waiting for ESP32 to boot...');
+        await new Promise(r => setTimeout(r, 2500));
+
+        writer = port.writable.getWriter();
+        reader = port.readable.getReader();
+
+        // Cancelling the reader is the only reliable way to unblock a pending read().
+        timer = setTimeout(() => { try { reader.cancel(); } catch (_) {} }, timeoutMs);
+
+        // PING first; resend the command once in case the first copy landed during boot.
+        await writer.write(encoder.encode('\nPING\n' + command + '\n'));
+        let resent = false;
+        const startedAt = Date.now();
+
+        let buffer = '';
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (!value) continue;
+            buffer += decoder.decode(value, { stream: true });
+
+            let nl;
+            while ((nl = buffer.indexOf('\n')) >= 0) {
+                const line = buffer.slice(0, nl).trim();
+                buffer = buffer.slice(nl + 1);
+                const result = matcher(line);
+                if (result) return result;
+            }
+
+            if (!resent && Date.now() - startedAt > 3000) {
+                resent = true;
+                await writer.write(encoder.encode('\n' + command + '\n'));
+            }
+        }
+        return null; // timed out
+    } finally {
+        if (timer) clearTimeout(timer);
+        try { if (reader) { await reader.cancel().catch(() => {}); reader.releaseLock(); } } catch (_) {}
+        try { if (writer) writer.releaseLock(); } catch (_) {}
+        try { await port.close(); } catch (_) {}
+    }
+}
+
+async function scanWifiOverUsb() {
+    if (!('serial' in navigator)) {
+        alert('WebSerial is not supported in this browser. Please use Chrome or Edge.');
+        return;
+    }
+
+    const btn = document.getElementById('btn-scan-usb');
+    const oldText = btn.innerText;
+    btn.innerText = 'Connecting...';
+    btn.disabled = true;
+    setWsStatus('info', 'Select your ESP32 in the browser prompt...');
+
+    try {
+        const data = await esp32SerialTransaction(
+            'SCAN_WIFI',
+            line => {
+                if (!line.startsWith('WIFI_LIST:')) return null;
+                try { return JSON.parse(line.substring(10)); } catch (_) { return null; }
+            },
+            20000,
+            msg => setWsStatus('info', msg)
+        );
+
+        const select = document.getElementById('ws-scanned-select');
+        if (data && Array.isArray(data.networks) && data.networks.length && select) {
+            select.innerHTML = '<option value="">-- Select from scanned networks --</option>';
+            data.networks.forEach(n => {
+                if (!n.ssid) return;
+                const opt = document.createElement('option');
+                opt.value = n.ssid;
+                opt.textContent = n.ssid + ' (' + n.rssi + ' dBm)';
+                select.appendChild(opt);
+            });
+            select.style.display = 'block';
+            setWsStatus('success', 'Found ' + data.networks.length + ' Wi-Fi networks. Select one from the dropdown.');
+        } else {
+            setWsStatus('error', 'No scan result from ESP32. Make sure it runs the latest HAVEN firmware and the Arduino Serial Monitor is closed. You can still type the SSID manually.');
+        }
+    } catch (err) {
+        if (err.name === 'NotFoundError') {
+            setWsStatus('info', 'Connection cancelled.');
+        } else {
+            setWsStatus('error', 'Serial error: ' + (err.message || err) + ' (Close the Arduino Serial Monitor if it is open.)');
+        }
+    } finally {
+        btn.innerText = oldText;
+        btn.disabled = false;
+    }
+}
+
+async function flashWebSerial() {
+    if (!('serial' in navigator)) {
+        alert('WebSerial is not supported in this browser. Please use Chrome or Edge.');
+        return;
+    }
+
+    const ssid = document.getElementById('ws-wifi-ssid').value.trim();
+    const pass = document.getElementById('ws-wifi-pass').value;
+    const serverUrl = document.getElementById('ws-server-url').value.trim();
+    const key = document.getElementById('ws-device-key').value.trim();
+    const vehId = parseInt(document.getElementById('ws-vehicle-select').value, 10) || 1;
+
+    if (!ssid) {
+        alert('Please enter your Wi-Fi SSID.');
+        return;
+    }
+    if (!serverUrl) {
+        alert('Please enter the Haven Server Ingest URL.');
+        return;
+    }
+    if (!key) {
+        alert('Please enter your vehicle device key.');
+        return;
+    }
+
+    const btn = document.getElementById('btn-flash-usb');
+    btn.disabled = true;
+    setWsStatus('info', 'Select your ESP32 in the browser prompt...');
+
+    const payload = { ssid: ssid, pass: pass, server: serverUrl, key: key, vehicle_id: vehId };
+    const command = 'SET_CONFIG:' + JSON.stringify(payload);
+    if (command.length > 480) {
+        setWsStatus('error', 'Configuration is too long for the ESP32 buffer. Shorten the server URL.');
+        btn.disabled = false;
+        return;
+    }
+
+    try {
+        const result = await esp32SerialTransaction(
+            command,
+            line => (line.startsWith('OK:SAVED') ? 'saved' : (line.startsWith('ERR:') ? line : null)),
+            20000,
+            msg => setWsStatus('info', msg)
+        );
+
+        if (result === 'saved') {
+            setWsStatus('success', '✓ Wi-Fi saved to ESP32 flash. It is rebooting and joining "' + ssid + '". Watch the live status bar.');
+            setTimeout(closeEsp32WebSerialModal, 3000);
+        } else if (result) {
+            setWsStatus('error', 'ESP32 rejected the configuration: ' + result);
+        } else {
+            setWsStatus('error', 'ESP32 did not confirm the save. Make sure it runs the latest HAVEN firmware and the Arduino Serial Monitor is closed, then try again.');
+        }
+    } catch (err) {
+        if (err.name === 'NotFoundError') {
+            setWsStatus('info', 'Connection cancelled by user.');
+        } else {
+            setWsStatus('error', 'WebSerial Error: ' + (err.message || err));
+        }
+    } finally {
+        btn.disabled = false;
     }
 }
 
@@ -582,9 +984,10 @@ function toggleHardwareInfo() {
 
             if (isMpuConnected) {
                 const peak = parseFloat(data.peak_g);
-                valVib.innerText = peak.toFixed(2);
+                valVib.innerText = peak.toFixed(3);
                 valVib.style.color = 'var(--h-text)';
-                const vibPct = Math.min(100, Math.max(0, (peak / 25) * 100));
+                // Values are gravity-removed g; 2 g fills the bar.
+                const vibPct = Math.min(100, Math.max(0, (peak / 2) * 100));
                 document.getElementById('bar-vib').style.width = vibPct + '%';
                 badgeVib.innerText = 'OK';
                 badgeVib.style.background = 'var(--h-green-bg)'; badgeVib.style.color = 'var(--h-green)';

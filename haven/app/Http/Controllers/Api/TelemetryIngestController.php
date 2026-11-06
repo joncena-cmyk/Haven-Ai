@@ -78,6 +78,10 @@ class TelemetryIngestController extends Controller
         $mags = [];
         $sampleCount = 0;
 
+        // Collect raw samples first; gravity/DC is removed below before computing peak/RMS.
+        $xyzRows = [];
+        $scalarRows = [];
+
         if (!empty($validated['csv_data'])) {
             $filename = 'vibration/' . Str::uuid() . '.csv';
             Storage::disk('local')->put($filename, $validated['csv_data']);
@@ -85,13 +89,18 @@ class TelemetryIngestController extends Controller
 
             $lines = array_filter(array_map('trim', explode("\n", $validated['csv_data'])));
             if (count($lines) > 1) {
-                array_shift($lines); // skip header
                 foreach ($lines as $line) {
+                    if ($line === '' || str_starts_with($line, '#')) {
+                        continue;
+                    }
                     $cols = str_getcsv($line);
+                    if (empty($cols) || !is_numeric(trim((string) $cols[0]))) {
+                        continue;
+                    }
                     if (count($cols) >= 4) {
-                        $mags[] = sqrt(((float) $cols[1] ** 2) + ((float) $cols[2] ** 2) + ((float) $cols[3] ** 2));
+                        $xyzRows[] = [(float) $cols[1], (float) $cols[2], (float) $cols[3]];
                     } elseif (count($cols) >= 2) {
-                        $mags[] = abs((float) $cols[1]);
+                        $scalarRows[] = (float) $cols[1];
                     }
                 }
             }
@@ -103,14 +112,28 @@ class TelemetryIngestController extends Controller
             foreach ($validated['samples'] as $sample) {
                 if (is_array($sample)) {
                     if (isset($sample['x'], $sample['y'], $sample['z'])) {
-                        $mags[] = sqrt(((float) $sample['x'] ** 2) + ((float) $sample['y'] ** 2) + ((float) $sample['z'] ** 2));
+                        $xyzRows[] = [(float) $sample['x'], (float) $sample['y'], (float) $sample['z']];
                     } elseif (isset($sample['magnitude'])) {
-                        $mags[] = abs((float) $sample['magnitude']);
+                        $scalarRows[] = (float) $sample['magnitude'];
                     }
                 } elseif (is_numeric($sample)) {
-                    $mags[] = abs((float) $sample);
+                    $scalarRows[] = (float) $sample;
                 }
             }
+        }
+
+        if (!empty($xyzRows)) {
+            // Per-axis mean subtraction cancels the static 1 g gravity vector.
+            $n = count($xyzRows);
+            $mx = array_sum(array_column($xyzRows, 0)) / $n;
+            $my = array_sum(array_column($xyzRows, 1)) / $n;
+            $mz = array_sum(array_column($xyzRows, 2)) / $n;
+            foreach ($xyzRows as [$x, $y, $z]) {
+                $mags[] = sqrt((($x - $mx) ** 2) + (($y - $my) ** 2) + (($z - $mz) ** 2));
+            }
+        } elseif (!empty($scalarRows)) {
+            $mean = array_sum($scalarRows) / count($scalarRows);
+            $mags = array_map(fn($v) => abs($v - $mean), $scalarRows);
         }
 
         $sampleCount = count($mags);
@@ -159,7 +182,9 @@ class TelemetryIngestController extends Controller
         // 6. Compute Component Pluggability & Health Status
         $healthInput = $request->input('health', []);
         $ds18Ok = filter_var($healthInput['ds18b20'] ?? true, FILTER_VALIDATE_BOOLEAN) && !is_null($tempC) && $tempC > -50 && $tempC < 125;
-        $mpuOk = filter_var($healthInput['mpu6050'] ?? true, FILTER_VALIDATE_BOOLEAN) && !is_null($peakG) && $peakG > 0.05;
+        // MPU health: trust the firmware's explicit health flag. Peak is now gravity-removed,
+        // so a stationary but connected sensor legitimately reports ~0 g.
+        $mpuOk = filter_var($healthInput['mpu6050'] ?? true, FILTER_VALIDATE_BOOLEAN) && !is_null($peakG);
         $inaReported = filter_var($healthInput['ina219'] ?? true, FILTER_VALIDATE_BOOLEAN) && !is_null($voltageV);
         $micOk = filter_var($healthInput['inmp441'] ?? true, FILTER_VALIDATE_BOOLEAN) && !is_null($audioRms) && $audioRms > 0;
 
@@ -177,8 +202,8 @@ class TelemetryIngestController extends Controller
                 'pins'      => 'D21 (SDA) / D22 (SCL)',
                 'connected' => $mpuOk,
                 'status'    => $mpuOk ? 'CONNECTED' : 'DISCONNECTED / PIN UNPLUGGED',
-                'value'     => $mpuOk ? (round($peakG, 2) . ' m/s²') : 'DISCONNECTED',
-                'hint'      => $mpuOk ? 'Earth gravity detected (~9.8 m/s²)' : 'I2C line lost. Check D21 (SDA) / D22 (SCL) jumper wire.',
+                'value'     => $mpuOk ? (round($peakG, 3) . ' g') : 'DISCONNECTED',
+                'hint'      => $mpuOk ? 'Dynamic vibration (gravity removed). ~0 g when stationary.' : 'I2C line lost. Check D21 (SDA) / D22 (SCL) jumper wire.',
             ],
             'ina219' => [
                 'name'      => 'Battery / Power Monitor (INA219)',
@@ -219,7 +244,7 @@ class TelemetryIngestController extends Controller
             'voltage_v'         => $voltageV ? (float)$voltageV : null,
             'current_ma'        => $currentMa ? (float)$currentMa : null,
             'power_mw'          => $powerMw ? (float)$powerMw : null,
-            'peak_g'            => $peakG ? (float)$peakG : null,
+            'peak_g'            => !is_null($peakG) ? (float)$peakG : null,
             'accel_x'           => $request->input('sensor_data.mpu6050.ax'),
             'accel_y'           => $request->input('sensor_data.mpu6050.ay'),
             'accel_z'           => $request->input('sensor_data.mpu6050.az'),
@@ -242,7 +267,7 @@ class TelemetryIngestController extends Controller
             'time' => now()->format('H:i:s'),
             'rpm'  => $rpm ? (int)$rpm : 0,
             'temp' => $tempC ? (float)$tempC : null,
-            'peak' => $peakG ? (float)$peakG : null,
+            'peak' => !is_null($peakG) ? (float)$peakG : null,
         ];
         if (count($history) > 30) {
             $history = array_slice($history, -30);
@@ -288,9 +313,11 @@ class TelemetryIngestController extends Controller
             'status'                  => $autoAnalyze ? 'processing' : 'submitted',
             'audio_path'              => $audioPath,
             'vibration_path'          => $vibrationPath,
+            'vibration_source'        => !empty($vibrationPath) ? 'device_sensor' : null,
             'vibration_sample_count'  => $sampleCount,
             'vibration_peak_g'        => $peakG,
             'vibration_rms_g'         => $rmsG,
+            'sample_rate_hz'          => isset($validated['sample_rate_hz']) ? (int) $validated['sample_rate_hz'] : null,
             'temperature_c'           => $tempC ? (float)$tempC : null,
             'rpm'                     => $rpm ? (int)$rpm : null,
             'voltage_v'               => $voltageV ? (float)$voltageV : null,

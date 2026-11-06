@@ -39,6 +39,7 @@ return [
     'ml_backend' => [
         'url'     => env('ML_BACKEND_URL', 'http://localhost:8001'),
         'timeout' => env('ML_BACKEND_TIMEOUT', 30),
+        'secret'  => env('ML_API_SECRET', ''),
     ],
 
     // NHTSA vPIC vehicle catalog (free, no key)

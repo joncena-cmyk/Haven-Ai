@@ -85,9 +85,10 @@
                                     @php
                                         $vehTelemetry = \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $veh->id)
                                             ?? ((($latestTelemetry['vehicle_id'] ?? null) == $veh->id) ? $latestTelemetry : null);
+                                        $vehTs = $vehTelemetry['timestamp'] ?? $vehTelemetry['received_at'] ?? null;
                                         $isOnline = !empty($vehTelemetry['online'])
-                                            && isset($vehTelemetry['received_at'])
-                                            && \Illuminate\Support\Carbon::parse($vehTelemetry['received_at'])->diffInSeconds(now()) <= 20;
+                                            && !empty($vehTs)
+                                            && abs(\Illuminate\Support\Carbon::parse($vehTs)->diffInSeconds(now())) <= 20;
                                         $rawKey = (string) ($veh->device_key ?? '');
                                         $maskedKey = strlen($rawKey) > 12
                                             ? substr($rawKey, 0, 12) . str_repeat('•', 16)
@@ -183,10 +184,10 @@
                                                            style="background:var(--h-surface);border:1px solid var(--h-border);color:var(--h-text);border-radius:var(--h-radius-sm);padding:0.28rem 0.5rem;font-size:0.75rem;width:100%;outline:none;">
                                                 </label>
                                                 <label style="display:flex;flex-direction:column;gap:0.2rem;">
-                                                    <span style="font-size:0.68rem;color:var(--h-text3);">Max Vibration (m/s²)</span>
-                                                    <input type="number" name="vibration_max" min="1" max="50" step="0.5"
+                                                    <span style="font-size:0.68rem;color:var(--h-text3);">Max Vibration (g)</span>
+                                                    <input type="number" name="vibration_max" min="0.1" max="50" step="0.1"
                                                            value="{{ $thresholds['vibration_max'] ?? '' }}"
-                                                           placeholder="e.g. 15"
+                                                           placeholder="e.g. 1.5"
                                                            style="background:var(--h-surface);border:1px solid var(--h-border);color:var(--h-text);border-radius:var(--h-radius-sm);padding:0.28rem 0.5rem;font-size:0.75rem;width:100%;outline:none;">
                                                 </label>
                                             </div>
