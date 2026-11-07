@@ -780,6 +780,7 @@
                         'valve_clearance' => 'badge-danger',
                         'misfire' => 'badge-warn',
                         'loose_component' => 'badge-warn',
+                        'ambient_noise' => 'badge-warn',
                         default => 'badge-neutral',
                     };
                 @endphp
@@ -3240,14 +3241,80 @@
         document.getElementById('live-rec-dot').classList.remove('active');
     };
 
-    function finalizeAudioCapture(stream) {
+    function encodeAudioBufferToMonoWav16(audioBuffer) {
+        const numChannels = audioBuffer.numberOfChannels || 1;
+        const sampleRate = audioBuffer.sampleRate || 44100;
+        const length = audioBuffer.length;
+        const mono = new Float32Array(length);
+
+        for (let ch = 0; ch < numChannels; ch++) {
+            const chData = audioBuffer.getChannelData(ch);
+            for (let i = 0; i < length; i++) {
+                mono[i] += chData[i] / numChannels;
+            }
+        }
+
+        const dataBytes = length * 2;
+        const buffer = new ArrayBuffer(44 + dataBytes);
+        const view = new DataView(buffer);
+
+        const writeStr = (offset, str) => {
+            for (let i = 0; i < str.length; i++) {
+                view.setUint8(offset + i, str.charCodeAt(i));
+            }
+        };
+
+        writeStr(0, 'RIFF');
+        view.setUint32(4, 36 + dataBytes, true);
+        writeStr(8, 'WAVE');
+        writeStr(12, 'fmt ');
+        view.setUint32(16, 16, true);          // PCM chunk size
+        view.setUint16(20, 1, true);           // Format = 1 (Linear PCM)
+        view.setUint16(22, 1, true);           // Channels = 1 (Mono)
+        view.setUint32(24, sampleRate, true);  // Sample rate
+        view.setUint32(28, sampleRate * 2, true); // Byte rate
+        view.setUint16(32, 2, true);           // Block align
+        view.setUint16(34, 16, true);          // Bits per sample = 16
+        writeStr(36, 'data');
+        view.setUint32(40, dataBytes, true);
+
+        let offset = 44;
+        for (let i = 0; i < length; i++) {
+            const clamped = Math.max(-1, Math.min(1, mono[i]));
+            const int16 = clamped < 0 ? Math.round(clamped * 0x8000) : Math.round(clamped * 0x7FFF);
+            view.setInt16(offset, int16, true);
+            offset += 2;
+        }
+
+        return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    async function finalizeAudioCapture(stream) {
         if (stream) {
             stream.getTracks().forEach(t => t.stop());
         }
-        audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const rawMime = (mediaRecorder && mediaRecorder.mimeType) ? mediaRecorder.mimeType : 'audio/webm';
+        const rawBlob = new Blob(audioChunks, { type: rawMime });
+        let uploadExt = 'webm';
+        let uploadMime = 'audio/webm';
+        audioBlob = rawBlob;
+
+        // Transcode browser capture to uncompressed 16-bit mono PCM WAV so Python DSP decodes natively without ffmpeg
+        try {
+            const decodeCtx = (audioCtx && audioCtx.state !== 'closed')
+                ? audioCtx
+                : new (window.AudioContext || window.webkitAudioContext)();
+            const arrayBuf = await rawBlob.arrayBuffer();
+            const decoded = await decodeCtx.decodeAudioData(arrayBuf.slice(0));
+            audioBlob = encodeAudioBufferToMonoWav16(decoded);
+            uploadExt = 'wav';
+            uploadMime = 'audio/wav';
+        } catch (wavErr) {
+            console.warn('WAV PCM conversion fallback:', wavErr);
+        }
 
         // Bind to hidden form
-        const file = new File([audioBlob], 'engine_audio_' + Date.now() + '.webm', { type: 'audio/webm' });
+        const file = new File([audioBlob], 'engine_audio_' + Date.now() + '.' + uploadExt, { type: uploadMime });
         const dt = new DataTransfer();
         dt.items.add(file);
         document.getElementById('form_audio_blob').files = dt.files;
@@ -3401,12 +3468,12 @@
         if (window.DeviceMotionEvent && !window._vibDeviceMotionBound) {
             window._vibDeviceMotionBound = true;
             window.addEventListener('devicemotion', function(e) {
-                const a = e.acceleration || e.accelerationIncludingGravity;
-                if (a && a.x !== null) {
+                const a = e.accelerationIncludingGravity || e.acceleration;
+                if (a && (a.x !== null || a.y !== null || a.z !== null)) {
                     latestDeviceAccel = {
-                        x: a.x / 9.80665,
-                        y: a.y / 9.80665,
-                        z: (a.z || 9.8) / 9.80665
+                        x: (a.x ?? 0) / 9.80665,
+                        y: (a.y ?? 0) / 9.80665,
+                        z: (a.z ?? 0) / 9.80665
                     };
                     const label = document.getElementById('hud-progress-label');
                     if (label && captureState === 'RECORDING_VIBRATION') {
@@ -3427,11 +3494,10 @@
             let x, y, z;
 
             if (latestDeviceAccel) {
-                // Blend live device motion with high-frequency engine oscillation
-                const microJitter = (Math.random() - 0.5) * 0.04;
-                x = latestDeviceAccel.x + microJitter;
-                y = latestDeviceAccel.y + microJitter;
-                z = latestDeviceAccel.z + (Math.sin(elapsed * baseFreq * 2 * Math.PI) * 0.08) + microJitter;
+                // Record uncontaminated physical device accelerometer readings (in Gs)
+                x = latestDeviceAccel.x;
+                y = latestDeviceAccel.y;
+                z = latestDeviceAccel.z;
             } else {
                 // Realistic calibrated ADXL345 3-axis accelerometer output (in Gs)
                 const noiseX = (Math.random() - 0.5) * 0.05;

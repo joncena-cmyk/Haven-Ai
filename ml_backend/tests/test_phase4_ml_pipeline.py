@@ -441,5 +441,166 @@ def test_audio_only_submodel_and_window_ensemble_inference(tmp_path: pathlib.Pat
     clap_res = ec.predict(clap_noise)
     assert clap_res["condition"] == "ambient_noise"
 
+    # 4. Vibration-only inference uses dedicated 5-feature `vibration_model` (BUG-07)
+    assert "vibration_model" in saved and saved["vibration_model"] is not None
+    vib_only_valve = {
+        "vibration_source": "adxl345_live",
+        "peak_g": 2.15,
+        "rms_g": 0.46,
+        "crest_factor": 4.67,
+        "dominant_freq_hz": 24.0,
+        "spectral_entropy": 0.42,
+    }
+    vib_res = ec.predict(vib_only_valve)
+    assert vib_res["mode"] == "trained_vibration_only"
+    assert vib_res["condition"] == "valve_clearance"
+
+    # 5. Quiet healthy idle audio (rms_audio = 0.024) is classified as normal, not ambient_noise (BUG-10)
+    quiet_idle_audio = {
+        "vibration_source": "skipped",
+        "rms_mean": 0.024,
+        "rms_std": 0.004,
+        "zcr_mean": 0.08,
+        "spectral_centroid_mean": 1050.0,
+        "spectral_rolloff_mean": 2100.0,
+        "spectral_bandwidth_mean": 1100.0,
+        "mfcc_1_mean": -250.0,
+        "mfcc_2_mean": 82.0,
+        "mfcc_3_mean": -14.0,
+        "mfcc_4_mean": 24.0,
+    }
+    quiet_res = ec.predict(quiet_idle_audio)
+    assert quiet_res["condition"] == "normal"
+
+
+def test_bug_audit_regressions_multivehicle_train_nan_json_and_range_g8(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """
+    Regression coverage for BUG-03 (multi-vehicle /train NameError), BUG-06 (empty vibration CSV NaN JSON crash),
+    BUG-09 (firmware RANGE_G=8 clipping check), and BUG-12 (timestamp-less JSON 100 Hz fallback).
+    """
+    import asyncio
+    from starlette.datastructures import UploadFile as StarletteUploadFile
+    import main as ml_main
+    from features import extract_vibration_features
+    from record_session import parse_firmware_range_g
+    from validate_recording import validate_recording_folder
+
+    monkeypatch.setenv("ML_API_SECRET", "test-audit-secret")
+
+    # 1. BUG-03: Multi-vehicle POST /train (>= 2 vehicle groups) succeeds without NameError
+    tmp_model_path = tmp_path / "trained_api_model.pkl"
+    monkeypatch.setattr(ml_main.classifier, "reload_model", lambda: True)
+    records = [
+        {
+            "vehicle_id": "1",
+            "session_id": "S1",
+            "true_condition": "normal",
+            "peak_g": 0.25,
+            "rms_g": 0.11,
+            "crest_factor": 2.27,
+            "dominant_freq_hz": 14.0,
+            "spectral_entropy": 0.28,
+        },
+        {
+            "vehicle_id": "2",
+            "session_id": "S2",
+            "true_condition": "valve_clearance",
+            "peak_g": 2.10,
+            "rms_g": 0.44,
+            "crest_factor": 4.77,
+            "dominant_freq_hz": 24.0,
+            "spectral_entropy": 0.45,
+        },
+    ]
+    import train as train_mod
+
+    orig_train_export = train_mod.train_and_export
+
+    def _redirected_train_export(*args, **kwargs):
+        kwargs["model_path"] = str(tmp_model_path)
+        return orig_train_export(*args, **kwargs)
+
+    monkeypatch.setattr(train_mod, "train_and_export", _redirected_train_export)
+    train_resp = asyncio.run(
+        ml_main.retrain_model(
+            {
+                "records": records,
+                "augment_synthetic": True,
+                "synthetic_per_class": 25,
+            }
+        )
+    )
+    train_json = json.loads(train_resp.body.decode("utf-8"))
+    assert train_json["success"] is True
+    assert train_json["meta"]["real_samples_count"] == 2
+
+    # 2. BUG-06: Empty vibration CSV (0 rows -> NaN) + valid WAV audio returns valid JSON (no 500 ValueError)
+    wav_path = tmp_path / "valid.wav"
+    sr = 16000
+    t = np.arange(sr * 2, dtype=np.float64) / sr
+    sig = 0.15 * np.sin(2.0 * np.pi * 120.0 * t)
+    sf.write(str(wav_path), (sig * 32767.0).astype(np.int16), sr, subtype="PCM_16")
+
+    empty_csv = tmp_path / "empty_vib.csv"
+    empty_csv.write_text("t_us,ax,ay,az\n", encoding="utf-8")
+
+    with wav_path.open("rb") as f_aud, empty_csv.open("rb") as f_vib:
+        aud_up = StarletteUploadFile(filename="valid.wav", file=f_aud)
+        vib_up = StarletteUploadFile(filename="empty_vib.csv", file=f_vib)
+        analyze_resp = asyncio.run(
+            ml_main.analyze(
+                audio_file=aud_up,
+                vibration_file=vib_up,
+                diagnostic_id=101,
+                vehicle_id=1,
+                temperature_c=None,
+                rpm=None,
+                voltage_v=None,
+                current_ma=None,
+                sample_rate_hz=None,
+                recording_mode="idle",
+                vibration_source="adxl345_live",
+            )
+        )
+    analyze_json = json.loads(analyze_resp.body.decode("utf-8"))
+    assert analyze_resp.status_code == 200
+    assert analyze_json["vibration_features"]["peak_g"] is None
+
+    # 3. BUG-12: Timestamp-less JSON samples without sample_rate_hz default to 100.0 Hz
+    json_vib = tmp_path / "esp32_samples.json"
+    samples_3d = [
+        {"x": 0.25 * np.sin(2.0 * np.pi * 15.0 * (i / 100.0)), "y": 0.0, "z": 1.0}
+        for i in range(128)
+    ]
+    json_vib.write_text(json.dumps(samples_3d), encoding="utf-8")
+    jf = extract_vibration_features(str(json_vib), ext="json", sample_rate_hz=None)
+    assert jf["sample_rate_hz"] == pytest.approx(100.0)
+    assert jf["peak_g"] == pytest.approx(0.25, abs=0.03)
+
+    # 4. BUG-09: Firmware header RANGE_G=8 is parsed and enforces ±8g clipping in validator
+    assert parse_firmware_range_g(["# HAVEN_LOGGER_V1 SENSOR=MPU6050 RANGE_G=8"]) == 8.0
+    clip_dir = _write_synthetic_recording_folder(
+        tmp_path / "rec_clip",
+        session_id="S-CLIP",
+        vehicle_id="car1",
+        condition="normal",
+        vib_freq_hz=20.0,
+        vib_amp_g=7.95,  # Clips ±8g (98% of 8g = 7.84g), would NOT clip ±16g!
+        audio_freq_hz=150.0,
+        audio_amp=0.15,
+    )
+    meta_file = clip_dir / "metadata.json"
+    meta_obj = json.loads(meta_file.read_text(encoding="utf-8"))
+    meta_obj["vibration_sensor_range_g"] = 16.0  # Legacy stale default
+    meta_obj["firmware_headers"] = ["# HAVEN_LOGGER_V1 SENSOR=MPU6050 RANGE_G=8 ACHIEVED_RATE_HZ=1000.0"]
+    meta_file.write_text(json.dumps(meta_obj, indent=2), encoding="utf-8")
+
+    clip_val = validate_recording_folder(clip_dir)
+    assert clip_val.valid is False
+    assert any("±8.0g" in err or "±8g" in err for err in clip_val.errors)
+
+
 
 

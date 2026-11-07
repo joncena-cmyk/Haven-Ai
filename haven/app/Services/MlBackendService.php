@@ -76,11 +76,19 @@ class MlBackendService
                 $remoteModel = array_merge($nestedMeta, $remoteModel);
             }
             $info['model'] = $this->normalizeModelMetadata(array_merge($localMeta, $remoteModel));
+            $secretConfigured = (bool) ($health['secret_configured'] ?? true) && ($this->apiSecret !== '');
 
-            return array_merge([
-                'online' => true,
-                'url'    => $this->baseUrl,
+            $merged = array_merge([
+                'online'            => true,
+                'url'               => $this->baseUrl,
+                'secret_configured' => $secretConfigured,
             ], $health, $info);
+            $merged['secret_configured'] = $secretConfigured;
+            if (! $secretConfigured) {
+                $merged['auth_warning'] = 'ML_API_SECRET is blank in haven/.env — authenticated /analyze and /train requests will fail until configured.';
+            }
+
+            return $merged;
         } catch (\Throwable $e) {
             return [
                 'online' => false,
@@ -178,7 +186,7 @@ class MlBackendService
                     $cmd = [
                         'python',
                         $trainScript,
-                        '--generate-synthetic',
+                        $augmentSynthetic ? '--generate-synthetic' : '--no-synthetic',
                         '--samples',
                         (string) $syntheticPerClass,
                     ];
@@ -264,10 +272,18 @@ class MlBackendService
      * Submit a Diagnostic record to the ML backend for analysis.
      * Returns the parsed result array or throws on hard failure.
      */
-    public function analyze(Diagnostic $diagnostic): array
+    public function analyze(Diagnostic $diagnostic, bool $allowTransientFallback = true): array
     {
+        // Telemetry-only diagnostics (no audio and no vibration file) use contextual heuristics directly
+        if (! $diagnostic->hasAudio() && ! $diagnostic->hasVibration()) {
+            return $this->mockAnalysis($diagnostic, 'telemetry_only');
+        }
+
         // Check connectivity first
         if (! $this->isAlive()) {
+            if (! $allowTransientFallback) {
+                throw new \RuntimeException("ML backend unavailable at {$this->baseUrl} for diagnostic #{$diagnostic->id}");
+            }
             Log::info("ML backend unavailable — using mock classifier for diagnostic #{$diagnostic->id}");
             return $this->mockAnalysis($diagnostic);
         }
@@ -276,6 +292,8 @@ class MlBackendService
             $request = Http::timeout($this->timeoutSec)
                 ->withHeaders(['X-ML-API-Secret' => $this->apiSecret])
                 ->asMultipart();
+
+            $attachedFiles = 0;
 
             // Attach audio file if present (resolve from private disk first, fallback to public)
             if ($diagnostic->hasAudio()) {
@@ -287,6 +305,7 @@ class MlBackendService
                         file_get_contents($audioPath),
                         basename($diagnostic->audio_path)
                     );
+                    $attachedFiles++;
                 }
             }
 
@@ -300,7 +319,12 @@ class MlBackendService
                         file_get_contents($vibPath),
                         basename($diagnostic->vibration_path)
                     );
+                    $attachedFiles++;
                 }
+            }
+
+            if ($attachedFiles === 0) {
+                return $this->mockAnalysis($diagnostic, 'missing_signal_files');
             }
 
             $params = [
@@ -339,14 +363,24 @@ class MlBackendService
                 'body' => $response->body(),
             ]);
 
+            if (! $allowTransientFallback && $response->serverError()) {
+                throw new \RuntimeException("ML backend returned HTTP {$response->status()} for diagnostic #{$diagnostic->id}");
+            }
+
             // Degraded: still mock rather than crash
             return $this->mockAnalysis($diagnostic, 'backend_error');
 
         } catch (ConnectionException $e) {
             Log::warning("ML backend connection failed: {$e->getMessage()}");
+            if (! $allowTransientFallback) {
+                throw $e;
+            }
             return $this->mockAnalysis($diagnostic, 'connection_error');
         } catch (\Throwable $e) {
             Log::error("ML backend unexpected error: {$e->getMessage()}");
+            if (! $allowTransientFallback) {
+                throw $e;
+            }
             return $this->mockAnalysis($diagnostic, 'unexpected_error');
         }
     }

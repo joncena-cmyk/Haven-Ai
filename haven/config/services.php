@@ -37,7 +37,7 @@ return [
 
     // HAVEN ML Backend (FastAPI)
     'ml_backend' => [
-        'url'     => env('ML_BACKEND_URL', 'http://localhost:8001'),
+        'url'     => env('ML_BACKEND_URL', env('ML_API_URL', 'http://127.0.0.1:8001')),
         'timeout' => env('ML_BACKEND_TIMEOUT', 30),
         'secret'  => env('ML_API_SECRET', ''),
     ],

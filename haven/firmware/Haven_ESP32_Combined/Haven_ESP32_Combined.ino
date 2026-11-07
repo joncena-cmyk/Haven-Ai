@@ -122,9 +122,13 @@ float busVoltage = 0;
 float currentMA = 0;
 float powerMW = 0;
 
-// 100Hz 128-Sample Vibration Ring Buffer for FFT Spectral Analysis
+// 100Hz 128-Sample 3-Axis Vibration Ring Buffer for FFT Spectral Analysis
+// Stores raw (ax, ay, az) per axis so static 1.0g gravity is subtracted per axis BEFORE
+// computing dynamic Euclidean magnitude — preventing horizontal attenuation and 2*omega doubling.
 #define VIB_BUFFER_SIZE 128
-float vibBuffer[VIB_BUFFER_SIZE];
+float vibBufX[VIB_BUFFER_SIZE];
+float vibBufY[VIB_BUFFER_SIZE];
+float vibBufZ[VIB_BUFFER_SIZE];
 int vibBufferIdx = 0;
 bool vibBufferFull = false;
 float windowPeakG = 0;
@@ -137,8 +141,10 @@ unsigned long lastTemp = 0;
 unsigned long lastMPU = 0;
 unsigned long lastINA = 0;
 unsigned long lastMic = 0;
+unsigned long lastWifiRetry = 0;
 unsigned long lastHavenUpload = 0;
 const unsigned long UPLOAD_INTERVAL_MS = 5000; // Ingest to Haven every 5s
+const unsigned long WIFI_RETRY_INTERVAL_MS = 15000; // Auto-reconnect Wi-Fi every 15s if dropped
 
 // ============================================================
 // HALL SENSOR INTERRUPT
@@ -225,12 +231,16 @@ bool probeI2C(uint8_t address) {
 // ============================================================
 void postTelemetryToHaven() {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[HAVEN] Wi-Fi not connected. Skipping upload.");
+    if (strlen(wifiSSID) == 0) {
+      Serial.println("[HAVEN] Wi-Fi not configured yet. Use 'Pair Wi-Fi (USB)' on Dashboard or connect to hotspot 'HAVEN_AI_LOCAL' (http://192.168.4.1/config).");
+    } else {
+      Serial.printf("[HAVEN] Wi-Fi not connected to '%s'. Skipping upload (auto-retrying)...\n", wifiSSID);
+    }
     return;
   }
 
-  // Live I2C hardware bus probe right before sending
-  bool mpuDetected = probeI2C(0x68);
+  // Live hardware bus probe via swappable IAccelDriver (supports MPU6050 I2C 0x68/0x69 and ADXL345 SPI)
+  bool mpuDetected = accelDriver->isConnected();
   if (!mpuDetected) {
     mpuReady = false;
   } else if (!mpuReady) {
@@ -246,22 +256,29 @@ void postTelemetryToHaven() {
 
   bool ds18Plugged = (!isnan(temperature) && ds18DeviceCount > 0);
 
-  // Compute window Peak G, RMS G, and Crest Factor across the 100Hz ring buffer.
-  // The raw magnitude includes ~1 g of static gravity, so subtract the window mean first;
-  // otherwise a sensor resting on a table reports ~1.0 g peak/RMS.
+  // Compute window Peak G, RMS G, and Crest Factor across the 100Hz 3-axis ring buffer.
+  // Subtract per-axis DC mean (meanX, meanY, meanZ) FIRST to cancel static 1.0g gravity in any tilt orientation.
   int sampleCount = vibBufferFull ? VIB_BUFFER_SIZE : vibBufferIdx;
-  float meanMag = 0.0f;
   if (mpuReady && sampleCount > 0) {
-    double sum = 0;
-    for (int i = 0; i < sampleCount; i++) sum += vibBuffer[i];
-    meanMag = (float)(sum / sampleCount);
+    double sumX = 0, sumY = 0, sumZ = 0;
+    for (int i = 0; i < sampleCount; i++) {
+      sumX += vibBufX[i];
+      sumY += vibBufY[i];
+      sumZ += vibBufZ[i];
+    }
+    float meanX = (float)(sumX / sampleCount);
+    float meanY = (float)(sumY / sampleCount);
+    float meanZ = (float)(sumZ / sampleCount);
 
     double sumSq = 0;
     float maxG = 0;
     for (int i = 0; i < sampleCount; i++) {
-      float v = fabsf(vibBuffer[i] - meanMag);
-      if (v > maxG) maxG = v;
-      sumSq += (double)v * (double)v;
+      float dx = vibBufX[i] - meanX;
+      float dy = vibBufY[i] - meanY;
+      float dz = vibBufZ[i] - meanZ;
+      float dynMag = sqrtf(dx * dx + dy * dy + dz * dz);
+      if (dynMag > maxG) maxG = dynMag;
+      sumSq += (double)dynMag * (double)dynMag;
     }
     windowPeakG = maxG;
     windowRmsG  = sqrt(sumSq / sampleCount);
@@ -316,11 +333,13 @@ void postTelemetryToHaven() {
     doc["rms_g"]        = round(windowRmsG * 1000.0) / 1000.0;
     doc["crest_factor"] = round(windowCrestFactor * 100.0) / 100.0;
     JsonArray samplesArr = doc.createNestedArray("samples");
-    int countToSend = (sampleCount > 64) ? 64 : sampleCount;
+    int countToSend = (sampleCount > 32) ? 32 : sampleCount;
     for (int i = 0; i < countToSend; i++) {
       int idx = (vibBufferIdx - countToSend + i + VIB_BUFFER_SIZE) % VIB_BUFFER_SIZE;
-      // Send gravity-removed dynamic magnitude, consistent with peak_g / rms_g above.
-      samplesArr.add(round((vibBuffer[idx] - meanMag) * 1000.0) / 1000.0);
+      JsonObject sObj = samplesArr.createNestedObject();
+      sObj["x"] = round(vibBufX[idx] * 1000.0) / 1000.0;
+      sObj["y"] = round(vibBufY[idx] * 1000.0) / 1000.0;
+      sObj["z"] = round(vibBufZ[idx] * 1000.0) / 1000.0;
     }
   } else {
     doc["peak_g"] = nullptr;
@@ -658,7 +677,7 @@ void checkSerialModeCommand() {
       return;
     } else if (upper == "PING") {
       Serial.println("PONG:HAVEN_ESP32_NODE");
-      return;
+      continue;
     } else if (upper == "SCAN_WIFI") {
       int n = WiFi.scanNetworks();
       DynamicJsonDocument doc(4096);
@@ -672,19 +691,19 @@ void checkSerialModeCommand() {
       Serial.print("WIFI_LIST:");
       serializeJson(doc, Serial);
       Serial.println();
-      return;
+      continue;
     } else if (upper.startsWith("SET_CONFIG:")) {
       String jsonStr = raw.substring(11);
       StaticJsonDocument<768> doc;
       DeserializationError err = deserializeJson(doc, jsonStr);
       if (err) {
         Serial.println("ERR:INVALID_JSON");
-        return;
+        continue;
       }
       const char* newSsid = doc["ssid"] | "";
       if (strlen(newSsid) == 0) {
         Serial.println("ERR:MISSING_SSID");
-        return;
+        continue;
       }
       copyBounded(wifiSSID, sizeof(wifiSSID), newSsid);
       copyBounded(wifiPassword, sizeof(wifiPassword), doc["pass"] | "");
@@ -706,6 +725,7 @@ void checkSerialModeCommand() {
       prefs.end();
 
       Serial.println("OK:SAVED");
+      Serial.flush();
       delay(400);
       ESP.restart();
       return;
@@ -721,7 +741,7 @@ void checkSerialModeCommand() {
       Serial.print("CONFIG:");
       serializeJson(doc, Serial);
       Serial.println();
-      return;
+      continue;
     }
   }
 }
@@ -946,12 +966,14 @@ void loop() {
     if (mpuReady && accelDriver->readSampleG(accelX, accelY, accelZ)) {
       accelMagnitude = sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ);
 
-      vibBuffer[vibBufferIdx] = accelMagnitude;
+      vibBufX[vibBufferIdx] = accelX;
+      vibBufY[vibBufferIdx] = accelY;
+      vibBufZ[vibBufferIdx] = accelZ;
       vibBufferIdx = (vibBufferIdx + 1) % VIB_BUFFER_SIZE;
       if (vibBufferIdx == 0) {
         vibBufferFull = true;
       }
-    } else if (now % 1000 < 10 && probeI2C(0x68)) {
+    } else if (now % 1000 < 10 && accelDriver->isConnected()) {
       mpuReady = accelDriver->begin(false);
     }
   }
@@ -982,7 +1004,14 @@ void loop() {
     lastMic = millis();
   }
 
-  // 6. Push Live Data to HAVEN AI Website (Every 5 seconds)
+  // 6. Auto-reconnect Wi-Fi in background if credentials exist and router dropped
+  if (strlen(wifiSSID) > 0 && WiFi.status() != WL_CONNECTED && (now - lastWifiRetry >= WIFI_RETRY_INTERVAL_MS)) {
+    lastWifiRetry = now;
+    WiFi.disconnect(false);
+    WiFi.begin(wifiSSID, wifiPassword);
+  }
+
+  // 7. Push Live Data to HAVEN AI Website (Every 5 seconds)
   if (now - lastHavenUpload >= UPLOAD_INTERVAL_MS) {
     lastHavenUpload = now;
     postTelemetryToHaven();

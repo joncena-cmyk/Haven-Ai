@@ -102,6 +102,22 @@ class Diagnostic extends Model
         return !is_null($this->temperature_c) ? round(($this->temperature_c * 9/5) + 32, 1) : null;
     }
 
+    /**
+     * Computed vibration Crest Factor (Peak G / RMS G), preferring DSP-extracted value when available.
+     */
+    public function getCrestFactorAttribute(): ?float
+    {
+        $raw = is_array($this->ml_result_raw) ? $this->ml_result_raw : [];
+        $dspCrest = $raw['vibration_features']['crest_factor'] ?? null;
+        if (is_numeric($dspCrest) && (float) $dspCrest > 0) {
+            return round((float) $dspCrest, 2);
+        }
+        if ($this->vibration_rms_g !== null && $this->vibration_rms_g > 0 && $this->vibration_peak_g !== null && $this->vibration_peak_g > 0) {
+            return round((float) $this->vibration_peak_g / (float) $this->vibration_rms_g, 2);
+        }
+        return null;
+    }
+
     public function getRecordingModeLabelAttribute(): string
     {
         return match ($this->recording_mode) {

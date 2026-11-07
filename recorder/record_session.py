@@ -161,6 +161,23 @@ def parse_serial_csv_line(line: str) -> Optional[Tuple[int, float, float, float]
         return None
 
 
+def parse_firmware_range_g(headers: List[str]) -> Optional[float]:
+    """
+    Extract accelerometer full-scale range in g (e.g. RANGE_G=8) from
+    '# HAVEN_LOGGER_V1 ... RANGE_G=8' firmware header lines.
+    """
+    for hdr in reversed(headers):
+        match = re.search(r"\bRANGE_G\s*=\s*([0-9]+(?:\.[0-9]+)?)", str(hdr), flags=re.IGNORECASE)
+        if match:
+            try:
+                val = float(match.group(1))
+                if math.isfinite(val) and val > 0.0:
+                    return val
+            except ValueError:
+                continue
+    return None
+
+
 def build_output_dir(
     output_root: pathlib.Path,
     session_id: str,
@@ -389,7 +406,8 @@ def record_synchronized_session(
     duration_s = float(args.duration)
     audio_sr = int(args.audio_rate)
     baud_rate = int(args.baud)
-    sensor_range_g = float(args.sensor_range_g)
+    requested_range_g = float(args.sensor_range_g)
+    active_range_g: List[float] = [requested_range_g if requested_range_g > 0.0 else 16.0]
 
     vib_samples: List[Tuple[int, float, float, float]] = []
     firmware_headers: List[str] = []
@@ -407,6 +425,10 @@ def record_synchronized_session(
             ser = open_esp32_serial(args.port, baud_rate=baud_rate, timeout=0.05)
             negotiated_headers = ensure_esp32_logger_mode(ser, target_baud=baud_rate)
             firmware_headers.extend(negotiated_headers)
+            if requested_range_g <= 0.0:
+                detected_rg = parse_firmware_range_g(firmware_headers)
+                if detected_rg is not None:
+                    active_range_g[0] = detected_rg
             ser.reset_input_buffer()
             serial_ready.set()
 
@@ -421,6 +443,10 @@ def record_synchronized_session(
                 line = raw.decode("utf-8", errors="replace").strip()
                 if line.startswith("#"):
                     firmware_headers.append(line)
+                    if requested_range_g <= 0.0:
+                        detected_rg = parse_firmware_range_g([line])
+                        if detected_rg is not None:
+                            active_range_g[0] = detected_rg
                     continue
                 parsed = parse_serial_csv_line(line)
                 if parsed is not None:
@@ -431,6 +457,11 @@ def record_synchronized_session(
             stop_gate.set()
         finally:
             if ser is not None:
+                try:
+                    ser.write(b"\nLIVE\n")
+                    ser.flush()
+                except Exception:
+                    pass
                 try:
                     ser.close()
                 except Exception:
@@ -564,7 +595,7 @@ def record_synchronized_session(
                 clip_warn = ""
                 if aud_peak >= 0.99:
                     clip_warn += " [WARN: AUDIO CLIPPING!]"
-                if vib_peak >= 0.98 * sensor_range_g:
+                if vib_peak >= 0.98 * active_range_g[0]:
                     clip_warn += " [WARN: VIBRATION RAILING!]"
                 print(
                     f"  [{elapsed:5.1f}s / {duration_s:.1f}s] "
@@ -600,6 +631,12 @@ def record_synchronized_session(
     audio_float = audio_int16.reshape(-1).astype(np.float64) / 32768.0
     audio_clipped_count = int(np.count_nonzero(np.abs(audio_int16) >= 32600))
     audio_duration_actual = float(audio_int16.shape[0]) / float(audio_sr) if audio_sr > 0 else 0.0
+
+    sensor_range_g = active_range_g[0]
+    if requested_range_g <= 0.0:
+        detected_final_rg = parse_firmware_range_g(firmware_headers)
+        if detected_final_rg is not None:
+            sensor_range_g = detected_final_rg
 
     if len(vib_samples) >= 2:
         vib_arr = np.array(vib_samples, dtype=np.float64)
@@ -707,7 +744,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--baud", type=int, default=921600, help="Serial baud rate (default: 921600)")
     parser.add_argument("--device", type=str, default=None, help="Audio input device index or name (sounddevice)")
     parser.add_argument("--audio-rate", type=int, default=44100, help="Audio sample rate in Hz (default: 44100)")
-    parser.add_argument("--sensor-range-g", type=float, default=16.0, help="Accelerometer full-scale range in g")
+    parser.add_argument(
+        "--sensor-range-g",
+        type=float,
+        default=0.0,
+        help="Accelerometer full-scale range in g (0 = auto-detect RANGE_G from firmware header, fallback 16g)",
+    )
     parser.add_argument("--output-root", type=str, default="recordings", help="Root output directory")
     return parser
 

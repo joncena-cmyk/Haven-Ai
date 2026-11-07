@@ -334,13 +334,25 @@ class DiagnosticController extends Controller
             try {
                 $result = $ml->analyze($diagnostic);
 
-                $diagnostic->update([
+                $vibFeats = is_array($result['vibration_features'] ?? null) ? $result['vibration_features'] : [];
+                $updatePayload = [
                     'status'          => 'completed',
                     'ml_condition'    => $result['condition']    ?? null,
                     'ml_confidence'   => $result['confidence']   ?? null,
                     'ml_result_raw'   => $result,
                     'ml_processed_at' => now(),
-                ]);
+                ];
+                if (isset($vibFeats['peak_g']) && is_numeric($vibFeats['peak_g']) && (float) $vibFeats['peak_g'] > 0) {
+                    $updatePayload['vibration_peak_g'] = round((float) $vibFeats['peak_g'], 4);
+                }
+                if (isset($vibFeats['rms_g']) && is_numeric($vibFeats['rms_g']) && (float) $vibFeats['rms_g'] > 0) {
+                    $updatePayload['vibration_rms_g'] = round((float) $vibFeats['rms_g'], 4);
+                }
+                if (empty($diagnostic->sample_rate_hz) && !empty($vibFeats['sample_rate_hz']) && (float) $vibFeats['sample_rate_hz'] > 0) {
+                    $updatePayload['sample_rate_hz'] = (int) round((float) $vibFeats['sample_rate_hz']);
+                }
+
+                $diagnostic->update($updatePayload);
 
                 $condition  = ucfirst($result['condition']  ?? 'unknown');
                 $confidence = $result['confidence_pct'] ?? '';
@@ -537,28 +549,48 @@ class DiagnosticController extends Controller
         return response()->stream(function () use ($diagnostics) {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, [
-                'diagnostic_id', 'session_id', 'vehicle', 'engine', 'vibration_source',
+                'diagnostic_id', 'session_id', 'vehicle_id', 'vehicle', 'engine', 'vibration_source',
                 'sample_rate_hz', 'peak_g', 'rms_g', 'crest_factor',
+                'dominant_freq_hz', 'spectral_entropy',
+                'rms_mean', 'zcr_mean', 'spectral_centroid_mean', 'spectral_rolloff_mean',
+                'mfcc_1_mean', 'mfcc_2_mean', 'mfcc_3_mean', 'mfcc_4_mean', 'mfcc_5_mean',
                 'temperature_c', 'rpm', 'target_rpm', 'load_state',
                 'sensor_position', 'mic_position', 'operator', 'verified_by',
                 'voltage_v', 'current_ma', 'true_condition', 'fault_detail',
             ]);
 
             foreach ($diagnostics as $diag) {
-                $crest = ($diag->vibration_rms_g > 0 && $diag->vibration_peak_g > 0)
-                    ? round($diag->vibration_peak_g / $diag->vibration_rms_g, 3)
-                    : null;
+                $raw     = is_array($diag->ml_result_raw) ? $diag->ml_result_raw : [];
+                $audFeat = is_array($raw['audio_features'] ?? null) ? $raw['audio_features'] : [];
+                $vibFeat = is_array($raw['vibration_features'] ?? null) ? $raw['vibration_features'] : [];
+                $peak    = $vibFeat['peak_g'] ?? $diag->vibration_peak_g;
+                $rms     = $vibFeat['rms_g'] ?? $diag->vibration_rms_g;
+                $crest   = $vibFeat['crest_factor'] ?? (($rms > 0 && $peak > 0)
+                    ? round($peak / $rms, 3)
+                    : null);
 
                 fputcsv($handle, [
                     $diag->id,
                     $diag->session_id,
+                    $diag->vehicle_id,
                     $diag->vehicle?->display_name ?? 'N/A',
                     $diag->vehicle?->engine_type ?? 'N/A',
                     $diag->vibration_source ?? 'physical',
                     $diag->sample_rate_hz,
-                    $diag->vibration_peak_g,
-                    $diag->vibration_rms_g,
+                    $peak,
+                    $rms,
                     $crest,
+                    $vibFeat['dominant_freq_hz'] ?? null,
+                    $vibFeat['spectral_entropy'] ?? null,
+                    $audFeat['rms_mean'] ?? ($audFeat['rms_audio'] ?? null),
+                    $audFeat['zcr_mean'] ?? null,
+                    $audFeat['spectral_centroid_mean'] ?? null,
+                    $audFeat['spectral_rolloff_mean'] ?? null,
+                    $audFeat['mfcc_1_mean'] ?? null,
+                    $audFeat['mfcc_2_mean'] ?? null,
+                    $audFeat['mfcc_3_mean'] ?? null,
+                    $audFeat['mfcc_4_mean'] ?? null,
+                    $audFeat['mfcc_5_mean'] ?? null,
                     $diag->temperature_c,
                     $diag->rpm,
                     $diag->target_rpm,

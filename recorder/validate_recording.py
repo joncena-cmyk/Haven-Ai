@@ -122,6 +122,13 @@ def validate_recording_folder(
 
     target_duration = float(meta.get("duration_target_sec") or 0.0)
     sensor_range_g = float(meta.get("vibration_sensor_range_g") or 16.0)
+    fw_headers = meta.get("firmware_headers")
+    if isinstance(fw_headers, list) and fw_headers:
+        from record_session import parse_firmware_range_g
+
+        fw_rg = parse_firmware_range_g([str(h) for h in fw_headers])
+        if fw_rg is not None:
+            sensor_range_g = fw_rg
     expected_audio_sr = int(meta.get("audio_sample_rate_hz") or 44100)
 
     # ── 2. Validate audio.wav ──

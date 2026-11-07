@@ -27,6 +27,13 @@
     "mfcc_4_mean",
     "mfcc_5_mean"
   ],
+  "vibration_feature_order": [
+    "peak_g",
+    "rms_g",
+    "crest_factor",
+    "dominant_freq_hz",
+    "spectral_entropy"
+  ],
   "context_metadata_excluded": [
     "temperature_c",
     "rpm",
@@ -44,7 +51,7 @@
   "cv_std": 0.0194,
   "f1_macro": 0.925,
   "f1_weighted": 0.925,
-  "trained_on": "2026-11-05T18:19:03.999477+00:00",
+  "trained_on": "2026-11-07T12:28:28.603580+00:00",
   "n_samples": 600,
   "real_samples_count": 0,
   "synthetic_samples_count": 600,

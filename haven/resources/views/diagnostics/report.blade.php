@@ -64,6 +64,7 @@
         .result-banner.valve_clearance { background: #fef2f2; border: 1.5px solid #fca5a5; }
         .result-banner.misfire         { background: #fffbeb; border: 1.5px solid #fcd34d; }
         .result-banner.loose_component { background: #fffbeb; border: 1.5px solid #fcd34d; }
+        .result-banner.ambient_noise   { background: #fffbeb; border: 1.5px solid #fcd34d; }
         /* Legacy fallback classes */
         .result-banner.knocking        { background: #fef2f2; border: 1.5px solid #fca5a5; }
         .result-banner.misfiring       { background: #fffbeb; border: 1.5px solid #fcd34d; }

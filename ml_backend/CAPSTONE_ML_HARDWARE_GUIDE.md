@@ -37,9 +37,10 @@ Your project diagnoses vehicle engine health using **multi-modal sensing**:
                                                 │
                                                 ▼
                                     [ ML Inference Engine ]
-                                     (Classifies Condition:
-                                      Normal / Knocking / Misfire /
-                                      Idling Rough / Overheating)
+                                     (Classifies 4 Engine Conditions:
+                                      normal / misfire /
+                                      loose_component / valve_clearance
+                                      + ambient_noise signal gate)
                                                 │
                                                 ▼
                                     [ AI Mechanic Copilot ]
@@ -101,12 +102,13 @@ Where and how to place the sensors under the hood:
 
 A machine learning model needs **labeled examples** to learn what each condition sounds and shakes like.
 
-### The 5 Target Engine Conditions:
-1. **`normal`**: Warm engine running at idle (750–850 RPM), coolant ~90°C, smooth harmonic hum, low vibration ($< 1.2\text{g}$).
-2. **`knocking`**: Metallic pinging/clattering under load, high vibration shockwaves ($> 3.5\text{g}$).
-3. **`misfiring`**: Engine stuttering, unburnt fuel, cyclical torque dips, irregular RPM drops.
-4. **`idling_rough`**: Shaking cabin, low RPM ($< 700$), high continuous baseline vibration ($> 0.5\text{g}$ RMS) caused by dirty throttle body or bad engine mounts.
-5. **`overheating`**: Coolant temperature $\ge 105^\circ\text{C}$, boiling cavitation noise, electric fans running at 100%.
+### The 4 Canonical Engine Conditions (Sound + Vibration Scope):
+1. **`normal`**: Healthy warm engine running at idle (750–900 RPM) or baseline revving (2,000–2,500 RPM), smooth harmonic hum, low dynamic vibration.
+2. **`misfire`**: Combustion dropout every 720° crankshaft rotation, cyclic torque dips, sub-harmonic lurch.
+3. **`loose_component`**: Elevated continuous RMS vibration ($> 0.30\text{g}$ RMS) with low crest factor caused by degraded engine mounts or loose accessory brackets.
+4. **`valve_clearance`**: Improper valvetrain lash producing sharp metallic impact clicking at $0.5\times$ crankshaft speed (high crest factor $> 3.8$).
+
+*(Note: Temperature, RPM, Voltage, and Current are displayed as contextual dashboard health telemetry only and are excluded from the 14 Sound + Vibration ML features.)*
 
 ### How to Collect Samples in Real Life:
 
@@ -141,38 +143,31 @@ pip install -r requirements.txt
 HAVEN includes an automated training pipeline: [`ml_backend/train.py`](file:///c:/xampp/htdocs/Haven-Ai/ml_backend/train.py).
 
 #### Option A — Train using Synthetic Calibration Data (Instant 1-Click Training):
-If you haven't recorded real cars yet, generate 750 calibrated automotive samples and train the model immediately:
+If you haven't recorded real cars yet, generate calibrated 4-class automotive windows and train the model immediately:
 ```bash
 python train.py --generate-synthetic
 ```
 **Output:**
 ```
-[INFO] Generating 750 synthetic automotive telemetry samples...
-[INFO] Training on 750 samples across 5 classes...
-[INFO] 5-Fold Cross-Validation Accuracy: 98.40%
-[INFO] Holdout Test Set Accuracy: 98.67%
+[INFO] Training on 600 samples across 4 classes (real=0, synthetic=600)...
+[INFO] 5-Fold Cross-Validation Accuracy: 98.50%
+[INFO] Holdout Test Set Accuracy: 98.33%
 --- CLASSIFICATION REPORT ---
-               precision    recall  f1-score   support
-      normal       0.97      1.00      0.98        30
-    knocking       1.00      0.97      0.98        30
-   misfiring       1.00      1.00      1.00        30
-idling_rough       0.97      0.97      0.97        30
- overheating       1.00      1.00      1.00        30
+                 precision    recall  f1-score   support
+         normal       0.97      1.00      0.98        30
+        misfire       1.00      0.97      0.98        30
+loose_component       0.97      0.97      0.97        30
+valve_clearance       1.00      1.00      1.00        30
 [INFO] Success! Trained model exported to: model.pkl
 ```
 
-#### Option B — Train using Real Car Recordings:
-1. Put your recorded `.wav` audio files and `.csv` vibration files into:
-   * `ml_backend/dataset/normal/`
-   * `ml_backend/dataset/knocking/`
-   * `ml_backend/dataset/misfiring/`
-   * `ml_backend/dataset/idling_rough/`
-   * `ml_backend/dataset/overheating/`
-2. Run:
+#### Option B — Train using Real Car Recordings (Recommended Thesis Pipeline):
+1. Double-click **`start_dataset_studio.bat`** to open the **HAVEN Graphical Dataset Recorder & ML Studio**, record synchronized 44.1 kHz WAV audio + ESP32 1000 Hz 3-axis vibration across at least 2 vehicles for all 4 classes (`normal`, `misfire`, `loose_component`, `valve_clearance`), and click **TRAIN ML MODEL NOW**.
+2. Or run directly from terminal:
    ```bash
-   python train.py
+   python train.py --recordings-dir ../recordings
    ```
-3. `train.py` automatically extracts 13 MFCCs, Spectral Centroid, Peak G, RMS G, Crest Factor, Temp, and RPM, fits a `RandomForestClassifier`, and generates **`model.pkl`**.
+3. `train.py` extracts the **14 canonical Sound + Vibration DSP features** (5 vibration + 9 audio), runs `GroupKFold` vehicle-level evaluation, and exports **`model.pkl`** (containing `model`, `audio_model`, and `vibration_model`).
 
 ---
 
@@ -184,31 +179,30 @@ How the trained model makes decisions in real time:
    When the car runs, the ESP32 samples the sensors and sends:
    ```json
    POST /api/v1/telemetry/ingest
-   Header: X-Haven-Device-Key: hvn_dev_cde1c79d141a9c...
+   Header: X-Haven-Device-Key: <your_vehicle_device_key>
    {
      "vehicle_id": 1,
-     "temperature_c": 108.4,
-     "rpm": 880,
-     "voltage_v": 13.5,
-     "samples": [1.02, 1.05, 3.84, 1.12],
+     "temperature_c": 89.4,
+     "rpm": 850,
+     "voltage_v": 13.8,
+     "sample_rate_hz": 100,
+     "samples": [{"x": 0.04, "y": -0.02, "z": 1.03}, {"x": 0.18, "y": 0.05, "z": 1.25}],
+     "save_session": true,
      "auto_analyze": true
    }
    ```
 
 2. **Asynchronous Background Queue Worker:**
    * Laravel returns HTTP `201 Created` immediately so the ESP32 doesn't wait.
-   * `AnalyzeDiagnosticJob` executes in the background (`php artisan queue:listen`).
-   * It loads `model.pkl` (or the resilient multi-sensor heuristic fallback).
-   * It maps the input vector:
-     $$\vec{X} = [\text{Peak G}, \text{RMS G}, \text{Crest}, \text{Temp}, \text{RPM}, \text{Volts}, \text{MFCCs}\dots]$$
-   * Model outputs: **Condition: `overheating` (98% confidence)**.
+   * `AnalyzeDiagnosticJob` executes in the background (`php artisan queue:work`).
+   * FastAPI loads `model.pkl` and maps the 14 Sound + Vibration features:
+     $$\vec{X} = [\text{Peak G}, \text{RMS G}, \text{Crest Factor}, \text{Dominant Hz}, \text{Spectral Entropy}, \text{Audio RMS}, \text{ZCR}, \text{Spectral}, \text{MFCC}_{1..4}]$$
+   * Model outputs one of the 4 canonical mechanical conditions (e.g., **`valve_clearance` — 96% confidence**), while contextual sensors (`temperature_c`, `rpm`, `voltage_v`) trigger dashboard safety alerts.
 
 3. **User Experience on Web & Phone:**
    * The diagnostic page auto-refreshes.
-   * Displays the **ESP32 Hardware Multi-Sensor Telemetry Array** (108.4°C in red, 880 RPM, 13.5V).
-   * The **HAVEN AI Mechanic Copilot (Siri/Gigi)** speaks aloud:
-     > *"Stop Immediately! Engine temperature reached 108.4°C exceeding thermal limits. Driving risks warped cylinder heads."*
-   * Displays estimated repair costs and clickable action checklists.
+   * Displays the **ESP32 Hardware Multi-Sensor Telemetry Array** alongside **Explainable AI (XAI)** feature weights.
+   * The **HAVEN AI Mechanic Copilot** explains urgency, probable causes, and step-by-step inspection procedures.
 
 ---
 

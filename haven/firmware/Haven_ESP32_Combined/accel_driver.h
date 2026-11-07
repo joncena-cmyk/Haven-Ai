@@ -25,6 +25,9 @@ public:
   // Read a single 3-axis acceleration sample in units of g (1g = 9.80665 m/s^2).
   virtual bool readSampleG(float &ax, float &ay, float &az) = 0;
 
+  // Lightweight bus check (I2C ACK or SPI WHO_AM_I / DEVID) to detect live connect/disconnect.
+  virtual bool isConnected() = 0;
+
   // Metadata reported in the LOGGER CSV header.
   virtual const char* sensorName() const = 0;
   virtual int rangeG() const = 0;
@@ -106,6 +109,10 @@ public:
     return (Wire.endTransmission() == 0);
   }
 
+  bool isConnected() override {
+    return probe();
+  }
+
   const char* sensorName() const override { return "MPU6050"; }
   int rangeG() const override { return 8; }
   int bandwidthHz() const override { return _bwHz; }
@@ -172,6 +179,10 @@ public:
     ay = (float)rawY * kAdxlFullResScale;
     az = (float)rawZ * kAdxlFullResScale;
     return true;
+  }
+
+  bool isConnected() override {
+    return (readReg(0x00) == 0xE5);
   }
 
   const char* sensorName() const override { return "ADXL345_SPI"; }

@@ -430,7 +430,7 @@ class DatasetStudioController:
         folder: pathlib.Path | str,
         laravel_vehicle_id: int,
         verified_by: str = "",
-        analyze: bool = False,
+        analyze: bool = True,
     ) -> str:
         proc = import_validated_recording_to_laravel(
             pathlib.Path(folder),
@@ -563,9 +563,24 @@ class LiveSensorMonitor:
                                 self.state["vib_rate_hz"] = total_n / elapsed
                                 self.state["vib_wave"] = tail
             except Exception as exc:
-                ser_err.append(f"ESP32 Serial ({port}): {exc}")
+                msg = str(exc)
+                if "FileNotFoundError" in msg or "cannot find the file" in msg:
+                    ser_err.append(
+                        f"ESP32 USB ({port}) is unplugged. Plug in USB cable & click Refresh Devices (or use 'Test Mic' for audio-only)."
+                    )
+                elif "PermissionError" in msg or "Access is denied" in msg:
+                    ser_err.append(
+                        f"ESP32 USB ({port}) is locked by Arduino Serial Monitor or Browser. Close them and retry."
+                    )
+                else:
+                    ser_err.append(f"ESP32 Serial ({port}): {msg}")
             finally:
                 if ser is not None:
+                    try:
+                        ser.write(b"\nLIVE\n")
+                        ser.flush()
+                    except Exception:
+                        pass
                     try:
                         ser.close()
                     except Exception:
@@ -1335,13 +1350,20 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
     def start_sensor_test(enable_audio: bool, enable_vib: bool) -> None:
         if recording_active["flag"]:
             return
+        if enable_vib:
+            refresh_devices()
         selected_port = port_map.get(port_var.get()) if enable_vib else None
-        if enable_vib and not enable_audio and not selected_port:
-            messagebox.showwarning(
-                "ESP32 USB Port Required",
-                "Plug in your ESP32 via USB, close Arduino Serial Monitor, and click '🔄 Refresh Devices' first.",
-            )
-            return
+        if enable_vib and not selected_port:
+            if not enable_audio:
+                messagebox.showwarning(
+                    "ESP32 USB Cable Unplugged",
+                    "No ESP32 USB Serial port (e.g. COM4) was found.\n\n"
+                    "• Wi-Fi only sends 5-second dashboard summaries.\n"
+                    "• For 1000 Hz vibration testing & ML dataset recording, keep the ESP32 plugged into your laptop's USB port.\n\n"
+                    "Plug in the USB cable and click 'Test Vibration' again (or click 'Test Mic' to test audio only).",
+                )
+                return
+            enable_vib = False
         selected_mic = mic_map.get(mic_var.get()) if enable_audio else None
         monitor.start(
             port=selected_port,
@@ -1350,7 +1372,7 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
             enable_vib=enable_vib,
         )
         btn_stop_preview.config(state="normal")
-        tag = "Mic + Vibration" if (enable_audio and enable_vib) else ("Mic Only" if enable_audio else "Vibration Only")
+        tag = "Mic + Vibration" if (enable_audio and enable_vib) else ("Mic Only (USB Unplugged)" if enable_audio else "Vibration Only")
         lbl_sensor_readout.config(text=f"Testing {tag}...", fg=ACCENT_GREEN)
 
     def set_banner(text: str, bg_color: str = "#0b1120", fg_color: str = "#cbd5e1", show_discard: bool = False) -> None:
@@ -1378,14 +1400,16 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
         if recording_active["flag"]:
             return
 
+        refresh_devices()
         selected_port = port_map.get(port_var.get())
         if not selected_port:
             messagebox.showwarning(
                 "ESP32 USB Port Required",
-                "No ESP32 USB Serial port is selected.\n\n"
-                "1. Plug your ESP32 (with MPU6050) into a USB port.\n"
-                "2. Make sure Arduino Serial Monitor is closed.\n"
-                "3. Click '🔄 Refresh Devices' and select your COM port.",
+                "No ESP32 USB Serial port (e.g. COM4) is currently plugged into this laptop.\n\n"
+                "Note: Wi-Fi streams 5-second summaries to the Website Dashboard, while the Graphical Dataset Recorder uses the USB cable for 1000 Hz 3-axis vibration capture.\n\n"
+                "1. Plug your ESP32 into your laptop's USB port.\n"
+                "2. Keep Arduino Serial Monitor closed.\n"
+                "3. Click '🔴 RECORD AUDIO + VIBRATION SAMPLE' again.",
             )
             return
 
@@ -1417,7 +1441,7 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
             baud=921600,
             device=selected_mic,
             audio_rate=44100,
-            sensor_range_g=16.0,
+            sensor_range_g=0.0,
             output_root=str(ctrl.recordings_root),
             session_id=sess,
             vehicle_id=veh,

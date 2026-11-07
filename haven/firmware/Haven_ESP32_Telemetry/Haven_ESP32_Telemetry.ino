@@ -134,6 +134,7 @@ void sendTelemetry() {
   doc["device_id"]       = "ESP32-HAVEN-NODE-01";
   doc["device_key"]      = deviceKey;
   doc["sample_rate_hz"]  = 50;
+  doc["save_session"]    = true;
   doc["auto_analyze"]    = true;
 
   float tempC     = readTemperatureC();
@@ -166,7 +167,7 @@ void sendTelemetry() {
   int responseCode = http.POST(body);
   Serial.printf("[HAVEN] Server Response Code: %d\n", responseCode);
 
-  if (responseCode == 201) {
+  if (responseCode == 201 || responseCode == 200) {
     String resp = http.getString();
     Serial.println("[HAVEN] [OK] Telemetry ingested successfully!");
     StaticJsonDocument<512> respDoc;

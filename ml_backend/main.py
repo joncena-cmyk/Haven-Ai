@@ -16,15 +16,17 @@ from __future__ import annotations
 
 import hmac
 import logging
+import math
 import os
 import pathlib
 import tempfile
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import numpy as np
 import uvicorn
 
 from classifier import EngineClassifier
@@ -33,6 +35,22 @@ from train import CONTEXT_METADATA_COLS, FEATURE_COLS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_json_floats(obj: Any) -> Any:
+    """Recursively convert non-finite floats (NaN, Inf, -Inf) to None for strict JSON compliance."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, np.floating):
+        val = float(obj)
+        return val if math.isfinite(val) else None
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, dict):
+        return {k: _sanitize_json_floats(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_json_floats(v) for v in obj]
+    return obj
 
 
 def _resolve_ml_api_secret() -> str:
@@ -99,6 +117,7 @@ def health():
     return {
         "status": "ok",
         "model_loaded": classifier.is_model_loaded(),
+        "secret_configured": bool(_resolve_ml_api_secret()),
         "mode": "trained" if classifier.is_model_loaded() else "rule_based",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -234,24 +253,34 @@ async def analyze(
     }
     result = classifier.predict(all_features)
 
+    features_used = [
+        k
+        for k in FEATURE_COLS
+        if k in all_features
+        and all_features[k] is not None
+        and not (isinstance(all_features[k], (float, np.floating)) and not math.isfinite(float(all_features[k])))
+    ]
+
     return JSONResponse(
-        {
-            "diagnostic_id": diagnostic_id,
-            "vehicle_id": vehicle_id,
-            "condition": result["condition"],
-            "confidence": result["confidence"],
-            "confidence_pct": f"{result['confidence'] * 100:.1f}%",
-            "top_classes": result.get("top_classes", []),
-            "feature_contributions": result.get("feature_contributions", []),
-            "features_used": [k for k in FEATURE_COLS if k in all_features and all_features[k] is not None],
-            "audio_features": audio_features,
-            "vibration_features": vibration_features,
-            "hardware_features": context_metadata,
-            "context_metadata": context_metadata,
-            "mode": result.get("mode", "rule_based"),
-            "warnings": errors + result.get("warnings", []),
-            "processed_at": datetime.now(timezone.utc).isoformat(),
-        }
+        _sanitize_json_floats(
+            {
+                "diagnostic_id": diagnostic_id,
+                "vehicle_id": vehicle_id,
+                "condition": result["condition"],
+                "confidence": result["confidence"],
+                "confidence_pct": f"{result['confidence'] * 100:.1f}%",
+                "top_classes": result.get("top_classes", []),
+                "feature_contributions": result.get("feature_contributions", []),
+                "features_used": features_used,
+                "audio_features": audio_features,
+                "vibration_features": vibration_features,
+                "hardware_features": context_metadata,
+                "context_metadata": context_metadata,
+                "mode": result.get("mode", "rule_based"),
+                "warnings": errors + result.get("warnings", []),
+                "processed_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
     )
 
 
@@ -296,11 +325,13 @@ async def retrain_model(payload: dict = None):
         classifier.reload_model()
 
         return JSONResponse(
-            {
-                "success": True,
-                "message": "Model retrained and reloaded successfully (14 Sound + Vibration features).",
-                "meta": meta,
-            }
+            _sanitize_json_floats(
+                {
+                    "success": True,
+                    "message": "Model retrained and reloaded successfully (14 Sound + Vibration features).",
+                    "meta": meta,
+                }
+            )
         )
     except Exception as e:
         logger.error(f"Retraining failed: {e}", exc_info=True)

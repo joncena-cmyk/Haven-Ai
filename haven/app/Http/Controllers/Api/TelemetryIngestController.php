@@ -155,7 +155,13 @@ class TelemetryIngestController extends Controller
                 ], 422);
             }
             if (strlen($rawAudio) > 0) {
-                $ext = str_contains($validated['audio_mime'] ?? '', 'wav') ? 'wav' : 'webm';
+                $mimeStr = strtolower((string) ($validated['audio_mime'] ?? ''));
+                $ext = match (true) {
+                    str_contains($mimeStr, 'wav')  => 'wav',
+                    str_contains($mimeStr, 'ogg')  => 'ogg',
+                    str_contains($mimeStr, 'mpeg') || str_contains($mimeStr, 'mp3') => 'mp3',
+                    default                        => 'webm',
+                };
                 $audioFilename = 'audio/' . Str::uuid() . '.' . $ext;
                 Storage::disk('local')->put($audioFilename, $rawAudio);
                 $audioPath = $audioFilename;
@@ -317,7 +323,9 @@ class TelemetryIngestController extends Controller
             'vibration_sample_count'  => $sampleCount,
             'vibration_peak_g'        => $peakG,
             'vibration_rms_g'         => $rmsG,
-            'sample_rate_hz'          => isset($validated['sample_rate_hz']) ? (int) $validated['sample_rate_hz'] : null,
+            'sample_rate_hz'          => isset($validated['sample_rate_hz'])
+                ? (int) $validated['sample_rate_hz']
+                : (!empty($vibrationPath) ? 100 : null),
             'temperature_c'           => $tempC ? (float)$tempC : null,
             'rpm'                     => $rpm ? (int)$rpm : null,
             'voltage_v'               => $voltageV ? (float)$voltageV : null,
@@ -438,14 +446,17 @@ class TelemetryIngestController extends Controller
                 $cached['rpm'] = 0;
             }
 
-            $historyKey = $vehicle ? ('telemetry:history:' . $vehicle->id) : ('telemetry:history:user:' . $user->id);
+            $activeVid = !empty($cached['vehicle_id']) ? (int) $cached['vehicle_id'] : ($vehicle?->id);
+            $historyKey = $activeVid ? ('telemetry:history:' . $activeVid) : ('telemetry:history:user:' . $user->id);
             $cached['history'] = \Illuminate\Support\Facades\Cache::get($historyKey, []);
 
             return response()->json($cached);
         }
 
         // Hardware is currently offline / not sending
-        $historyKey = $vehicle ? ('telemetry:history:' . $vehicle->id) : ('telemetry:history:user:' . $user->id);
+        $historyKey = ($vehicleId !== null && $vehicleId !== '' && $vehicle)
+            ? ('telemetry:history:' . $vehicle->id)
+            : ('telemetry:history:user:' . $user->id);
         return response()->json([
             'online'            => false,
             'diff_seconds'      => 999,
@@ -497,11 +508,13 @@ class TelemetryIngestController extends Controller
             if (ob_get_level() > 0) ob_flush();
             flush();
 
-            $cached = $vehicle
+            $cached = ($vehicleId && $vehicle)
                 ? \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id)
-                : \Illuminate\Support\Facades\Cache::get('telemetry:live:user:' . $user->id);
+                : (\Illuminate\Support\Facades\Cache::get('telemetry:live:user:' . $user->id)
+                    ?? ($vehicle ? \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id) : null));
 
-            $historyKey = $vehicle ? ('telemetry:history:' . $vehicle->id) : ('telemetry:history:user:' . $user->id);
+            $activeVid = !empty($cached['vehicle_id']) ? (int) $cached['vehicle_id'] : ($vehicle?->id);
+            $historyKey = $activeVid ? ('telemetry:history:' . $activeVid) : ('telemetry:history:user:' . $user->id);
             $history = \Illuminate\Support\Facades\Cache::get($historyKey, []);
 
             $payload = $cached ?: [

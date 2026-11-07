@@ -29,6 +29,7 @@ import os
 import pathlib
 import pickle
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -36,7 +37,14 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.model_selection import GroupKFold, StratifiedKFold, cross_val_score, train_test_split
+from sklearn.model_selection import (
+    GroupKFold,
+    GroupShuffleSplit,
+    KFold,
+    StratifiedKFold,
+    cross_val_score,
+    train_test_split,
+)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -368,16 +376,25 @@ def evaluate_and_train_grouped(
             "support": int(c_rep.get("support", 0)),
         }
 
-    # Fit final pipeline on all real windows (14-feature multimodal + 9-feature audio sub-pipeline)
+    # Fit final pipeline on all real windows (14-feature multimodal + audio-only + vibration-only sub-pipelines)
     final_pipeline = build_pipeline(random_state=42)
     final_pipeline.fit(X, y)
 
     audio_idx = [FEATURE_COLS.index(c) for c in AUDIO_FEATURE_COLS]
     X_audio = X[:, audio_idx]
+    valid_aud_mask = ~np.all(np.isnan(X_audio), axis=1)
     audio_pipeline = None
-    if X_audio.size > 0 and not np.all(np.isnan(X_audio)):
+    if int(np.count_nonzero(valid_aud_mask)) >= 4 and len(set(y[valid_aud_mask])) >= 2:
         audio_pipeline = build_pipeline(random_state=42)
-        audio_pipeline.fit(X_audio, y)
+        audio_pipeline.fit(X_audio[valid_aud_mask], y[valid_aud_mask])
+
+    vib_idx = [FEATURE_COLS.index(c) for c in VIBRATION_FEATURE_COLS]
+    X_vib = X[:, vib_idx]
+    valid_vib_mask = ~np.all(np.isnan(X_vib), axis=1)
+    vibration_pipeline = None
+    if int(np.count_nonzero(valid_vib_mask)) >= 4 and len(set(y[valid_vib_mask])) >= 2:
+        vibration_pipeline = build_pipeline(random_state=42)
+        vibration_pipeline.fit(X_vib[valid_vib_mask], y[valid_vib_mask])
 
     rf_model = final_pipeline.named_steps["rf"]
     raw_importances = rf_model.feature_importances_
@@ -394,6 +411,7 @@ def evaluate_and_train_grouped(
         "evaluation_scheme": f"GroupKFold(n_splits={n_splits}, group_by={group_by})",
         "feature_order": FEATURE_COLS,
         "audio_feature_order": AUDIO_FEATURE_COLS,
+        "vibration_feature_order": VIBRATION_FEATURE_COLS,
         "context_metadata_excluded": CONTEXT_METADATA_COLS,
         "classes": CLASSES,
         "vehicles": unique_vehicles,
@@ -425,7 +443,15 @@ def evaluate_and_train_grouped(
         m_path = pathlib.Path(model_path)
         m_path.parent.mkdir(parents=True, exist_ok=True)
         with m_path.open("wb") as mf:
-            pickle.dump({"model": final_pipeline, "audio_model": audio_pipeline, "meta": meta}, mf)
+            pickle.dump(
+                {
+                    "model": final_pipeline,
+                    "audio_model": audio_pipeline,
+                    "vibration_model": vibration_pipeline,
+                    "meta": meta,
+                },
+                mf,
+            )
         meta_json_path = m_path.parent / "model_meta.json"
         with meta_json_path.open("w", encoding="utf-8") as mjf:
             json.dump(meta, mjf, indent=2)
@@ -650,35 +676,72 @@ def train_and_export(
 ) -> Dict[str, Any]:
     """
     Train the 14-feature Sound + Vibration pipeline and export `model.pkl`.
-    Uses GroupKFold when distinct vehicle/session groups are provided.
+    Uses GroupKFold & GroupShuffleSplit when distinct vehicle/session groups are
+    provided so overlapping windows from the same vehicle never leak across splits.
     """
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+    if len(X) < 4 or len(set(str(lbl) for lbl in y)) < 2:
+        raise ValueError(
+            f"At least 4 samples across >= 2 classes are required for training (got {len(X)} samples)."
+        )
+
+    unique_groups = sorted(set(str(g) for g in groups if str(g).strip())) if groups is not None else []
+    use_grouped = groups is not None and len(unique_groups) >= 2 and len(groups) == len(X)
+
+    if use_grouped:
+        gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+        train_idx, test_idx = next(gss.split(X, y, groups=groups))
+        X_train, X_test = X[train_idx], X[test_idx]
+        y_train, y_test = y[train_idx], y[test_idx]
+    else:
+        class_counts = Counter(str(lbl) for lbl in y)
+        min_cls = min(class_counts.values())
+        n_test = max(1, int(round(len(y) * 0.2)))
+        can_stratify = min_cls >= 2 and n_test >= len(class_counts) and (len(y) - n_test) >= len(class_counts)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y,
+            test_size=0.2,
+            random_state=42,
+            stratify=y if can_stratify else None,
+        )
 
     pipeline = build_pipeline(random_state=42)
     pipeline.fit(X_train, y_train)
 
     audio_idx = [FEATURE_COLS.index(c) for c in AUDIO_FEATURE_COLS]
     X_audio = X[:, audio_idx]
+    valid_aud_mask = ~np.all(np.isnan(X_audio), axis=1)
     audio_pipeline = None
-    if X_audio.size > 0 and not np.all(np.isnan(X_audio)):
+    if int(np.count_nonzero(valid_aud_mask)) >= 4 and len(set(y[valid_aud_mask])) >= 2:
         audio_pipeline = build_pipeline(random_state=42)
-        audio_pipeline.fit(X_audio, y)
+        audio_pipeline.fit(X_audio[valid_aud_mask], y[valid_aud_mask])
 
-    unique_groups = sorted(set(str(g) for g in groups if str(g).strip())) if groups is not None else []
-    if groups is not None and len(unique_groups) >= 2 and len(groups) == len(X):
+    vib_idx = [FEATURE_COLS.index(c) for c in VIBRATION_FEATURE_COLS]
+    X_vib = X[:, vib_idx]
+    valid_vib_mask = ~np.all(np.isnan(X_vib), axis=1)
+    vibration_pipeline = None
+    if int(np.count_nonzero(valid_vib_mask)) >= 4 and len(set(y[valid_vib_mask])) >= 2:
+        vibration_pipeline = build_pipeline(random_state=42)
+        vibration_pipeline.fit(X_vib[valid_vib_mask], y[valid_vib_mask])
+
+    if use_grouped:
         n_splits = min(5, len(unique_groups))
         gkf = GroupKFold(n_splits=n_splits)
         cv_scores = cross_val_score(pipeline, X, y, groups=groups, cv=gkf)
-        eval_scheme = f"GroupKFold(n_splits={n_splits}) + StratifiedHoldout(20%)"
+        eval_scheme = f"GroupKFold(n_splits={n_splits}) + GroupHoldout(20%)"
     else:
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        min_cls = min(Counter(str(lbl) for lbl in y).values())
+        if min_cls >= 2:
+            n_splits = min(5, min_cls)
+            cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+        else:
+            n_splits = min(5, len(X))
+            cv = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         cv_scores = cross_val_score(pipeline, X, y, cv=cv)
         eval_scheme = (
-            "Hybrid StratifiedHoldout(20%) + 5-Fold StratifiedKFold"
+            f"Hybrid StratifiedHoldout(20%) + {n_splits}-Fold CV"
             if real_count > 0
-            else "Synthetic Baseline Calibration (5-Fold StratifiedKFold + 20% Holdout)"
+            else f"Synthetic Baseline Calibration ({n_splits}-Fold StratifiedKFold + 20% Holdout)"
         )
 
     mean_cv = float(np.mean(cv_scores))
@@ -719,10 +782,12 @@ def train_and_export(
     payload = {
         "model": pipeline,
         "audio_model": audio_pipeline,
+        "vibration_model": vibration_pipeline,
         "meta": {
             "evaluation_scheme": eval_scheme,
             "feature_order": FEATURE_COLS,
             "audio_feature_order": AUDIO_FEATURE_COLS,
+            "vibration_feature_order": VIBRATION_FEATURE_COLS,
             "context_metadata_excluded": CONTEXT_METADATA_COLS,
             "classes": CLASSES,
             "accuracy": round(test_acc, 4),
@@ -777,6 +842,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--window-sec", type=float, default=1.5, help="Window length in seconds (1-2s)")
     parser.add_argument("--overlap", type=float, default=0.5, help="Window overlap ratio (default: 0.5)")
     parser.add_argument("--generate-synthetic", action="store_true", help="Train with synthetic calibration data")
+    parser.add_argument("--no-synthetic", action="store_true", help="Disable synthetic augmentation when training from --records-json")
     parser.add_argument("--samples", type=int, default=150, help="Synthetic samples per class")
     parser.add_argument("--records-json", type=str, default=None, help="Path to JSON records from Laravel")
     args = parser.parse_args(argv)
@@ -810,12 +876,29 @@ def main(argv: Optional[List[str]] = None) -> int:
         with open(args.records_json, "r", encoding="utf-8") as rf:
             real_records = json.load(rf)
 
+    augment_synth = not args.no_synthetic
     X, y, real_c, synth_c = load_hybrid_dataset(
         real_records=real_records,
-        augment_synthetic=True,
+        augment_synthetic=augment_synth,
         synthetic_per_class=args.samples,
     )
-    meta = train_and_export(X, y, real_count=real_c, synth_count=synth_c)
+    groups = None
+    if real_records and real_c > 0:
+        real_groups = []
+        for idx, r in enumerate(real_records):
+            cond = str(r.get("true_condition") or r.get("condition") or r.get("label") or "").lower().strip()
+            feat_dict = r.get("features") if isinstance(r.get("features"), dict) else r
+            if cond in CLASSES:
+                try:
+                    build_feature_vector(feat_dict)
+                    real_groups.append(str(r.get("vehicle_id") or r.get("session_id") or f"real_{idx}"))
+                except ValueError:
+                    continue
+        if len(set(real_groups)) >= 2 and len(real_groups) == real_c:
+            synth_groups = [f"synth_grp_{i % 5}" for i in range(synth_c)]
+            groups = np.asarray(real_groups + synth_groups, dtype=object)
+
+    meta = train_and_export(X, y, real_count=real_c, synth_count=synth_c, groups=groups)
     print(f"Accuracy: {meta['accuracy'] * 100:.2f}% | F1: {meta['f1_macro'] * 100:.2f}%")
     return 0
 

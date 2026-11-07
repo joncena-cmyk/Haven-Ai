@@ -14,7 +14,10 @@ class DiagnosticAiService
     public function generateRecommendations(Diagnostic $diagnostic): array
     {
         $vehicle = $diagnostic->vehicle;
-        $condition = $diagnostic->ml_condition ?? 'normal';
+        $rawCondition = $diagnostic->ml_condition ?? 'normal';
+        $condition = ($rawCondition === 'ambient_noise')
+            ? 'ambient_noise'
+            : Diagnostic::canonicalCondition($rawCondition);
         $confidence = round(($diagnostic->ml_confidence ?? 0.8) * 100, 1);
         $peakG = $diagnostic->vibration_peak_g ?? 0;
         $rmsG = $diagnostic->vibration_rms_g ?? 0;
@@ -243,7 +246,7 @@ class DiagnosticAiService
         $conf = round(($diagnostic->ml_confidence ?? 0.8) * 100, 1);
         $peakG = $diagnostic->vibration_peak_g ?? 0;
         $rmsG = $diagnostic->vibration_rms_g ?? 0;
-        $crest = $diagnostic->crest_factor ?? 0;
+        $crest = $diagnostic->crest_factor ?? ($rmsG > 0 ? round($peakG / $rmsG, 2) : 0);
 
         $systemPrompt = "You are HAVEN AI, an ASE Master Diagnostic Specialist analyzing an active diagnostic session for a user's vehicle.\n"
             . "Session Data:\n"

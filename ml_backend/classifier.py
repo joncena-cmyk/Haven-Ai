@@ -12,6 +12,7 @@ Condition classes (UMak CET Capstone Scope):
   valve_clearance — Improper Valve Clearance (valvetrain lash, 0.5x RPM tapping)
 """
 
+import math
 import os
 import pickle
 import numpy as np
@@ -24,10 +25,31 @@ MODEL_PATH = os.path.join(os.path.dirname(__file__), "model.pkl")
 CLASSES = ["normal", "misfire", "loose_component", "valve_clearance"]
 
 
+def _safe_float(val, default: float = 0.0) -> float:
+    """Convert any scalar to a finite float, returning `default` for None, NaN, or Inf."""
+    if val is None or val == "":
+        return default
+    try:
+        f = float(val)
+        return f if math.isfinite(f) else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _has_finite_value(val) -> bool:
+    if val is None or val == "":
+        return False
+    try:
+        return math.isfinite(float(val))
+    except (TypeError, ValueError):
+        return False
+
+
 class EngineClassifier:
     def __init__(self):
         self._model = None
         self._audio_model = None
+        self._vibration_model = None
         self._model_meta = {}
         self._model_mtime = None
         self._load_model()
@@ -40,6 +62,7 @@ class EngineClassifier:
                     payload = pickle.load(f)
                 self._model = payload.get("model") or payload  # support both formats
                 self._audio_model = payload.get("audio_model") if isinstance(payload, dict) else None
+                self._vibration_model = payload.get("vibration_model") if isinstance(payload, dict) else None
                 self._model_meta = payload.get("meta", {}) if isinstance(payload, dict) else {}
                 self._model_mtime = mtime
                 logger.info("Trained model loaded from model.pkl")
@@ -47,10 +70,12 @@ class EngineClassifier:
                 logger.warning(f"Could not load model.pkl: {e}. Using rule-based fallback.")
                 self._model = None
                 self._audio_model = None
+                self._vibration_model = None
                 self._model_mtime = None
         else:
             self._model = None
             self._audio_model = None
+            self._vibration_model = None
             self._model_meta = {}
             self._model_mtime = None
             logger.info("model.pkl not found — using rule-based classifier.")
@@ -91,28 +116,28 @@ class EngineClassifier:
 
     def predict(self, features: dict) -> dict:
         self._ensure_fresh_model()
-        peak_g = float(features.get("peak_g") or 0.0)
-        rms_g = float(features.get("rms_g") or 0.0)
+        peak_g = _safe_float(features.get("peak_g"), 0.0)
+        rms_g = _safe_float(features.get("rms_g"), 0.0)
         temp_c = features.get("temperature_c")
         voltage_v = features.get("voltage_v")
         rpm = features.get("rpm")
-        rms_audio = float(features.get("rms_mean") or 0.0)
-        rms_audio_std = float(features.get("rms_std") or 0.0)
-        centroid = float(features.get("spectral_centroid_mean") or 0.0)
-        rolloff = float(features.get("spectral_rolloff_mean") or 0.0)
+        rms_audio = _safe_float(features.get("rms_mean"), 0.0)
+        rms_audio_std = _safe_float(features.get("rms_std"), 0.0)
+        centroid = _safe_float(features.get("spectral_centroid_mean"), 0.0)
+        rolloff = _safe_float(features.get("spectral_rolloff_mean"), 0.0)
 
         vibration_source = features.get("vibration_source")
         has_mechanical = (vibration_source not in ("simulated", "skipped")) and (peak_g >= 0.08 or rms_g >= 0.04)
         has_telemetry = (
-            (temp_c is not None and float(temp_c) >= 45.0)
-            or (voltage_v is not None and float(voltage_v) >= 12.2)
-            or (rpm is not None and float(rpm) >= 300.0)
+            (_has_finite_value(temp_c) and float(temp_c) >= 45.0)
+            or (_has_finite_value(voltage_v) and float(voltage_v) >= 12.2)
+            or (_has_finite_value(rpm) and float(rpm) >= 300.0)
         )
         # Acoustic engine presence requires sustained energy and plausible engine spectral envelope
-        # (rejects silent room or isolated transient claps where rms_std >> rms_mean)
+        # (accepts quiet normal 4-cyl idle down to rms >= 0.018 while rejecting silent room & claps)
         is_sustained_audio = (rms_audio_std == 0.0) or (rms_audio_std <= rms_audio * 2.2)
         has_engine_spectrum = (centroid == 0.0 and rms_audio >= 0.08) or (350.0 <= centroid <= 6500.0 and rolloff >= 700.0)
-        has_strong_audio = (rms_audio >= 0.035) and is_sustained_audio and has_engine_spectrum
+        has_strong_audio = (rms_audio >= 0.018) and is_sustained_audio and has_engine_spectrum
 
         # Engine presence gating
         if not has_mechanical and not has_telemetry and not has_strong_audio:
@@ -144,16 +169,16 @@ class EngineClassifier:
         standardized deviation (`|z-score|` from the trained `StandardScaler`).
         Strictly uses the 14 Sound + Vibration model features and guarantees a non-empty list.
         """
-        peak_g    = float(features.get("peak_g") or 0.0)
-        rms_g     = float(features.get("rms_g") or 0.0)
-        crest     = float(features.get("crest_factor") or 0.0)
-        dom_hz    = float(features.get("dominant_freq_hz") or 0.0)
-        entropy   = float(features.get("spectral_entropy") or 0.0)
-        rms_audio = float(features.get("rms_mean") or 0.0)
-        zcr       = float(features.get("zcr_mean") or 0.0)
-        centroid  = float(features.get("spectral_centroid_mean") or 0.0)
-        rolloff   = float(features.get("spectral_rolloff_mean") or 0.0)
-        mfcc1     = float(features.get("mfcc_1_mean") or 0.0)
+        peak_g    = _safe_float(features.get("peak_g"), 0.0)
+        rms_g     = _safe_float(features.get("rms_g"), 0.0)
+        crest     = _safe_float(features.get("crest_factor"), 0.0)
+        dom_hz    = _safe_float(features.get("dominant_freq_hz"), 0.0)
+        entropy   = _safe_float(features.get("spectral_entropy"), 0.0)
+        rms_audio = _safe_float(features.get("rms_mean"), 0.0)
+        zcr       = _safe_float(features.get("zcr_mean"), 0.0)
+        centroid  = _safe_float(features.get("spectral_centroid_mean"), 0.0)
+        rolloff   = _safe_float(features.get("spectral_rolloff_mean"), 0.0)
+        mfcc1     = _safe_float(features.get("mfcc_1_mean"), 0.0)
 
         if predicted_class in ("ambient_noise", "no_engine"):
             return [
@@ -298,16 +323,38 @@ class EngineClassifier:
 
         vib_source = str(features.get("vibration_source") or "").strip().lower()
         has_vibration = vib_source != "skipped" and (peak_g > 0.0 or rms_g > 0.0)
-        use_audio_only = (not has_vibration) and (self._audio_model is not None)
-        active_model = self._audio_model if use_audio_only else self._model
-        active_cols = (
-            self._model_meta.get("audio_feature_order", [
-                "rms_mean", "zcr_mean", "spectral_centroid_mean", "spectral_rolloff_mean",
-                "mfcc_1_mean", "mfcc_2_mean", "mfcc_3_mean", "mfcc_4_mean", "mfcc_5_mean",
-            ])
-            if use_audio_only
-            else self._model_meta.get("feature_order", list(feature_catalog.keys()))
+        has_audio = any(
+            _has_finite_value(features.get(k))
+            for k in ("rms_mean", "zcr_mean", "spectral_centroid_mean", "mfcc_1_mean")
         )
+        use_audio_only = (not has_vibration) and (self._audio_model is not None)
+        use_vibration_only = has_vibration and (not has_audio) and (self._vibration_model is not None)
+
+        if use_audio_only:
+            active_model = self._audio_model
+            active_cols = self._model_meta.get(
+                "audio_feature_order",
+                [
+                    "rms_mean",
+                    "zcr_mean",
+                    "spectral_centroid_mean",
+                    "spectral_rolloff_mean",
+                    "mfcc_1_mean",
+                    "mfcc_2_mean",
+                    "mfcc_3_mean",
+                    "mfcc_4_mean",
+                    "mfcc_5_mean",
+                ],
+            )
+        elif use_vibration_only:
+            active_model = self._vibration_model
+            active_cols = self._model_meta.get(
+                "vibration_feature_order",
+                ["peak_g", "rms_g", "crest_factor", "dominant_freq_hz", "spectral_entropy"],
+            )
+        else:
+            active_model = self._model
+            active_cols = self._model_meta.get("feature_order", list(feature_catalog.keys()))
 
         # Extract trained Random Forest Gini importances & StandardScaler z-scores when available
         rf_weights = {}
@@ -340,8 +387,10 @@ class EngineClassifier:
         for col, meta_info in feature_catalog.items():
             if not has_vibration and col in ("peak_g", "rms_g", "crest_factor", "dominant_freq_hz", "spectral_entropy"):
                 continue
+            if not has_audio and col in ("rms_mean", "zcr_mean", "spectral_centroid_mean", "spectral_rolloff_mean", "mfcc_1_mean"):
+                continue
             raw_v = features.get(col)
-            if raw_v is None or (isinstance(raw_v, float) and np.isnan(raw_v)):
+            if not _has_finite_value(raw_v):
                 continue
             base_imp = rf_weights.get(col, 0.08)
             z_factor = 0.6 + min(3.5, z_scores.get(col, 0.5))
@@ -373,7 +422,7 @@ class EngineClassifier:
 
         return contributions
 
-    # ── Trained model path (NaN-aware; supports Audio-Only sub-model & Window Ensemble) ──
+    # ── Trained model path (NaN-aware; supports Audio-Only, Vibration-Only & Window Ensemble) ──
     def _predict_trained(self, features: dict) -> dict:
         try:
             vib_source = str(features.get("vibration_source") or "").strip().lower()
@@ -382,27 +431,49 @@ class EngineClassifier:
             has_vibration = (
                 vib_source != "skipped"
                 and (
-                    (peak_g_val is not None and not (isinstance(peak_g_val, float) and np.isnan(peak_g_val)) and float(peak_g_val) > 0.0)
-                    or (rms_g_val is not None and not (isinstance(rms_g_val, float) and np.isnan(rms_g_val)) and float(rms_g_val) > 0.0)
+                    (_has_finite_value(peak_g_val) and float(peak_g_val) > 0.0)
+                    or (_has_finite_value(rms_g_val) and float(rms_g_val) > 0.0)
                 )
+            )
+            has_audio = any(
+                _has_finite_value(features.get(k))
+                for k in ("rms_mean", "zcr_mean", "spectral_centroid_mean", "mfcc_1_mean")
             )
 
             use_audio_only = (not has_vibration) and (self._audio_model is not None)
-            active_model = self._audio_model if use_audio_only else self._model
-            feature_order = (
-                self._model_meta.get("audio_feature_order", [
-                    "rms_mean", "zcr_mean", "spectral_centroid_mean", "spectral_rolloff_mean",
-                    "mfcc_1_mean", "mfcc_2_mean", "mfcc_3_mean", "mfcc_4_mean", "mfcc_5_mean",
-                ])
-                if use_audio_only
-                else self._model_meta.get("feature_order", [])
-            )
+            use_vibration_only = has_vibration and (not has_audio) and (self._vibration_model is not None)
+
+            if use_audio_only:
+                active_model = self._audio_model
+                feature_order = self._model_meta.get(
+                    "audio_feature_order",
+                    [
+                        "rms_mean",
+                        "zcr_mean",
+                        "spectral_centroid_mean",
+                        "spectral_rolloff_mean",
+                        "mfcc_1_mean",
+                        "mfcc_2_mean",
+                        "mfcc_3_mean",
+                        "mfcc_4_mean",
+                        "mfcc_5_mean",
+                    ],
+                )
+            elif use_vibration_only:
+                active_model = self._vibration_model
+                feature_order = self._model_meta.get(
+                    "vibration_feature_order",
+                    ["peak_g", "rms_g", "crest_factor", "dominant_freq_hz", "spectral_entropy"],
+                )
+            else:
+                active_model = self._model
+                feature_order = self._model_meta.get("feature_order", [])
 
             def _dict_to_row(d: dict) -> list:
                 row_vals = []
                 for k in feature_order:
                     v = d.get(k)
-                    if v is None or (isinstance(v, float) and np.isnan(v)):
+                    if not _has_finite_value(v):
                         row_vals.append(np.nan)
                     else:
                         row_vals.append(float(v))
@@ -412,7 +483,7 @@ class EngineClassifier:
                 X_summary = np.array([_dict_to_row(features)], dtype=np.float64)
             else:
                 X_summary = np.array(
-                    [[float(v) for k, v in features.items() if not str(k).startswith("_") and isinstance(v, (int, float)) and v is not None]],
+                    [[float(v) for k, v in features.items() if not str(k).startswith("_") and _has_finite_value(v)]],
                     dtype=np.float64,
                 )
 
@@ -448,7 +519,12 @@ class EngineClassifier:
                 confidence = 0.85
                 top_classes = [{"condition": str(pred), "confidence": confidence}]
 
-            mode_label = "trained_audio_only" if use_audio_only else "trained"
+            if use_audio_only:
+                mode_label = "trained_audio_only"
+            elif use_vibration_only:
+                mode_label = "trained_vibration_only"
+            else:
+                mode_label = "trained"
             if X_wins is not None and len(X_wins) > 1:
                 mode_label += "_window_ensemble"
 
@@ -475,13 +551,13 @@ class EngineClassifier:
         """
         scores = {c: 0.0 for c in CLASSES}
 
-        peak_g      = features.get("peak_g") or 0.0
-        rms_g       = features.get("rms_g") or 0.0
-        crest       = features.get("crest_factor") or 0.0
-        zcr         = features.get("zcr_mean") or 0.0
-        centroid    = features.get("spectral_centroid_mean") or 0.0
-        rms_audio   = features.get("rms_mean") or 0.0
-        mfcc1       = features.get("mfcc_1_mean") or 0.0
+        peak_g      = _safe_float(features.get("peak_g"), 0.0)
+        rms_g       = _safe_float(features.get("rms_g"), 0.0)
+        crest       = _safe_float(features.get("crest_factor"), 0.0)
+        zcr         = _safe_float(features.get("zcr_mean"), 0.0)
+        centroid    = _safe_float(features.get("spectral_centroid_mean"), 0.0)
+        rms_audio   = _safe_float(features.get("rms_mean"), 0.0)
+        mfcc1       = _safe_float(features.get("mfcc_1_mean"), 0.0)
         temp_c      = features.get("temperature_c")
         rpm         = features.get("rpm")
         voltage_v   = features.get("voltage_v")

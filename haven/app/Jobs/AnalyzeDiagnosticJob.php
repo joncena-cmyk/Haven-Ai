@@ -43,7 +43,13 @@ class AnalyzeDiagnosticJob implements ShouldQueue
         $this->diagnostic->update(['status' => 'processing']);
 
         try {
-            $result = $ml->analyze($this->diagnostic);
+            $isAsyncRetryable = ($this->job !== null)
+                && (config('queue.default') !== 'sync')
+                && ($this->attempts() < $this->tries);
+
+            $result = $isAsyncRetryable
+                ? $ml->analyze($this->diagnostic, false)
+                : $ml->analyze($this->diagnostic);
 
             $vibFeats = is_array($result['vibration_features'] ?? null) ? $result['vibration_features'] : [];
             $updatePayload = [

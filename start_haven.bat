@@ -49,7 +49,10 @@ echo   ------------------------------------------------------------------
 echo.
 
 :: ── 3. LAUNCH FASTAPI ML BACKEND (PORT 8001) ──
-echo [3/4] Launching FastAPI ML Engine (Port 8001)...
+echo [3/4] Ensuring ML_API_SECRET and Launching FastAPI ML Engine (Port 8001)...
+if exist "%~dp0haven\.env" (
+    python -c "import pathlib, re, secrets; p = pathlib.Path(r'%~dp0haven\.env'); t = p.read_text(encoding='utf-8', errors='ignore'); m = re.search(r'^ML_API_SECRET=(.*)$', t, flags=re.M); s = 'hvn_ml_' + secrets.token_hex(24); (p.write_text(re.sub(r'^ML_API_SECRET=.*$', f'ML_API_SECRET={s}', t, flags=re.M) if m else t.rstrip() + f'\nML_API_SECRET={s}\n', encoding='utf-8') if (not m or not m.group(1).strip()) else None)" 2>nul
+)
 netstat -ano | findstr :8001 | findstr LISTENING >nul 2>&1
 if %ERRORLEVEL% equ 0 (
     echo   [OK] ML Backend (FastAPI) is already active on port 8001.
@@ -61,12 +64,18 @@ echo.
 
 :: ── 4. LAUNCH LARAVEL WEB APP AND QUEUE WORKER (PORT 8000) ──
 echo [4/4] Launching HAVEN Laravel App and Queue Worker...
-netstat -ano | findstr :8000 | findstr LISTENING >nul 2>&1
+netstat -ano | findstr "0.0.0.0:8000" | findstr LISTENING >nul 2>&1
 if %ERRORLEVEL% equ 0 (
-    echo   [OK] Laravel Web App is already active on port 8000.
+    echo   [OK] Laravel Web App is already active on 0.0.0.0:8000 ^(ESP32 Wi-Fi reachable^).
 ) else (
-    start "HAVEN AI - Web App (Laravel :8000)" cmd /k "title HAVEN AI - Web App && cd /d "%~dp0haven" && php artisan serve --host=0.0.0.0 --port=8000"
-    echo   [OK] Spawned Laravel HTTP server bound to 0.0.0.0:8000.
+    netstat -ano | findstr :8000 | findstr LISTENING >nul 2>&1
+    if !ERRORLEVEL! equ 0 (
+        echo   [WARN] Port 8000 is occupied on 127.0.0.1 ^(localhost-only or another project^)!
+        echo   [WARN] Stop the other server on port 8000 so HAVEN AI can bind 0.0.0.0:8000 for ESP32 Wi-Fi.
+    ) else (
+        start "HAVEN AI - Web App (Laravel :8000)" cmd /k "title HAVEN AI - Web App && cd /d "%~dp0haven" && php artisan serve --host=0.0.0.0 --port=8000"
+        echo   [OK] Spawned Laravel HTTP server bound to 0.0.0.0:8000.
+    )
 )
 
 start "HAVEN AI - Queue Worker" cmd /k "title HAVEN AI - Queue Worker && cd /d "%~dp0haven" && php artisan queue:work --tries=3 --timeout=90"

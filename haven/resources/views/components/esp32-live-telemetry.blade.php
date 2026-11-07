@@ -236,6 +236,23 @@
 {{-- WebSerial 1-Click ESP32 Wi-Fi Setup Modal --}}
 @php
     $userVehicles = auth()->check() ? auth()->user()->vehicles()->select('id', 'make', 'model', 'year', 'device_key')->get() : collect();
+    $detectedLanIp = '';
+    $udpProbe = @stream_socket_client('udp://8.8.8.8:80', $udpErrNo, $udpErrStr, 1);
+    if ($udpProbe) {
+        $sockName = @stream_socket_get_name($udpProbe, false);
+        @fclose($udpProbe);
+        if ($sockName && preg_match('/^(\d+\.\d+\.\d+\.\d+):/', $sockName, $ipMatch) && !in_array($ipMatch[1], ['127.0.0.1', '0.0.0.0'], true)) {
+            $detectedLanIp = $ipMatch[1];
+        }
+    }
+    if ($detectedLanIp === '') {
+        foreach ((gethostbynamel(gethostname()) ?: []) as $candIp) {
+            if (!str_starts_with($candIp, '127.') && !str_starts_with($candIp, '169.254.') && !str_ends_with($candIp, '.1')) {
+                $detectedLanIp = $candIp;
+                break;
+            }
+        }
+    }
 @endphp
 <div id="esp32-webserial-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);z-index:99999;align-items:center;justify-content:center;padding:1.25rem;" onclick="if(event.target===this)closeEsp32WebSerialModal()">
     <div style="background:#0f172a;border:1px solid #1e293b;border-radius:14px;max-width:540px;width:100%;padding:1.5rem;box-shadow:0 24px 48px rgba(0,0,0,0.6);color:#f1f5f9;position:relative;max-height:90vh;overflow-y:auto;">
@@ -307,7 +324,7 @@
                 {{-- Haven Ingest Server URL --}}
                 <div>
                     <label style="display:block;font-size:0.72rem;font-weight:700;color:#94a3b8;margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Haven Ingest Server URL</label>
-                    <input type="text" id="ws-server-url" value="" style="width:100%;padding:0.6rem;background:#131c2e;border:1px solid #334155;border-radius:8px;color:#f8fafc;font-size:0.82rem;box-sizing:border-box;font-family:monospace;outline:none;">
+                    <input type="text" id="ws-server-url" data-lan-ip="{{ $detectedLanIp }}" value="" style="width:100%;padding:0.6rem;background:#131c2e;border:1px solid #334155;border-radius:8px;color:#f8fafc;font-size:0.82rem;box-sizing:border-box;font-family:monospace;outline:none;">
                     <div id="ws-ip-tip" style="font-size:0.68rem;color:#f59e0b;margin-top:0.25rem;"></div>
                 </div>
 
@@ -482,14 +499,20 @@ function openEsp32WebSerialModal() {
         if (scanBtn) scanBtn.disabled = false;
     }
 
-    // Auto-fill Server URL based on current host
+    // Auto-fill Server URL based on detected laptop Wi-Fi LAN IP when browsing via localhost
     const serverInput = document.getElementById('ws-server-url');
     const tip = document.getElementById('ws-ip-tip');
     if (serverInput && !serverInput.value) {
         const host = window.location.hostname;
+        const lanIp = (serverInput.getAttribute('data-lan-ip') || '').trim();
         const port = window.location.port ? ':' + window.location.port : '';
-        serverInput.value = window.location.protocol + '//' + host + port + '/api/v1/telemetry/ingest';
-        if (host === 'localhost' || host === '127.0.0.1') {
+        const targetHost = ((host === 'localhost' || host === '127.0.0.1') && lanIp) ? lanIp : host;
+        serverInput.value = window.location.protocol + '//' + targetHost + port + '/api/v1/telemetry/ingest';
+        if ((host === 'localhost' || host === '127.0.0.1') && lanIp) {
+            if (tip) {
+                tip.innerHTML = '✓ Auto-detected laptop Wi-Fi IP <code>' + lanIp + '</code>. Make sure Laravel was started via <code>start_haven.bat</code> or <code>php artisan serve --host=0.0.0.0</code>.';
+            }
+        } else if (host === 'localhost' || host === '127.0.0.1') {
             if (tip) {
                 tip.innerHTML = '⚠️ Note: Since ESP32 connects via Wi-Fi, replace <code>' + host + '</code> with your laptop\'s Wi-Fi IP (e.g. <code>http://192.168.1.50:8000/...</code>) so the ESP32 can reach it.';
             }
@@ -588,8 +611,8 @@ async function esp32SerialTransaction(command, matcher, timeoutMs, onStatus) {
         // Cancelling the reader is the only reliable way to unblock a pending read().
         timer = setTimeout(() => { try { reader.cancel(); } catch (_) {} }, timeoutMs);
 
-        // PING first; resend the command once in case the first copy landed during boot.
-        await writer.write(encoder.encode('\nPING\n' + command + '\n'));
+        // Send command directly (without prepending PING, which caused checkSerialModeCommand() to return early).
+        await writer.write(encoder.encode('\n' + command + '\n'));
         let resent = false;
         const startedAt = Date.now();
 
@@ -712,7 +735,11 @@ async function flashWebSerial() {
     try {
         const result = await esp32SerialTransaction(
             command,
-            line => (line.startsWith('OK:SAVED') ? 'saved' : (line.startsWith('ERR:') ? line : null)),
+            line => (
+                (line.includes('OK:SAVED') || line.includes('[PREFS] Loaded custom Wi-Fi') || line.includes('[STA] [OK] Connected'))
+                    ? 'saved'
+                    : (line.startsWith('ERR:') ? line : null)
+            ),
             20000,
             msg => setWsStatus('info', msg)
         );
@@ -728,6 +755,8 @@ async function flashWebSerial() {
     } catch (err) {
         if (err.name === 'NotFoundError') {
             setWsStatus('info', 'Connection cancelled by user.');
+        } else if (String(err.message || err).includes('Failed to open serial port')) {
+            setWsStatus('error', '⚠️ USB port is locked by another app (usually Arduino IDE Serial Monitor). Click the "X" to close the Serial Monitor panel in Arduino IDE, then click "Flash Wi-Fi to ESP32 over USB" again.');
         } else {
             setWsStatus('error', 'WebSerial Error: ' + (err.message || err));
         }
@@ -786,27 +815,25 @@ async function flashWebSerial() {
         'hall_rpm': 'Hall Tachometer'
     };
 
-    async function pollTelemetry() {
-        try {
-            const res = await fetch('/api/v1/telemetry/latest', { cache: 'no-store' });
-            if (!res.ok) return;
-            const data = await res.json();
+    function renderTelemetryData(data) {
+        if (!data) return;
 
-            const dot = document.getElementById('live-dot');
-            const statusText = document.getElementById('live-status-text');
+        const dot = document.getElementById('live-dot');
+        const statusText = document.getElementById('live-status-text');
+        if (!dot || !statusText) return;
 
-            // ── Connection State Change Notifications ──
-            if (data.online && wasOnline === false) {
-                // Just came online
-                showToast('success', '●', '✓ ESP32 DAQ Node Connected — 5 sensors streaming live', 6000);
-            } else if (data.online && wasOnline === null) {
-                // First page load and already online
-                showToast('info', '●', 'ESP32 DAQ Node detected — Live hardware stream active', 4000);
-            } else if (!data.online && wasOnline === true) {
-                // Just went offline
-                showToast('warning', '●', '⚠ ESP32 DAQ Node disconnected — Check USB / Wi-Fi', 8000);
-            }
-            wasOnline = data.online;
+        // ── Connection State Change Notifications ──
+        if (data.online && wasOnline === false) {
+            // Just came online
+            showToast('success', '●', '✓ ESP32 DAQ Node Connected — 5 sensors streaming live', 6000);
+        } else if (data.online && wasOnline === null) {
+            // First page load and already online
+            showToast('info', '●', 'ESP32 DAQ Node detected — Live hardware stream active', 4000);
+        } else if (!data.online && wasOnline === true) {
+            // Just went offline
+            showToast('warning', '●', '⚠ ESP32 DAQ Node disconnected — Check USB / Wi-Fi', 8000);
+        }
+        wasOnline = data.online;
 
             // ── Per-Sensor Connect/Disconnect Notifications ──
             if (data.components_health) {
@@ -1112,7 +1139,14 @@ async function flashWebSerial() {
             if (data.history && Array.isArray(data.history)) {
                 drawRollingChart(data.history);
             }
+    }
 
+    async function pollTelemetry() {
+        try {
+            const res = await fetch('/api/v1/telemetry/latest', { cache: 'no-store' });
+            if (!res.ok) return;
+            const data = await res.json();
+            renderTelemetryData(data);
         } catch (e) {
             console.warn('[Haven IoT] Polling error:', e);
         }

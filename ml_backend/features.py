@@ -293,10 +293,13 @@ def _load_raw_vibration_file(
 
     arr = np.asarray(rows_xyz, dtype=np.float64)
     ts_arr = np.asarray(timestamps, dtype=np.float64)
+    effective_fallback_sr = sample_rate_hz
+    if effective_fallback_sr is None and ext.lower() == "json" and ts_arr.size == 0:
+        effective_fallback_sr = 100.0
     inferred_sr = infer_sample_rate_from_timestamps(
         ts_arr,
         header_col=first_col_name,
-        fallback_sr=sample_rate_hz,
+        fallback_sr=effective_fallback_sr,
     )
     return arr, inferred_sr
 
@@ -464,8 +467,22 @@ def extract_audio_windows(
             y = np.mean(y, axis=1)
         sr = int(sr)
     except Exception:
-        y, sr = librosa.load(file_path, sr=None, mono=True, duration=30.0)
-        sr = int(sr)
+        try:
+            from scipy.io import wavfile
+
+            sr_w, data_w = wavfile.read(file_path)
+            arr_w = np.asarray(data_w)
+            if arr_w.ndim > 1:
+                arr_w = np.mean(arr_w, axis=1)
+            if np.issubdtype(arr_w.dtype, np.integer):
+                max_val = float(np.iinfo(arr_w.dtype).max)
+                y = (arr_w.astype(np.float32) / max_val) if max_val > 0 else arr_w.astype(np.float32)
+            else:
+                y = arr_w.astype(np.float32)
+            sr = int(sr_w)
+        except Exception:
+            y, sr = librosa.load(file_path, sr=None, mono=True, duration=30.0)
+            sr = int(sr)
 
     if y.size == 0 or sr <= 0:
         raise ValueError(f"Audio file '{file_path}' contains 0 samples.")

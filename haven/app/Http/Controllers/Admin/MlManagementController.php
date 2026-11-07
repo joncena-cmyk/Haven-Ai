@@ -10,6 +10,7 @@ use App\Services\MlBackendService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class MlManagementController extends Controller
@@ -80,8 +81,33 @@ class MlManagementController extends Controller
         $records = [];
         foreach ($diagnostics as $d) {
             $raw = is_array($d->ml_result_raw) ? $d->ml_result_raw : [];
-            $audioFeat = $raw['audio_features'] ?? [];
-            $vibFeat   = $raw['vibration_features'] ?? [];
+            $audioFeat = is_array($raw['audio_features'] ?? null) ? $raw['audio_features'] : [];
+            $vibFeat   = is_array($raw['vibration_features'] ?? null) ? $raw['vibration_features'] : [];
+
+            $audioExistsOnDisk = $d->hasAudio() && (
+                Storage::disk('local')->exists($d->audio_path) || Storage::disk('public')->exists($d->audio_path)
+            );
+            $vibExistsOnDisk = $d->hasVibration() && (
+                Storage::disk('local')->exists($d->vibration_path) || Storage::disk('public')->exists($d->vibration_path)
+            );
+
+            $missingAudioFeats = $audioExistsOnDisk && empty($audioFeat);
+            $missingVibFeats   = $vibExistsOnDisk && !isset($vibFeat['dominant_freq_hz']);
+
+            if ($missingAudioFeats || $missingVibFeats) {
+                try {
+                    $extracted = $mlService->analyze($d);
+                    if (is_array($extracted) && (!empty($extracted['audio_features']) || !empty($extracted['vibration_features']))) {
+                        $raw = $extracted;
+                        $audioFeat = is_array($raw['audio_features'] ?? null) ? $raw['audio_features'] : $audioFeat;
+                        $vibFeat   = is_array($raw['vibration_features'] ?? null) ? $raw['vibration_features'] : $vibFeat;
+                        $d->update(['ml_result_raw' => $extracted]);
+                    }
+                } catch (\Throwable) {
+                    // Proceed with available stored metrics if live DSP extraction is unavailable
+                }
+            }
+
             $peakG     = $vibFeat['peak_g'] ?? $d->vibration_peak_g ?? null;
             $rmsG      = $vibFeat['rms_g'] ?? $d->vibration_rms_g ?? null;
             $crest     = $vibFeat['crest_factor'] ?? (($rmsG !== null && $rmsG > 0 && $peakG !== null)
@@ -141,16 +167,20 @@ class MlManagementController extends Controller
         return response()->streamDownload(function () use ($diagnostics) {
             $out = fopen('php://output', 'w');
             fputcsv($out, [
-                'diagnostic_id', 'session_id', 'vehicle', 'vibration_source', 'sample_rate_hz',
+                'diagnostic_id', 'session_id', 'vehicle_id', 'vehicle', 'vibration_source', 'sample_rate_hz',
                 'peak_g', 'rms_g', 'crest_factor',
-                'dominant_freq_hz', 'spectral_entropy', 'temperature_c', 'rpm', 'target_rpm',
+                'dominant_freq_hz', 'spectral_entropy',
+                'rms_mean', 'zcr_mean', 'spectral_centroid_mean', 'spectral_rolloff_mean',
+                'mfcc_1_mean', 'mfcc_2_mean', 'mfcc_3_mean', 'mfcc_4_mean', 'mfcc_5_mean',
+                'temperature_c', 'rpm', 'target_rpm',
                 'load_state', 'sensor_position', 'mic_position', 'operator', 'verified_by',
                 'voltage_v', 'current_ma', 'true_condition', 'fault_detail', 'created_at',
             ]);
 
             foreach ($diagnostics as $d) {
                 $raw     = is_array($d->ml_result_raw) ? $d->ml_result_raw : [];
-                $vibFeat = $raw['vibration_features'] ?? [];
+                $audFeat = is_array($raw['audio_features'] ?? null) ? $raw['audio_features'] : [];
+                $vibFeat = is_array($raw['vibration_features'] ?? null) ? $raw['vibration_features'] : [];
                 $peak    = $vibFeat['peak_g'] ?? $d->vibration_peak_g ?? null;
                 $rms     = $vibFeat['rms_g'] ?? $d->vibration_rms_g ?? null;
                 $crest   = $vibFeat['crest_factor'] ?? (($rms > 0 && $peak > 0) ? round($peak / $rms, 3) : null);
@@ -158,6 +188,7 @@ class MlManagementController extends Controller
                 fputcsv($out, [
                     $d->id,
                     $d->session_id,
+                    $d->vehicle_id,
                     $d->vehicle?->display_name ?? 'Vehicle #' . $d->vehicle_id,
                     $d->vibration_source ?? 'physical',
                     $d->sample_rate_hz,
@@ -166,6 +197,15 @@ class MlManagementController extends Controller
                     $crest,
                     $vibFeat['dominant_freq_hz'] ?? null,
                     $vibFeat['spectral_entropy'] ?? null,
+                    $audFeat['rms_mean'] ?? ($audFeat['rms_audio'] ?? null),
+                    $audFeat['zcr_mean'] ?? null,
+                    $audFeat['spectral_centroid_mean'] ?? null,
+                    $audFeat['spectral_rolloff_mean'] ?? null,
+                    $audFeat['mfcc_1_mean'] ?? null,
+                    $audFeat['mfcc_2_mean'] ?? null,
+                    $audFeat['mfcc_3_mean'] ?? null,
+                    $audFeat['mfcc_4_mean'] ?? null,
+                    $audFeat['mfcc_5_mean'] ?? null,
                     $d->temperature_c,
                     $d->rpm,
                     $d->target_rpm,
