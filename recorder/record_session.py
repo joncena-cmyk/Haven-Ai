@@ -26,7 +26,7 @@ import re
 import sys
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import soundfile as sf
@@ -184,35 +184,184 @@ def build_output_dir(
     )
 
 
+def get_serial_ports() -> List[Dict[str, str]]:
+    """Return available USB/Serial ports as structured dictionaries."""
+    if serial is None:
+        return []
+    result: List[Dict[str, str]] = []
+    for p in serial.tools.list_ports.comports():
+        result.append(
+            {
+                "device": str(p.device),
+                "description": str(p.description or p.device),
+                "hwid": str(p.hwid or ""),
+                "label": f"{p.device} — {p.description or 'Serial Device'}",
+            }
+        )
+    return result
+
+
+def get_audio_input_devices() -> List[Dict[str, Any]]:
+    """Return available audio input microphones as structured dictionaries."""
+    if sd is None:
+        return []
+    result: List[Dict[str, Any]] = []
+    try:
+        devices = sd.query_devices()
+        default_in = None
+        try:
+            default_pair = sd.default.device
+            if isinstance(default_pair, (list, tuple)) and len(default_pair) >= 1:
+                default_in = default_pair[0]
+        except Exception:
+            default_in = None
+
+        for idx, dev in enumerate(devices):
+            max_in = int(dev.get("max_input_channels", 0) or 0)
+            if max_in > 0:
+                is_def = idx == default_in
+                prefix = "★ " if is_def else ""
+                result.append(
+                    {
+                        "index": idx,
+                        "name": str(dev.get("name", f"Device {idx}")),
+                        "channels": max_in,
+                        "default_samplerate": float(dev.get("default_samplerate", 44100.0)),
+                        "is_default": is_def,
+                        "label": f"{prefix}[{idx}] {dev.get('name', f'Device {idx}')}",
+                    }
+                )
+    except Exception:
+        pass
+    return result
+
+
+def open_esp32_serial(port: str, baud_rate: int = 921600, timeout: float = 0.05) -> Any:
+    """
+    Open an ESP32 serial connection with DTR/RTS held low so opening or changing
+    baud rate does not trigger an unwanted bootloader reset on CP210x/CH340 boards.
+    """
+    if serial is None:
+        raise RuntimeError("pyserial is required to open serial ports")
+    ser = serial.Serial()
+    ser.port = port
+    ser.baudrate = int(baud_rate)
+    ser.timeout = float(timeout)
+    try:
+        ser.dtr = False
+        ser.rts = False
+    except Exception:
+        pass
+    ser.open()
+    return ser
+
+
+def ensure_esp32_logger_mode(
+    ser: Any,
+    target_baud: int = 921600,
+    control_baud: int = 115200,
+) -> List[str]:
+    """
+    Ensure the connected ESP32 is streaming high-rate 't_us,ax,ay,az' CSV lines
+    at `target_baud`.
+
+    1. Listens briefly at `target_baud` in case the board is already in LOGGER mode.
+    2. If no valid CSV lines arrive and `target_baud != control_baud`, switches in-place
+       to `control_baud` (115200), sends `LOGGER\\n` so `Haven_ESP32_Combined.ino` shuts
+       down Wi-Fi and switches UART to `target_baud`, waits briefly for its 200-sample
+       hardware calibration burst, and switches host UART back to `target_baud`.
+    Returns any `# HAVEN_LOGGER_...` header lines captured during negotiation.
+    """
+    headers: List[str] = []
+
+    def _probe_stream(window_s: float) -> bool:
+        deadline = time.monotonic() + window_s
+        valid_count = 0
+        while time.monotonic() < deadline:
+            raw = ser.readline()
+            if not raw:
+                continue
+            line = raw.decode("utf-8", errors="replace").strip()
+            if line.startswith("#"):
+                headers.append(line)
+                continue
+            if parse_serial_csv_line(line) is not None:
+                valid_count += 1
+                if valid_count >= 2:
+                    return True
+        return False
+
+    try:
+        ser.reset_input_buffer()
+    except Exception:
+        pass
+
+    # Fast check: already in high-rate LOGGER mode?
+    if _probe_stream(0.22):
+        return headers
+
+    # Also try sending LOGGER at current baud in case firmware was compiled at target_baud
+    try:
+        ser.write(b"\nLOGGER\n")
+        ser.flush()
+    except Exception:
+        pass
+
+    if _probe_stream(0.25):
+        return headers
+
+    # Negotiate from default 115200 normal mode -> 921600 LOGGER mode
+    if int(target_baud) != int(control_baud):
+        try:
+            ser.baudrate = int(control_baud)
+            ser.reset_input_buffer()
+            for _ in range(2):
+                ser.write(b"\nLOGGER\n")
+                ser.flush()
+                time.sleep(0.18)
+            # Allow ESP32 to complete 200-sample calibration (~200 ms) and switch UART baud
+            time.sleep(0.20)
+            ser.baudrate = int(target_baud)
+            ser.reset_input_buffer()
+            _probe_stream(0.25)
+        except Exception:
+            try:
+                ser.baudrate = int(target_baud)
+            except Exception:
+                pass
+
+    return headers
+
+
 def list_available_devices() -> None:
     """Print available serial ports and audio input devices."""
     print("=== Serial Ports (pyserial) ===")
     if serial is None:
         print("  pyserial not installed.")
     else:
-        ports = list(serial.tools.list_ports.comports())
+        ports = get_serial_ports()
         if not ports:
             print("  No serial ports detected.")
         for p in ports:
-            print(f"  {p.device}: {p.description} [{p.hwid}]")
+            print(f"  {p['device']}: {p['description']} [{p['hwid']}]")
 
     print("\n=== Audio Input Devices (sounddevice) ===")
     if sd is None:
         print("  sounddevice not installed.")
     else:
-        try:
-            devices = sd.query_devices()
-            for idx, dev in enumerate(devices):
-                if dev.get("max_input_channels", 0) > 0:
-                    print(
-                        f"  [{idx}] {dev['name']} "
-                        f"(in={dev['max_input_channels']}, default_sr={dev['default_samplerate']})"
-                    )
-        except Exception as exc:
-            print(f"  Could not query audio devices: {exc}")
+        for dev in get_audio_input_devices():
+            print(
+                f"  [{dev['index']}] {dev['name']} "
+                f"(in={dev['channels']}, default_sr={dev['default_samplerate']})"
+            )
 
 
-def record_synchronized_session(args: argparse.Namespace) -> pathlib.Path:
+def record_synchronized_session(
+    args: argparse.Namespace,
+    *,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    external_stop_event: Optional[threading.Event] = None,
+) -> pathlib.Path:
     """
     Execute a synchronized serial + microphone capture session and write
     vibration.csv, audio.wav, and metadata.json into the output directory.
@@ -246,40 +395,46 @@ def record_synchronized_session(args: argparse.Namespace) -> pathlib.Path:
     firmware_headers: List[str] = []
     audio_chunks: List[np.ndarray] = []
 
+    serial_ready = threading.Event()
     start_gate = threading.Event()
     stop_gate = threading.Event()
     serial_error: List[str] = []
     timing_info: Dict[str, Any] = {}
 
     def serial_worker() -> None:
+        ser = None
         try:
-            with serial.Serial(args.port, baudrate=baud_rate, timeout=0.05) as ser:
-                ser.reset_input_buffer()
-                # Prompt firmware into LOGGER mode if supported
-                try:
-                    ser.write(b"LOGGER\n")
-                    ser.flush()
-                except Exception:
-                    pass
+            ser = open_esp32_serial(args.port, baud_rate=baud_rate, timeout=0.05)
+            negotiated_headers = ensure_esp32_logger_mode(ser, target_baud=baud_rate)
+            firmware_headers.extend(negotiated_headers)
+            ser.reset_input_buffer()
+            serial_ready.set()
 
-                start_gate.wait()
-                timing_info["serial_start_iso"] = dt.datetime.now(dt.timezone.utc).isoformat()
-                timing_info["serial_start_ns"] = time.perf_counter_ns()
+            start_gate.wait()
+            timing_info["serial_start_iso"] = dt.datetime.now(dt.timezone.utc).isoformat()
+            timing_info["serial_start_ns"] = time.perf_counter_ns()
 
-                while not stop_gate.is_set():
-                    raw = ser.readline()
-                    if not raw:
-                        continue
-                    line = raw.decode("utf-8", errors="replace").strip()
-                    if line.startswith("#"):
-                        firmware_headers.append(line)
-                        continue
-                    parsed = parse_serial_csv_line(line)
-                    if parsed is not None:
-                        vib_samples.append(parsed)
+            while not stop_gate.is_set():
+                raw = ser.readline()
+                if not raw:
+                    continue
+                line = raw.decode("utf-8", errors="replace").strip()
+                if line.startswith("#"):
+                    firmware_headers.append(line)
+                    continue
+                parsed = parse_serial_csv_line(line)
+                if parsed is not None:
+                    vib_samples.append(parsed)
         except Exception as exc:
             serial_error.append(str(exc))
+            serial_ready.set()
             stop_gate.set()
+        finally:
+            if ser is not None:
+                try:
+                    ser.close()
+                except Exception:
+                    pass
 
     serial_thread = threading.Thread(target=serial_worker, daemon=True)
     serial_thread.start()
@@ -306,6 +461,12 @@ def record_synchronized_session(args: argparse.Namespace) -> pathlib.Path:
         f"& Audio ({audio_sr} Hz, 16-bit mono)..."
     )
 
+    # Wait for ESP32 serial logger handshake before triggering synchronized audio+vibration gate
+    serial_ready.wait(timeout=4.0)
+    if serial_error:
+        serial_thread.join(timeout=1.0)
+        raise RuntimeError(f"Serial capture failed on {args.port}: {serial_error[0]}")
+
     with sd.InputStream(
         samplerate=audio_sr,
         channels=1,
@@ -320,16 +481,67 @@ def record_synchronized_session(args: argparse.Namespace) -> pathlib.Path:
 
         t0 = time.monotonic()
         last_print = t0
+        last_cb = 0.0
         print(
             "[HAVEN RECORDER] Recording started! "
             "Tip: Tap the sensor mount lightly within the first 2s to create an alignment marker."
         )
 
         while (time.monotonic() - t0) < duration_s and not stop_gate.is_set():
-            time.sleep(0.1)
+            if external_stop_event is not None and external_stop_event.is_set():
+                stop_gate.set()
+                break
+            time.sleep(0.08)
             now = time.monotonic()
+            elapsed = now - t0
+
+            if progress_callback is not None and (now - last_cb) >= 0.12:
+                n_vib = len(vib_samples)
+                est_vib_rate = n_vib / max(elapsed, 1e-3)
+                recent_vib = vib_samples[-250:]
+                recent_aud = audio_chunks[-4:]
+                aud_peak = (
+                    max((int(np.max(np.abs(c))) for c in recent_aud), default=0) / 32768.0
+                    if recent_aud
+                    else 0.0
+                )
+                vib_peak = (
+                    max((max(abs(s[1]), abs(s[2]), abs(s[3])) for s in recent_vib), default=0.0)
+                    if recent_vib
+                    else 0.0
+                )
+                latest_xyz = recent_vib[-1][1:4] if recent_vib else (0.0, 0.0, 0.0)
+                aud_tail: List[float] = []
+                if recent_aud:
+                    flat_a = np.concatenate(recent_aud, axis=0).reshape(-1)
+                    step_a = max(1, flat_a.size // 80)
+                    aud_tail = (flat_a[::step_a][-80:].astype(np.float64) / 32768.0).tolist()
+                vib_tail: List[float] = []
+                if len(recent_vib) >= 4:
+                    arr_v = np.asarray([s[1:4] for s in recent_vib], dtype=np.float64)
+                    dyn_v = np.linalg.norm(arr_v - np.mean(arr_v, axis=0, keepdims=True), axis=1)
+                    step_v = max(1, dyn_v.size // 80)
+                    vib_tail = dyn_v[::step_v][-80:].tolist()
+
+                try:
+                    progress_callback(
+                        {
+                            "elapsed_sec": elapsed,
+                            "duration_sec": duration_s,
+                            "vib_samples": n_vib,
+                            "vib_rate_hz": est_vib_rate,
+                            "vib_peak_g": vib_peak,
+                            "latest_xyz": latest_xyz,
+                            "audio_peak": aud_peak,
+                            "audio_tail": aud_tail,
+                            "vib_tail": vib_tail,
+                        }
+                    )
+                except Exception:
+                    pass
+                last_cb = now
+
             if (now - last_print) >= 1.0:
-                elapsed = now - t0
                 n_vib = len(vib_samples)
                 est_vib_rate = n_vib / max(elapsed, 1e-3)
                 n_aud = sum(chunk.shape[0] for chunk in audio_chunks)

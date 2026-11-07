@@ -45,4 +45,5 @@ ENV/
 # Firmware secrets & local recordings
 **/secrets.h
 recordings/
+recordings_quarantine/
 .pytest_cache/

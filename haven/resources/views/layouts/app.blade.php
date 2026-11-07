@@ -150,11 +150,11 @@
         });
     </script>
 
-    {{-- Automatic Inactivity Timeout (5 Minutes Idle Auto-Logout) --}}
+    {{-- Automatic Inactivity Timeout (30 Minutes Idle Auto-Logout) --}}
     @auth
     <script>
         (function() {
-            const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+            const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
             let idleTimer = null;
             let lastKeepAlivePing = Date.now();
 

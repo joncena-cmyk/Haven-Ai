@@ -130,7 +130,7 @@
     @if($admin)
     <script>
         (function() {
-            const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
+            const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutes
             let idleTimer = null;
 
             function triggerAdminAutoLogout() {

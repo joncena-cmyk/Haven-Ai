@@ -96,11 +96,12 @@ echo   [1] Open HAVEN Dashboard in Browser
 echo   [2] Open Admin ML and Datasets Console
 echo   [3] Open Hardware and Live Telemetry Fleet
 echo   [4] Test FastAPI ML Health Endpoint
+echo   [5] Launch Graphical Dataset Recorder and ML Studio
 echo   [S] Stop all HAVEN AI Services (Shutdown)
 echo   [Q] Exit this console (services will remain running)
 echo ========================================================================
 echo.
-set /p CHOICE="Select an option (1-4, S, Q): "
+set /p CHOICE="Select an option (1-5, S, Q): "
 
 if /i "%CHOICE%"=="1" (
     start http://localhost:8000/dashboard
@@ -116,6 +117,10 @@ if /i "%CHOICE%"=="3" (
 )
 if /i "%CHOICE%"=="4" (
     start http://127.0.0.1:8001/health
+    goto MENU
+)
+if /i "%CHOICE%"=="5" (
+    start "HAVEN Dataset Studio" python "%~dp0recorder\dataset_studio.py"
     goto MENU
 )
 if /i "%CHOICE%"=="S" (

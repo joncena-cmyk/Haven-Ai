@@ -29,23 +29,43 @@ class EngineClassifier:
         self._model = None
         self._audio_model = None
         self._model_meta = {}
+        self._model_mtime = None
         self._load_model()
 
     def _load_model(self):
         if os.path.exists(MODEL_PATH):
             try:
+                mtime = os.path.getmtime(MODEL_PATH)
                 with open(MODEL_PATH, "rb") as f:
                     payload = pickle.load(f)
                 self._model = payload.get("model") or payload  # support both formats
                 self._audio_model = payload.get("audio_model") if isinstance(payload, dict) else None
                 self._model_meta = payload.get("meta", {}) if isinstance(payload, dict) else {}
+                self._model_mtime = mtime
                 logger.info("Trained model loaded from model.pkl")
             except Exception as e:
                 logger.warning(f"Could not load model.pkl: {e}. Using rule-based fallback.")
                 self._model = None
                 self._audio_model = None
+                self._model_mtime = None
         else:
+            self._model = None
+            self._audio_model = None
+            self._model_meta = {}
+            self._model_mtime = None
             logger.info("model.pkl not found — using rule-based classifier.")
+
+    def _ensure_fresh_model(self) -> None:
+        """Automatically hot-reload model.pkl if it was updated on disk."""
+        if os.path.exists(MODEL_PATH):
+            try:
+                current_mtime = os.path.getmtime(MODEL_PATH)
+                if self._model is None or self._model_mtime != current_mtime:
+                    self._load_model()
+            except OSError:
+                pass
+        elif self._model is not None:
+            self._load_model()
 
     def reload_model(self) -> bool:
         """Hot-reload model.pkl after retraining."""
@@ -53,9 +73,11 @@ class EngineClassifier:
         return self.is_model_loaded()
 
     def is_model_loaded(self) -> bool:
+        self._ensure_fresh_model()
         return self._model is not None
 
     def model_info(self) -> dict:
+        self._ensure_fresh_model()
         if self._model:
             return {
                 "type": "trained_sklearn",
@@ -68,6 +90,7 @@ class EngineClassifier:
         }
 
     def predict(self, features: dict) -> dict:
+        self._ensure_fresh_model()
         peak_g = float(features.get("peak_g") or 0.0)
         rms_g = float(features.get("rms_g") or 0.0)
         temp_c = features.get("temperature_c")
