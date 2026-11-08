@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,9 +47,9 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        \App\Services\AuditLogger::log('auth.registered', [
+        AuditLogger::log('auth.registered', [
             'email' => $user->email,
-            'role'  => 'user',
+            'role' => 'user',
         ], $user->id);
 
         return redirect(route('dashboard', absolute: false));

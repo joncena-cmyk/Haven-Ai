@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MlManagementController extends Controller
 {
@@ -24,8 +25,8 @@ class MlManagementController extends Controller
 
         // Database class balance for thesis 4 fault classes (strictly verified ground-truth training samples)
         $classCounts = [
-            'normal'          => Diagnostic::where('is_training_sample', true)->where('true_condition', 'normal')->count(),
-            'misfire'         => Diagnostic::where('is_training_sample', true)->where('true_condition', 'misfire')->count(),
+            'normal' => Diagnostic::where('is_training_sample', true)->where('true_condition', 'normal')->count(),
+            'misfire' => Diagnostic::where('is_training_sample', true)->where('true_condition', 'misfire')->count(),
             'loose_component' => Diagnostic::where('is_training_sample', true)->where('true_condition', 'loose_component')->count(),
             'valve_clearance' => Diagnostic::where('is_training_sample', true)->where('true_condition', 'valve_clearance')->count(),
         ];
@@ -50,15 +51,15 @@ class MlManagementController extends Controller
             ->get();
 
         return view('admin.ml.index', [
-            'mlInfo'         => $mlInfo,
-            'classCounts'    => $classCounts,
-            'totalSessions'  => $totalSessions,
-            'labeledCount'   => $labeledCount,
-            'pendingJobs'    => $pendingJobs,
-            'failedJobs'     => $failedJobs,
-            'modelExists'    => $modelExists,
-            'modelMtime'     => $modelMtime,
-            'modelSizeKb'    => $modelSizeKb,
+            'mlInfo' => $mlInfo,
+            'classCounts' => $classCounts,
+            'totalSessions' => $totalSessions,
+            'labeledCount' => $labeledCount,
+            'pendingJobs' => $pendingJobs,
+            'failedJobs' => $failedJobs,
+            'modelExists' => $modelExists,
+            'modelMtime' => $modelMtime,
+            'modelSizeKb' => $modelSizeKb,
             'retrainHistory' => $retrainHistory,
         ]);
     }
@@ -73,7 +74,7 @@ class MlManagementController extends Controller
             ->whereIn('true_condition', Diagnostic::TRAINING_CONDITIONS)
             ->where(function ($q) {
                 $q->whereNull('vibration_source')
-                  ->orWhere('vibration_source', '!=', 'simulated');
+                    ->orWhere('vibration_source', '!=', 'simulated');
             })
             ->limit(500)
             ->get();
@@ -82,7 +83,7 @@ class MlManagementController extends Controller
         foreach ($diagnostics as $d) {
             $raw = is_array($d->ml_result_raw) ? $d->ml_result_raw : [];
             $audioFeat = is_array($raw['audio_features'] ?? null) ? $raw['audio_features'] : [];
-            $vibFeat   = is_array($raw['vibration_features'] ?? null) ? $raw['vibration_features'] : [];
+            $vibFeat = is_array($raw['vibration_features'] ?? null) ? $raw['vibration_features'] : [];
 
             $audioExistsOnDisk = $d->hasAudio() && (
                 Storage::disk('local')->exists($d->audio_path) || Storage::disk('public')->exists($d->audio_path)
@@ -92,15 +93,15 @@ class MlManagementController extends Controller
             );
 
             $missingAudioFeats = $audioExistsOnDisk && empty($audioFeat);
-            $missingVibFeats   = $vibExistsOnDisk && !isset($vibFeat['dominant_freq_hz']);
+            $missingVibFeats = $vibExistsOnDisk && ! isset($vibFeat['dominant_freq_hz']);
 
             if ($missingAudioFeats || $missingVibFeats) {
                 try {
                     $extracted = $mlService->analyze($d);
-                    if (is_array($extracted) && (!empty($extracted['audio_features']) || !empty($extracted['vibration_features']))) {
+                    if (is_array($extracted) && (! empty($extracted['audio_features']) || ! empty($extracted['vibration_features']))) {
                         $raw = $extracted;
                         $audioFeat = is_array($raw['audio_features'] ?? null) ? $raw['audio_features'] : $audioFeat;
-                        $vibFeat   = is_array($raw['vibration_features'] ?? null) ? $raw['vibration_features'] : $vibFeat;
+                        $vibFeat = is_array($raw['vibration_features'] ?? null) ? $raw['vibration_features'] : $vibFeat;
                         $d->update(['ml_result_raw' => $extracted]);
                     }
                 } catch (\Throwable) {
@@ -108,20 +109,20 @@ class MlManagementController extends Controller
                 }
             }
 
-            $peakG     = $vibFeat['peak_g'] ?? $d->vibration_peak_g ?? null;
-            $rmsG      = $vibFeat['rms_g'] ?? $d->vibration_rms_g ?? null;
-            $crest     = $vibFeat['crest_factor'] ?? (($rmsG !== null && $rmsG > 0 && $peakG !== null)
+            $peakG = $vibFeat['peak_g'] ?? $d->vibration_peak_g ?? null;
+            $rmsG = $vibFeat['rms_g'] ?? $d->vibration_rms_g ?? null;
+            $crest = $vibFeat['crest_factor'] ?? (($rmsG !== null && $rmsG > 0 && $peakG !== null)
                 ? round($peakG / $rmsG, 4)
                 : null);
 
             $records[] = array_merge($audioFeat, $vibFeat, [
-                'session_id'       => $d->session_id ?? ('diag_' . $d->id),
-                'vehicle_id'       => $d->vehicle_id !== null ? (string) $d->vehicle_id : null,
-                'true_condition'   => $d->true_condition,
-                'condition'        => $d->true_condition,
-                'peak_g'           => $peakG,
-                'rms_g'            => $rmsG,
-                'crest_factor'     => $crest,
+                'session_id' => $d->session_id ?? ('diag_'.$d->id),
+                'vehicle_id' => $d->vehicle_id !== null ? (string) $d->vehicle_id : null,
+                'true_condition' => $d->true_condition,
+                'condition' => $d->true_condition,
+                'peak_g' => $peakG,
+                'rms_g' => $rmsG,
+                'crest_factor' => $crest,
                 'dominant_freq_hz' => $vibFeat['dominant_freq_hz'] ?? null,
                 'spectral_entropy' => $vibFeat['spectral_entropy'] ?? null,
             ]);
@@ -129,27 +130,28 @@ class MlManagementController extends Controller
 
         $result = $mlService->triggerRetrain($records, true, 120);
 
-        $isSuccess = ($result['status'] ?? '') === 'success' || !empty($result['success']);
+        $isSuccess = ($result['status'] ?? '') === 'success' || ! empty($result['success']);
 
         AuditLogger::log('admin.ml_retrained', [
-            'status'        => $isSuccess ? 'success' : 'failure',
+            'status' => $isSuccess ? 'success' : 'failure',
             'test_accuracy' => $result['test_accuracy'] ?? null,
-            'n_samples'     => $result['n_samples'] ?? 0,
-            'message'       => $result['message'] ?? ($result['error'] ?? 'Model Retraining Pipeline'),
+            'n_samples' => $result['n_samples'] ?? 0,
+            'message' => $result['message'] ?? ($result['error'] ?? 'Model Retraining Pipeline'),
         ], null, $isSuccess ? 'success' : 'failure', auth('admin')->id());
 
         if ($isSuccess) {
-            $acc = isset($result['test_accuracy']) ? round($result['test_accuracy'] * 100, 1) . '%' : '98.5%';
+            $acc = isset($result['test_accuracy']) ? round($result['test_accuracy'] * 100, 1).'%' : '98.5%';
+
             return back()->with('status', "Retraining Complete! Random Forest model updated with {$acc} accuracy across 4 fault classes.");
         }
 
-        return back()->with('error', 'Retraining Error: ' . ($result['error'] ?? 'Unknown pipeline error.'));
+        return back()->with('error', 'Retraining Error: '.($result['error'] ?? 'Unknown pipeline error.'));
     }
 
     /**
      * Export all labeled vehicle diagnostic sessions as a CSV training dataset.
      */
-    public function exportDataset(): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function exportDataset(): StreamedResponse
     {
         $diagnostics = Diagnostic::with('vehicle')
             ->where('is_training_sample', true)
@@ -157,12 +159,12 @@ class MlManagementController extends Controller
             ->whereIn('true_condition', Diagnostic::TRAINING_CONDITIONS)
             ->where(function ($q) {
                 $q->whereNull('vibration_source')
-                  ->orWhere('vibration_source', '!=', 'simulated');
+                    ->orWhere('vibration_source', '!=', 'simulated');
             })
             ->orderBy('id', 'asc')
             ->get();
 
-        $filename = 'haven_admin_ml_dataset_' . now()->format('Ymd_His') . '.csv';
+        $filename = 'haven_admin_ml_dataset_'.now()->format('Ymd_His').'.csv';
 
         return response()->streamDownload(function () use ($diagnostics) {
             $out = fopen('php://output', 'w');
@@ -178,18 +180,18 @@ class MlManagementController extends Controller
             ]);
 
             foreach ($diagnostics as $d) {
-                $raw     = is_array($d->ml_result_raw) ? $d->ml_result_raw : [];
+                $raw = is_array($d->ml_result_raw) ? $d->ml_result_raw : [];
                 $audFeat = is_array($raw['audio_features'] ?? null) ? $raw['audio_features'] : [];
                 $vibFeat = is_array($raw['vibration_features'] ?? null) ? $raw['vibration_features'] : [];
-                $peak    = $vibFeat['peak_g'] ?? $d->vibration_peak_g ?? null;
-                $rms     = $vibFeat['rms_g'] ?? $d->vibration_rms_g ?? null;
-                $crest   = $vibFeat['crest_factor'] ?? (($rms > 0 && $peak > 0) ? round($peak / $rms, 3) : null);
+                $peak = $vibFeat['peak_g'] ?? $d->vibration_peak_g ?? null;
+                $rms = $vibFeat['rms_g'] ?? $d->vibration_rms_g ?? null;
+                $crest = $vibFeat['crest_factor'] ?? (($rms > 0 && $peak > 0) ? round($peak / $rms, 3) : null);
 
                 fputcsv($out, [
                     $d->id,
                     $d->session_id,
                     $d->vehicle_id,
-                    $d->vehicle?->display_name ?? 'Vehicle #' . $d->vehicle_id,
+                    $d->vehicle?->display_name ?? 'Vehicle #'.$d->vehicle_id,
                     $d->vibration_source ?? 'physical',
                     $d->sample_rate_hz,
                     $peak,
@@ -226,4 +228,3 @@ class MlManagementController extends Controller
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 }
-

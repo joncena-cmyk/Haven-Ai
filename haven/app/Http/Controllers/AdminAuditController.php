@@ -22,7 +22,7 @@ class AdminAuditController extends Controller
     {
         $search = trim((string) $request->query('q', ''));
         $status = trim((string) $request->query('status', ''));
-        $event  = trim((string) $request->query('event', ''));
+        $event = trim((string) $request->query('event', ''));
 
         $query = AuditLog::with(['user', 'admin'])->latest('created_at')->latest('id');
 
@@ -37,39 +37,39 @@ class AdminAuditController extends Controller
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $q->where('event', 'like', "%{$search}%")
-                  ->orWhere('ip_address', 'like', "%{$search}%")
-                  ->orWhereHas('user', function ($uq) use ($search) {
-                      $uq->where('name', 'like', "%{$search}%")
-                         ->orWhere('email', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('admin', function ($aq) use ($search) {
-                      $aq->where('name', 'like', "%{$search}%")
-                         ->orWhere('email', 'like', "%{$search}%");
-                  });
+                    ->orWhere('ip_address', 'like', "%{$search}%")
+                    ->orWhereHas('user', function ($uq) use ($search) {
+                        $uq->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('admin', function ($aq) use ($search) {
+                        $aq->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
             });
         }
 
-        $auditLogs  = $query->paginate(25)->withQueryString();
+        $auditLogs = $query->paginate(25)->withQueryString();
         $eventTypes = AuditLog::select('event')->distinct()->orderBy('event')->pluck('event');
-        $admins     = Admin::withCount('auditLogs')->orderBy('id')->get();
+        $admins = Admin::withCount('auditLogs')->orderBy('id')->get();
 
         $stats = [
-            'total_events'  => AuditLog::count(),
+            'total_events' => AuditLog::count(),
             'failed_events' => AuditLog::where('status', 'failure')->count(),
-            'total_users'   => User::count(),
-            'admin_users'   => $admins->count(),
-            'total_vehicles'=> Vehicle::count(),
+            'total_users' => User::count(),
+            'admin_users' => $admins->count(),
+            'total_vehicles' => Vehicle::count(),
         ];
 
         return view('admin.audit-logs', [
-            'auditLogs'  => $auditLogs,
+            'auditLogs' => $auditLogs,
             'eventTypes' => $eventTypes,
-            'admins'     => $admins,
-            'stats'      => $stats,
-            'filters'    => [
-                'q'      => $search,
+            'admins' => $admins,
+            'stats' => $stats,
+            'filters' => [
+                'q' => $search,
                 'status' => $status,
-                'event'  => $event,
+                'event' => $event,
             ],
         ]);
     }
@@ -83,8 +83,8 @@ class AdminAuditController extends Controller
             'exported_by' => Auth::guard('admin')->user()?->email,
         ]);
 
-        $filename = 'haven_iso27001_audit_logs_' . now()->format('Ymd_His') . '.csv';
-        $logs     = AuditLog::with(['user', 'admin'])->latest('created_at')->latest('id')->limit(2000)->get();
+        $filename = 'haven_iso27001_audit_logs_'.now()->format('Ymd_His').'.csv';
+        $logs = AuditLog::with(['user', 'admin'])->latest('created_at')->latest('id')->limit(2000)->get();
 
         return response()->streamDownload(function () use ($logs) {
             $out = fopen('php://output', 'w');

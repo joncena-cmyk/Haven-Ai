@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\Vehicle;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
 
@@ -19,15 +22,15 @@ class ProfileController extends Controller
         $vehicles = $request->user()->vehicles()->get();
         foreach ($vehicles as $veh) {
             if (empty($veh->device_key)) {
-                $veh->update(['device_key' => \App\Models\Vehicle::generateDeviceKey()]);
+                $veh->update(['device_key' => Vehicle::generateDeviceKey()]);
             }
         }
 
         return view('profile.edit', [
-            'user'            => $request->user(),
-            'auditLogs'       => $request->user()->auditLogs()->latest()->take(10)->get(),
-            'vehicles'        => $vehicles,
-            'latestTelemetry' => \Illuminate\Support\Facades\Cache::get('telemetry:live:user:' . $request->user()->id),
+            'user' => $request->user(),
+            'auditLogs' => $request->user()->auditLogs()->latest()->take(10)->get(),
+            'vehicles' => $vehicles,
+            'latestTelemetry' => Cache::get('telemetry:live:user:'.$request->user()->id),
         ]);
     }
 
@@ -44,7 +47,7 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
-        \App\Services\AuditLogger::log('profile.updated', [
+        AuditLogger::log('profile.updated', [
             'email' => $request->user()->email,
         ]);
 
@@ -62,7 +65,7 @@ class ProfileController extends Controller
 
         $user = $request->user();
 
-        \App\Services\AuditLogger::log('profile.deleted', [
+        AuditLogger::log('profile.deleted', [
             'email' => $user->email,
         ], $user->id);
 

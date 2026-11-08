@@ -27,7 +27,7 @@ class AuthController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $credentials = $request->validate([
-            'email'    => ['required', 'string', 'email'],
+            'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
         ]);
 
@@ -90,4 +90,3 @@ class AuthController extends Controller
         return redirect()->route('admin.login');
     }
 }
-

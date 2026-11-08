@@ -35,12 +35,12 @@ class Vehicle extends Model
     {
         static::creating(function (Vehicle $vehicle) {
             if (empty($vehicle->device_key)) {
-                $vehicle->device_key = 'hvn_dev_' . bin2hex(random_bytes(16));
+                $vehicle->device_key = 'hvn_dev_'.bin2hex(random_bytes(16));
             }
         });
 
         static::deleting(function (Vehicle $vehicle) {
-            if (!empty($vehicle->image_path)) {
+            if (! empty($vehicle->image_path)) {
                 Storage::disk('public')->delete($vehicle->image_path);
             }
             foreach ($vehicle->diagnostics as $diagnostic) {
@@ -50,8 +50,8 @@ class Vehicle extends Model
     }
 
     protected $casts = [
-        'year'             => 'integer',
-        'mileage_km'       => 'integer',
+        'year' => 'integer',
+        'mileage_km' => 'integer',
         'alert_thresholds' => 'array',
     ];
 
@@ -81,7 +81,7 @@ class Vehicle extends Model
             return strtolower($this->body_type);
         }
 
-        $combined = strtolower(($this->make ?? '') . ' ' . ($this->model ?? ''));
+        $combined = strtolower(($this->make ?? '').' '.($this->model ?? ''));
         if (preg_match('/\b(suv|crossover|rav4|cr-v|tucson|sportage|cx-5|cx-9|x3|x5|q5|q7|urus|macan|cayenne|montero|fortuner|everest|terra|mu-x|explorer|highlander|trailblazer)\b/i', $combined)) {
             return 'suv';
         }
@@ -104,7 +104,7 @@ class Vehicle extends Model
     public function getImageUrlAttribute(): ?string
     {
         if (! empty($this->image_path)) {
-            return \Illuminate\Support\Facades\Storage::disk('public')->url($this->image_path);
+            return Storage::disk('public')->url($this->image_path);
         }
 
         $type = $this->resolved_body_type;
@@ -122,11 +122,11 @@ class Vehicle extends Model
     public function getBodyTypeLabelAttribute(): string
     {
         return match (strtolower($this->body_type ?? 'sedan')) {
-            'suv'       => 'SUV / Crossover',
+            'suv' => 'SUV / Crossover',
             'hatchback' => 'Hatchback',
-            'coupe'     => 'Coupe / Sport',
-            'pickup'    => 'Pickup / Truck',
-            default     => 'Sedan',
+            'coupe' => 'Coupe / Sport',
+            'pickup' => 'Pickup / Truck',
+            default => 'Sedan',
         };
     }
 
@@ -142,15 +142,34 @@ class Vehicle extends Model
         if (preg_match('/^#([a-f0-9]{3}|[a-f0-9]{6})$/i', $c)) {
             return $c;
         }
-        if (str_contains($c, 'red') || str_contains($c, 'crimson') || str_contains($c, 'maroon')) return '#ef4444';
-        if (str_contains($c, 'blue') || str_contains($c, 'navy') || str_contains($c, 'sapphire')) return '#38bdf8';
-        if (str_contains($c, 'yellow') || str_contains($c, 'gold')) return '#eab308';
-        if (str_contains($c, 'orange') || str_contains($c, 'bronze') || str_contains($c, 'copper')) return '#f97316';
-        if (str_contains($c, 'green') || str_contains($c, 'lime') || str_contains($c, 'emerald')) return '#10b981';
-        if (str_contains($c, 'black') || str_contains($c, 'dark') || str_contains($c, 'obsidian')) return '#64748b';
-        if (str_contains($c, 'white') || str_contains($c, 'pearl')) return '#e2e8f0';
-        if (str_contains($c, 'silver') || str_contains($c, 'gray') || str_contains($c, 'grey')) return '#94a3b8';
-        if (str_contains($c, 'purple') || str_contains($c, 'violet')) return '#a855f7';
+        if (str_contains($c, 'red') || str_contains($c, 'crimson') || str_contains($c, 'maroon')) {
+            return '#ef4444';
+        }
+        if (str_contains($c, 'blue') || str_contains($c, 'navy') || str_contains($c, 'sapphire')) {
+            return '#38bdf8';
+        }
+        if (str_contains($c, 'yellow') || str_contains($c, 'gold')) {
+            return '#eab308';
+        }
+        if (str_contains($c, 'orange') || str_contains($c, 'bronze') || str_contains($c, 'copper')) {
+            return '#f97316';
+        }
+        if (str_contains($c, 'green') || str_contains($c, 'lime') || str_contains($c, 'emerald')) {
+            return '#10b981';
+        }
+        if (str_contains($c, 'black') || str_contains($c, 'dark') || str_contains($c, 'obsidian')) {
+            return '#64748b';
+        }
+        if (str_contains($c, 'white') || str_contains($c, 'pearl')) {
+            return '#e2e8f0';
+        }
+        if (str_contains($c, 'silver') || str_contains($c, 'gray') || str_contains($c, 'grey')) {
+            return '#94a3b8';
+        }
+        if (str_contains($c, 'purple') || str_contains($c, 'violet')) {
+            return '#a855f7';
+        }
+
         return '#38bdf8';
     }
 
@@ -161,12 +180,12 @@ class Vehicle extends Model
     public function getSketchfabUidAttribute(): ?string
     {
         // 1. If user set an explicit custom 3D model UID, use it
-        if (!empty($this->attributes['sketchfab_uid'])) {
+        if (! empty($this->attributes['sketchfab_uid'])) {
             return $this->attributes['sketchfab_uid'];
         }
 
-        $make     = strtolower(trim($this->make ?? ''));
-        $model    = strtolower(trim($this->model ?? ''));
+        $make = strtolower(trim($this->make ?? ''));
+        $model = strtolower(trim($this->model ?? ''));
         $combined = "{$make} {$model}";
 
         // 2. Strict, verified accurate 3D model mappings ONLY
@@ -205,7 +224,7 @@ class Vehicle extends Model
      */
     public function has3dModel(): bool
     {
-        return !empty($this->sketchfab_uid);
+        return ! empty($this->sketchfab_uid);
     }
 
     public function getSketchfabModelNameAttribute(): string
@@ -219,12 +238,13 @@ class Vehicle extends Model
      */
     public function isScopeCompliant(): bool
     {
-        return ($this->year >= 2015) && !$this->isExcludedPowertrain();
+        return ($this->year >= 2015) && ! $this->isExcludedPowertrain();
     }
 
     public function isExcludedPowertrain(): bool
     {
         $engine = strtolower($this->engine_type ?? '');
+
         return (bool) preg_match('/\b(diesel|tdi|crdi|cummins|duramax|hybrid|phev|ev|electric|motorcycle)\b/i', $engine);
     }
 
@@ -234,11 +254,11 @@ class Vehicle extends Model
         if ($compliant) {
             return [
                 'compliant' => true,
-                'label'     => '2015+ Gasoline (In Scope)',
+                'label' => '2015+ Gasoline (In Scope)',
                 'badge_css' => 'h-badge-teal',
-                'color'     => 'var(--h-teal)',
-                'icon'      => 'check-circle',
-                'notice'    => null,
+                'color' => 'var(--h-teal)',
+                'icon' => 'check-circle',
+                'notice' => null,
             ];
         }
 
@@ -252,11 +272,11 @@ class Vehicle extends Model
 
         return [
             'compliant' => false,
-            'label'     => 'Out of Scope',
+            'label' => 'Out of Scope',
             'badge_css' => 'h-badge-amber',
-            'color'     => 'var(--h-amber)',
-            'icon'      => 'alert-triangle',
-            'notice'    => implode(', ', $reasons) . '. Note: Research scope is 2015+ spark-ignition gasoline passenger vehicles.',
+            'color' => 'var(--h-amber)',
+            'icon' => 'alert-triangle',
+            'notice' => implode(', ', $reasons).'. Note: Research scope is 2015+ spark-ignition gasoline passenger vehicles.',
         ];
     }
 }

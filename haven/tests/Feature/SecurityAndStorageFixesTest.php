@@ -22,10 +22,10 @@ class SecurityAndStorageFixesTest extends TestCase
         $other = User::factory()->create();
 
         $vehicle = Vehicle::create([
-            'user_id'    => $owner->id,
-            'make'       => 'Toyota',
-            'model'      => 'Corolla',
-            'year'       => 2020,
+            'user_id' => $owner->id,
+            'make' => 'Toyota',
+            'model' => 'Corolla',
+            'year' => 2020,
             'device_key' => 'hvn_dev_aabbccddeeff00112233445566778899',
         ]);
 
@@ -35,16 +35,16 @@ class SecurityAndStorageFixesTest extends TestCase
 
         // Other user cannot access owner's sketch or telemetry
         $this->actingAs($other)
-            ->getJson('/api/v1/telemetry/sketch?vehicle_id=' . $vehicle->id)
+            ->getJson('/api/v1/telemetry/sketch?vehicle_id='.$vehicle->id)
             ->assertStatus(403);
 
         $this->actingAs($other)
-            ->getJson('/api/v1/telemetry/latest?vehicle_id=' . $vehicle->id)
+            ->getJson('/api/v1/telemetry/latest?vehicle_id='.$vehicle->id)
             ->assertStatus(403);
 
         // Owner can access their own sketch
         $this->actingAs($owner)
-            ->getJson('/api/v1/telemetry/sketch?vehicle_id=' . $vehicle->id)
+            ->getJson('/api/v1/telemetry/sketch?vehicle_id='.$vehicle->id)
             ->assertOk()
             ->assertJsonPath('vehicle_id', $vehicle->id);
     }
@@ -59,35 +59,35 @@ class SecurityAndStorageFixesTest extends TestCase
         $other = User::factory()->create();
 
         $vehicle = Vehicle::create([
-            'user_id'    => $owner->id,
-            'make'       => 'Honda',
-            'model'      => 'Civic',
-            'year'       => 2021,
+            'user_id' => $owner->id,
+            'make' => 'Honda',
+            'model' => 'Civic',
+            'year' => 2021,
             'device_key' => 'hvn_dev_11223344556677889900aabbccddeeff',
         ]);
 
         // Hardcoded fallback key hvn_dev_test must fail
         $this->postJson('/api/v1/telemetry/ingest', [
             'vehicle_id' => $vehicle->id,
-            'rpm'        => 850,
+            'rpm' => 850,
         ], ['X-Haven-Device-Key' => 'hvn_dev_test'])->assertStatus(401);
 
         // Oversized csv_data must fail validation
         $this->postJson('/api/v1/telemetry/ingest', [
             'vehicle_id' => $vehicle->id,
-            'csv_data'   => str_repeat('a', 600000),
+            'csv_data' => str_repeat('a', 600000),
         ], ['X-Haven-Device-Key' => $vehicle->device_key])->assertStatus(422);
 
         // Valid device key succeeds and does not leak to other users or global cache
         $this->postJson('/api/v1/telemetry/ingest', [
-            'vehicle_id'   => $vehicle->id,
-            'csv_data'     => "t,x,y,z\n0,0.1,0.2,0.9\n1,0.1,0.2,1.0",
+            'vehicle_id' => $vehicle->id,
+            'csv_data' => "t,x,y,z\n0,0.1,0.2,0.9\n1,0.1,0.2,1.0",
             'save_session' => true,
             'auto_analyze' => false,
         ], ['X-Haven-Device-Key' => $vehicle->device_key])->assertStatus(201);
 
         $this->assertNull(Cache::get('telemetry:live:latest'));
-        $this->assertNotNull(Cache::get('telemetry:live:' . $vehicle->id));
+        $this->assertNotNull(Cache::get('telemetry:live:'.$vehicle->id));
 
         // Other user polling /latest does not see owner's live telemetry
         $this->actingAs($other)
@@ -105,10 +105,10 @@ class SecurityAndStorageFixesTest extends TestCase
     {
         $user = User::factory()->create();
         $vehicle = Vehicle::create([
-            'user_id'    => $user->id,
-            'make'       => 'Mazda',
-            'model'      => '3',
-            'year'       => 2022,
+            'user_id' => $user->id,
+            'make' => 'Mazda',
+            'model' => '3',
+            'year' => 2022,
             'device_key' => 'hvn_dev_deadbeefcafebabe1234567890abcdef',
         ]);
 
@@ -117,7 +117,7 @@ class SecurityAndStorageFixesTest extends TestCase
 
         // Test offline expert engine response does not expose device_key
         config([
-            'services.groq.key'   => null,
+            'services.groq.key' => null,
             'services.gemini.key' => null,
             'services.openai.key' => null,
         ]);
@@ -149,17 +149,17 @@ class SecurityAndStorageFixesTest extends TestCase
 
         $vehicle = Vehicle::create([
             'user_id' => $owner->id,
-            'make'    => 'Subaru',
-            'model'   => 'Impreza',
-            'year'    => 2019,
+            'make' => 'Subaru',
+            'model' => 'Impreza',
+            'year' => 2019,
         ]);
 
         $audio = UploadedFile::fake()->create('engine.wav', 64, 'audio/wav');
-        $vib   = UploadedFile::fake()->createWithContent('vib.csv', "t,x,y,z\n0,0.1,0.1,1.0\n");
+        $vib = UploadedFile::fake()->createWithContent('vib.csv', "t,x,y,z\n0,0.1,0.1,1.0\n");
 
         $this->actingAs($owner)->post('/diagnostics', [
-            'vehicle_id'     => $vehicle->id,
-            'audio_file'     => $audio,
+            'vehicle_id' => $vehicle->id,
+            'audio_file' => $audio,
             'vibration_file' => $vib,
         ])->assertRedirect();
 
@@ -187,4 +187,3 @@ class SecurityAndStorageFixesTest extends TestCase
             ->assertStatus(403);
     }
 }
-

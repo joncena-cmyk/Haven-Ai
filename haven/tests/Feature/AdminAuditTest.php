@@ -6,6 +6,7 @@ use App\Models\Admin;
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class AdminAuditTest extends TestCase
@@ -22,14 +23,14 @@ class AdminAuditTest extends TestCase
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $user->id,
-            'event'   => 'admin.access_denied',
-            'status'  => 'failure',
+            'event' => 'admin.access_denied',
+            'status' => 'failure',
         ]);
     }
 
     public function test_admin_can_view_and_export_audit_logs(): void
     {
-        $admin      = Admin::factory()->create(['name' => 'Chief Admin']);
+        $admin = Admin::factory()->create(['name' => 'Chief Admin']);
         $targetUser = User::factory()->create();
         AuditLog::create(['user_id' => $targetUser->id, 'event' => 'vehicle.created', 'status' => 'success', 'created_at' => now()]);
 
@@ -48,15 +49,15 @@ class AdminAuditTest extends TestCase
 
         $this->assertDatabaseHas('audit_logs', [
             'admin_id' => $admin->id,
-            'user_id'  => null,
-            'event'    => 'admin.audit_exported',
-            'status'   => 'success',
+            'user_id' => null,
+            'event' => 'admin.audit_exported',
+            'status' => 'success',
         ]);
     }
 
     public function test_role_toggle_route_no_longer_exists(): void
     {
-        $this->assertFalse(\Illuminate\Support\Facades\Route::has('admin.users.toggle-admin'));
+        $this->assertFalse(Route::has('admin.users.toggle-admin'));
     }
 
     public function test_failed_login_and_profile_update_are_recorded_in_audit_trail(): void
@@ -66,25 +67,25 @@ class AdminAuditTest extends TestCase
         ]);
 
         $this->post('/login', [
-            'email'    => 'driver@haven.test',
+            'email' => 'driver@haven.test',
             'password' => 'wrong-password',
         ]);
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $user->id,
-            'event'   => 'auth.login_failed',
-            'status'  => 'failure',
+            'event' => 'auth.login_failed',
+            'status' => 'failure',
         ]);
 
         $this->actingAs($user)->patch('/profile', [
-            'name'  => 'Updated Driver',
+            'name' => 'Updated Driver',
             'email' => 'driver@haven.test',
         ]);
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $user->id,
-            'event'   => 'profile.updated',
-            'status'  => 'success',
+            'event' => 'profile.updated',
+            'status' => 'success',
         ]);
     }
 }

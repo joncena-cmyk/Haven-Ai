@@ -33,7 +33,7 @@ class Admin extends Authenticatable
     protected function casts(): array
     {
         return [
-            'password'      => 'hashed',
+            'password' => 'hashed',
             'last_login_at' => 'datetime',
         ];
     }
@@ -43,4 +43,3 @@ class Admin extends Authenticatable
         return $this->hasMany(AuditLog::class);
     }
 }
-

@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -45,8 +47,8 @@ class LoginRequest extends FormRequest
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
-            $existingUserId = \App\Models\User::where('email', (string) $this->input('email'))->value('id');
-            \App\Services\AuditLogger::log('auth.login_failed', [
+            $existingUserId = User::where('email', (string) $this->input('email'))->value('id');
+            AuditLogger::log('auth.login_failed', [
                 'email' => (string) $this->input('email'),
             ], $existingUserId, 'failure');
 
@@ -59,7 +61,7 @@ class LoginRequest extends FormRequest
             $suspendedId = Auth::id();
             Auth::logout();
 
-            \App\Services\AuditLogger::log('auth.login_blocked_suspended', [
+            AuditLogger::log('auth.login_blocked_suspended', [
                 'email' => (string) $this->input('email'),
             ], $suspendedId, 'failure');
 

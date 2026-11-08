@@ -25,15 +25,15 @@ class CsrfKeepAliveTest extends TestCase
         $response = $this->actingAs($user)->getJson(route('keep-alive'));
 
         $response->assertStatus(200)
-                 ->assertJsonStructure([
-                     'status',
-                     'csrf_token',
-                     'user_id',
-                 ])
-                 ->assertJson([
-                     'status' => 'alive',
-                     'user_id' => $user->id,
-                 ]);
+            ->assertJsonStructure([
+                'status',
+                'csrf_token',
+                'user_id',
+            ])
+            ->assertJson([
+                'status' => 'alive',
+                'user_id' => $user->id,
+            ]);
     }
 
     public function test_diagnostic_store_supports_json_and_returns_redirect_url(): void
@@ -56,14 +56,14 @@ class CsrfKeepAliveTest extends TestCase
         ]);
 
         $response->assertStatus(200)
-                 ->assertJsonStructure([
-                     'success',
-                     'message',
-                     'redirect_url',
-                     'diagnostic_id',
-                 ])
-                 ->assertJson([
-                     'success' => true,
-                 ]);
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'redirect_url',
+                'diagnostic_id',
+            ])
+            ->assertJson([
+                'success' => true,
+            ]);
     }
 }

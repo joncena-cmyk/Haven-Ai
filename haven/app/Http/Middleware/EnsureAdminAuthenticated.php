@@ -38,4 +38,3 @@ class EnsureAdminAuthenticated
         return $next($request);
     }
 }
-

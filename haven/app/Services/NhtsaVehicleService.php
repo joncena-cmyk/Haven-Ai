@@ -16,11 +16,12 @@ use RuntimeException;
 class NhtsaVehicleService
 {
     private string $baseUrl;
+
     private int $timeoutSec;
 
     public function __construct()
     {
-        $this->baseUrl    = rtrim(config('services.nhtsa.url', 'https://vpic.nhtsa.dot.gov/api/vehicles'), '/');
+        $this->baseUrl = rtrim(config('services.nhtsa.url', 'https://vpic.nhtsa.dot.gov/api/vehicles'), '/');
         $this->timeoutSec = (int) config('services.nhtsa.timeout', 20);
     }
 
@@ -118,9 +119,9 @@ class NhtsaVehicleService
         }
 
         $errorCode = (string) ($row['ErrorCode'] ?? '');
-        $make      = $this->usable($row['Make'] ?? '');
-        $model     = $this->usable($row['Model'] ?? '');
-        $yearRaw   = $this->usable($row['ModelYear'] ?? '');
+        $make = $this->usable($row['Make'] ?? '');
+        $model = $this->usable($row['Model'] ?? '');
+        $yearRaw = $this->usable($row['ModelYear'] ?? '');
 
         if ($make === null && ($errorCode === '' || ! str_starts_with($errorCode, '0'))) {
             $message = $this->usable($row['ErrorText'] ?? '') ?? 'This VIN could not be decoded.';
@@ -128,12 +129,12 @@ class NhtsaVehicleService
         }
 
         return [
-            'vin'           => $vin,
-            'make'          => $make ? $this->titleCase($make) : null,
-            'model'         => $model,
-            'year'          => $yearRaw && ctype_digit($yearRaw) ? (int) $yearRaw : null,
-            'engine_type'   => $this->composeEngine($row),
-            'transmission'  => $this->mapTransmission(
+            'vin' => $vin,
+            'make' => $make ? $this->titleCase($make) : null,
+            'model' => $model,
+            'year' => $yearRaw && ctype_digit($yearRaw) ? (int) $yearRaw : null,
+            'engine_type' => $this->composeEngine($row),
+            'transmission' => $this->mapTransmission(
                 $this->usable($row['TransmissionStyle'] ?? '')
                 ?? $this->usable($row['TransmissionDescriptor'] ?? '')
             ),

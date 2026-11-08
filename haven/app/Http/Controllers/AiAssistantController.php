@@ -9,9 +9,7 @@ use Illuminate\Support\Facades\Auth;
 
 class AiAssistantController extends Controller
 {
-    public function __construct(protected GlobalAiAssistantService $assistantService)
-    {
-    }
+    public function __construct(protected GlobalAiAssistantService $assistantService) {}
 
     /**
      * Handle website-wide AI Orb questions.

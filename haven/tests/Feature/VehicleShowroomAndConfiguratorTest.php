@@ -17,12 +17,12 @@ class VehicleShowroomAndConfiguratorTest extends TestCase
     {
         $user = User::factory()->create();
         $vehicle = Vehicle::create([
-            'user_id'     => $user->id,
-            'make'        => 'Audi',
-            'model'       => 'A7 Sportback',
-            'year'        => 2025,
-            'body_type'   => 'coupe',
-            'color'       => 'Solar Yellow',
+            'user_id' => $user->id,
+            'make' => 'Audi',
+            'model' => 'A7 Sportback',
+            'year' => 2025,
+            'body_type' => 'coupe',
+            'color' => 'Solar Yellow',
             'engine_type' => '3.0L TFSI V6',
         ]);
 
@@ -42,15 +42,15 @@ class VehicleShowroomAndConfiguratorTest extends TestCase
         $photo = UploadedFile::fake()->create('my_audi.jpg', 100, 'image/jpeg');
 
         $response = $this->actingAs($user)->post(route('vehicles.store'), [
-            'make'         => 'Audi',
-            'model'        => 'A7 Sportback',
-            'year'         => 2025,
-            'body_type'    => 'coupe',
-            'color'        => 'Cobalt Blue',
+            'make' => 'Audi',
+            'model' => 'A7 Sportback',
+            'year' => 2025,
+            'body_type' => 'coupe',
+            'color' => 'Cobalt Blue',
             'plate_number' => 'XYZ 9999',
             'transmission' => 'Automatic',
-            'mileage_km'   => 12500,
-            'photo'        => $photo,
+            'mileage_km' => 12500,
+            'photo' => $photo,
         ]);
 
         $response->assertRedirect(route('vehicles.index'));
@@ -69,21 +69,21 @@ class VehicleShowroomAndConfiguratorTest extends TestCase
         $file = UploadedFile::fake()->create('initial.jpg', 100, 'image/jpeg')->store('vehicles', 'public');
 
         $vehicle = Vehicle::create([
-            'user_id'    => $user->id,
-            'make'       => 'Toyota',
-            'model'      => 'Corolla',
-            'year'       => 2022,
-            'body_type'  => 'sedan',
+            'user_id' => $user->id,
+            'make' => 'Toyota',
+            'model' => 'Corolla',
+            'year' => 2022,
+            'body_type' => 'sedan',
             'image_path' => $file,
         ]);
 
         Storage::disk('public')->assertExists($file);
 
         $response = $this->actingAs($user)->patch(route('vehicles.update', $vehicle), [
-            'make'         => 'Toyota',
-            'model'        => 'Corolla Altis',
-            'year'         => 2023,
-            'body_type'    => 'sedan',
+            'make' => 'Toyota',
+            'model' => 'Corolla Altis',
+            'year' => 2023,
+            'body_type' => 'sedan',
             'remove_photo' => 1,
         ]);
 
@@ -102,10 +102,10 @@ class VehicleShowroomAndConfiguratorTest extends TestCase
         $file = UploadedFile::fake()->create('car.jpg', 100, 'image/jpeg')->store('vehicles', 'public');
 
         $vehicle = Vehicle::create([
-            'user_id'    => $user->id,
-            'make'       => 'Nissan',
-            'model'      => 'GT-R',
-            'year'       => 2021,
+            'user_id' => $user->id,
+            'make' => 'Nissan',
+            'model' => 'GT-R',
+            'year' => 2021,
             'image_path' => $file,
         ]);
 

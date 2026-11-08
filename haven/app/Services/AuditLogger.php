@@ -25,13 +25,13 @@ class AuditLogger
         }
 
         return AuditLog::create([
-            'user_id'    => $userId,
-            'admin_id'   => $adminId,
-            'event'      => $event,
-            'status'     => $status,
+            'user_id' => $userId,
+            'admin_id' => $adminId,
+            'event' => $event,
+            'status' => $status,
             'ip_address' => Request::ip(),
             'user_agent' => Request::header('User-Agent'),
-            'details'    => $details,
+            'details' => $details,
             'created_at' => now(),
         ]);
     }

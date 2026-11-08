@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LearningProgress;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -14,28 +16,28 @@ class LearningController extends Controller
     {
         return [
             'valve-clearance' => [
-                'slug'           => 'valve-clearance',
-                'title'          => 'Improper Valve Clearance',
-                'category'       => 'Mechanical Faults',
-                'severity'       => 'Critical',
+                'slug' => 'valve-clearance',
+                'title' => 'Improper Valve Clearance',
+                'category' => 'Mechanical Faults',
+                'severity' => 'Critical',
                 'severity_color' => 'red',
-                'read_time'      => '6 min read',
-                'summary'        => 'Understand abnormal valvetrain mechanical impacts, excessive lash causing high-frequency tapping, high Crest Factor vibration spikes, and camshaft lobe–rocker arm wear patterns in gasoline ICE.',
-                'icon'           => 'alert-triangle',
+                'read_time' => '6 min read',
+                'summary' => 'Understand abnormal valvetrain mechanical impacts, excessive lash causing high-frequency tapping, high Crest Factor vibration spikes, and camshaft lobe–rocker arm wear patterns in gasoline ICE.',
+                'icon' => 'alert-triangle',
                 'acoustic_signature' => [
-                    'frequency_range'  => '2.5 kHz – 6.5 kHz',
-                    'characteristics'  => 'Rapid, sharp metallic tapping or clicking at camshaft speed (half engine RPM). Loudest during cold start; may soften as oil reaches operating temp.',
-                    'zcr'              => '0.18 – 0.30 (Elevated zero-crossing rate from repetitive mechanical impact)',
-                    'spectral_centroid'=> 'Elevated (>2,600 Hz) due to sharp metallic impact waveforms at valve closure.',
+                    'frequency_range' => '2.5 kHz – 6.5 kHz',
+                    'characteristics' => 'Rapid, sharp metallic tapping or clicking at camshaft speed (half engine RPM). Loudest during cold start; may soften as oil reaches operating temp.',
+                    'zcr' => '0.18 – 0.30 (Elevated zero-crossing rate from repetitive mechanical impact)',
+                    'spectral_centroid' => 'Elevated (>2,600 Hz) due to sharp metallic impact waveforms at valve closure.',
                 ],
                 'vibration_signature' => [
-                    'peak_g'      => '> 3.6 g (Repetitive sharp impact spikes at camshaft frequency)',
-                    'rms_g'       => '0.30 g – 0.70 g',
-                    'crest_factor'=> '> 4.2 (High impulsiveness — repetitive sharp impulse-to-steady energy ratio)',
-                    'pattern'     => 'Periodic transient impact spikes at half-engine-speed frequency, representing valve opening and closing events.',
+                    'peak_g' => '> 3.6 g (Repetitive sharp impact spikes at camshaft frequency)',
+                    'rms_g' => '0.30 g – 0.70 g',
+                    'crest_factor' => '> 4.2 (High impulsiveness — repetitive sharp impulse-to-steady energy ratio)',
+                    'pattern' => 'Periodic transient impact spikes at half-engine-speed frequency, representing valve opening and closing events.',
                 ],
-                'dtc_codes'        => ['P0011', 'P0012', 'P0014', 'P0016', 'P0017'],
-                'root_causes'      => [
+                'dtc_codes' => ['P0011', 'P0012', 'P0014', 'P0016', 'P0017'],
+                'root_causes' => [
                     'Insufficient valve lash adjustment allowing metal-to-metal contact between camshaft lobe and rocker arm/tappet.',
                     'Worn camshaft lobes or rocker arm pads reducing lift profile.',
                     'Hydraulic lash adjuster (HLA) oil pressure starvation or collapsed lifter.',
@@ -142,28 +144,28 @@ class LearningController extends Controller
             ],
 
             'normal-operation' => [
-                'slug'           => 'normal-operation',
-                'title'          => 'Normal Engine Operation',
-                'category'       => 'Baseline Reference',
-                'severity'       => 'Normal',
+                'slug' => 'normal-operation',
+                'title' => 'Normal Engine Operation',
+                'category' => 'Baseline Reference',
+                'severity' => 'Normal',
                 'severity_color' => 'teal',
-                'read_time'      => '4 min read',
-                'summary'        => 'Understand the acoustic and vibration telemetry signatures of a healthy gasoline ICE under both baseline idling (700–900 RPM) and controlled revving (2,000–2,500 RPM) conditions.',
-                'icon'           => 'check-circle',
+                'read_time' => '4 min read',
+                'summary' => 'Understand the acoustic and vibration telemetry signatures of a healthy gasoline ICE under both baseline idling (700–900 RPM) and controlled revving (2,000–2,500 RPM) conditions.',
+                'icon' => 'check-circle',
                 'acoustic_signature' => [
-                    'frequency_range'  => '80 Hz – 2,000 Hz',
-                    'characteristics'  => 'Smooth, periodic combustion rhythm with consistent 4-stroke firing cadence. No sharp metallic impacts or cyclic amplitude dropouts.',
-                    'zcr'              => '0.08 – 0.14 (Steady low-frequency combustion harmonics)',
-                    'spectral_centroid'=> 'Low-to-mid (1,000–2,200 Hz) — dominated by fundamental firing frequency and harmonics.',
+                    'frequency_range' => '80 Hz – 2,000 Hz',
+                    'characteristics' => 'Smooth, periodic combustion rhythm with consistent 4-stroke firing cadence. No sharp metallic impacts or cyclic amplitude dropouts.',
+                    'zcr' => '0.08 – 0.14 (Steady low-frequency combustion harmonics)',
+                    'spectral_centroid' => 'Low-to-mid (1,000–2,200 Hz) — dominated by fundamental firing frequency and harmonics.',
                 ],
                 'vibration_signature' => [
-                    'peak_g'      => '≤ 1.8 g (No isolated impact spikes)',
-                    'rms_g'       => '≤ 0.45 g (Low continuous mechanical energy)',
-                    'crest_factor'=> '≤ 3.6 (No impulsive anomalies — smooth rotational energy)',
-                    'pattern'     => 'Even, periodic vibration harmonics corresponding to engine firing order. Idle: 750–900 RPM. Revving baseline: 2,000–2,500 RPM.',
+                    'peak_g' => '≤ 1.8 g (No isolated impact spikes)',
+                    'rms_g' => '≤ 0.45 g (Low continuous mechanical energy)',
+                    'crest_factor' => '≤ 3.6 (No impulsive anomalies — smooth rotational energy)',
+                    'pattern' => 'Even, periodic vibration harmonics corresponding to engine firing order. Idle: 750–900 RPM. Revving baseline: 2,000–2,500 RPM.',
                 ],
-                'dtc_codes'        => ['None — all systems within normal parameters'],
-                'root_causes'      => [
+                'dtc_codes' => ['None — all systems within normal parameters'],
+                'root_causes' => [
                     'This is the reference baseline condition for HAVEN AI classification.',
                     'Engine at idle: 750–900 RPM, temperature 85–95°C, 14.0–14.4V alternator charging.',
                     'Engine during revving: 2,000–2,500 RPM, smooth acceleration without torque dips or vibration spikes.',
@@ -265,25 +267,25 @@ class LearningController extends Controller
             // ── NEW MODULES ────────────────────────────────────────────────
 
             'pre-diagnostic-safety' => [
-                'slug'           => 'pre-diagnostic-safety',
-                'title'          => 'Pre-Diagnostic Safety Checklist',
-                'category'       => 'Safety & Preparation',
-                'severity'       => 'Important',
+                'slug' => 'pre-diagnostic-safety',
+                'title' => 'Pre-Diagnostic Safety Checklist',
+                'category' => 'Safety & Preparation',
+                'severity' => 'Important',
                 'severity_color' => 'amber',
-                'read_time'      => '4 min read',
-                'summary'        => 'Essential safety procedures and vehicle conditions to verify before running a HAVEN AI diagnostic session — protecting both the user and the integrity of acoustic and vibration data.',
-                'icon'           => 'shield',
+                'read_time' => '4 min read',
+                'summary' => 'Essential safety procedures and vehicle conditions to verify before running a HAVEN AI diagnostic session — protecting both the user and the integrity of acoustic and vibration data.',
+                'icon' => 'shield',
                 'acoustic_signature' => [
-                    'frequency_range'   => 'N/A (Pre-capture phase)',
-                    'characteristics'   => 'Environmental noise sources (traffic, A/C compressor, cooling fan) must be minimized before recording to prevent data contamination.',
-                    'zcr'               => 'Background noise floor should be below ZCR 0.05 to ensure clean signal baseline.',
+                    'frequency_range' => 'N/A (Pre-capture phase)',
+                    'characteristics' => 'Environmental noise sources (traffic, A/C compressor, cooling fan) must be minimized before recording to prevent data contamination.',
+                    'zcr' => 'Background noise floor should be below ZCR 0.05 to ensure clean signal baseline.',
                     'spectral_centroid' => 'Aim for ambient spectral centroid below 800 Hz — indicating a quiet recording environment.',
                 ],
                 'vibration_signature' => [
-                    'peak_g'       => '< 0.3 g ambient (engine off baseline — confirms sensor mounting is stable)',
-                    'rms_g'        => '< 0.05 g (acceptable idle ambient floor before engine start)',
+                    'peak_g' => '< 0.3 g ambient (engine off baseline — confirms sensor mounting is stable)',
+                    'rms_g' => '< 0.05 g (acceptable idle ambient floor before engine start)',
                     'crest_factor' => 'N/A (Pre-start phase)',
-                    'pattern'      => 'Static flat baseline — no oscillatory pattern. Any movement in pre-start data indicates loose sensor or external vibration source.',
+                    'pattern' => 'Static flat baseline — no oscillatory pattern. Any movement in pre-start data indicates loose sensor or external vibration source.',
                 ],
                 'dtc_codes' => ['N/A (Safety Protocol — no OBD codes applicable)'],
                 'root_causes' => [
@@ -323,25 +325,25 @@ class LearningController extends Controller
             ],
 
             'engine-oil-maintenance' => [
-                'slug'           => 'engine-oil-maintenance',
-                'title'          => 'Engine Oil & Fluid Health',
-                'category'       => 'Preventive Maintenance',
-                'severity'       => 'Medium',
+                'slug' => 'engine-oil-maintenance',
+                'title' => 'Engine Oil & Fluid Health',
+                'category' => 'Preventive Maintenance',
+                'severity' => 'Medium',
                 'severity_color' => 'amber',
-                'read_time'      => '5 min read',
-                'summary'        => 'How engine oil degradation, viscosity breakdown, and contamination directly change acoustic tapping frequencies and vibration amplitude — and what HAVEN\'s telemetry reveals about your lubrication system.',
-                'icon'           => 'droplet',
+                'read_time' => '5 min read',
+                'summary' => 'How engine oil degradation, viscosity breakdown, and contamination directly change acoustic tapping frequencies and vibration amplitude — and what HAVEN\'s telemetry reveals about your lubrication system.',
+                'icon' => 'droplet',
                 'acoustic_signature' => [
-                    'frequency_range'   => '1.5 kHz – 5.0 kHz (Low-oil acoustic range)',
-                    'characteristics'   => 'Increased metallic tapping and upper-engine chatter as oil film thins. High-frequency content intensifies as viscosity drops below specification.',
-                    'zcr'               => '0.12 – 0.22 (Elevated — more frequent sign changes from mechanical impacts as oil film collapses)',
+                    'frequency_range' => '1.5 kHz – 5.0 kHz (Low-oil acoustic range)',
+                    'characteristics' => 'Increased metallic tapping and upper-engine chatter as oil film thins. High-frequency content intensifies as viscosity drops below specification.',
+                    'zcr' => '0.12 – 0.22 (Elevated — more frequent sign changes from mechanical impacts as oil film collapses)',
                     'spectral_centroid' => 'Shifts progressively higher (> 2,000 Hz) as lubrication degrades — correlated with increasing valve train impact severity.',
                 ],
                 'vibration_signature' => [
-                    'peak_g'       => '2.0 g – 4.5 g (Elevated impulse peaks from dry contact between cam lobes and tappets)',
-                    'rms_g'        => '0.35 g – 0.65 g (Elevated continuous energy from increased friction across bearings)',
+                    'peak_g' => '2.0 g – 4.5 g (Elevated impulse peaks from dry contact between cam lobes and tappets)',
+                    'rms_g' => '0.35 g – 0.65 g (Elevated continuous energy from increased friction across bearings)',
                     'crest_factor' => '3.5 – 5.0 (Rising impulsiveness indicates boundary lubrication failure)',
-                    'pattern'      => 'Gradual amplitude increase over time — unlike sudden fault onset. RMS G rises slowly as viscosity index degrades over service intervals.',
+                    'pattern' => 'Gradual amplitude increase over time — unlike sudden fault onset. RMS G rises slowly as viscosity index degrades over service intervals.',
                 ],
                 'dtc_codes' => ['P0520', 'P0521', 'P0522', 'P0523', 'P0524'],
                 'root_causes' => [
@@ -380,25 +382,25 @@ class LearningController extends Controller
             ],
 
             'when-to-see-mechanic' => [
-                'slug'           => 'when-to-see-mechanic',
-                'title'          => 'When to Seek a Professional Mechanic',
-                'category'       => 'Safety & Preparation',
-                'severity'       => 'Critical',
+                'slug' => 'when-to-see-mechanic',
+                'title' => 'When to Seek a Professional Mechanic',
+                'category' => 'Safety & Preparation',
+                'severity' => 'Critical',
                 'severity_color' => 'red',
-                'read_time'      => '5 min read',
-                'summary'        => 'HAVEN AI is a diagnostic intelligence tool — not a replacement for hands-on mechanical repair. Learn which fault signatures require immediate professional intervention and which are safe to monitor.',
-                'icon'           => 'alert-triangle',
+                'read_time' => '5 min read',
+                'summary' => 'HAVEN AI is a diagnostic intelligence tool — not a replacement for hands-on mechanical repair. Learn which fault signatures require immediate professional intervention and which are safe to monitor.',
+                'icon' => 'alert-triangle',
                 'acoustic_signature' => [
-                    'frequency_range'   => 'Any frequency range with sudden onset above normal baseline',
-                    'characteristics'   => 'Any new sharp metallic knock, deep rhythmic thud, or grinding sound not previously present — treat as urgent until diagnosed.',
-                    'zcr'               => 'Sudden ZCR jump > 0.25 compared to previous baseline warrants immediate investigation.',
+                    'frequency_range' => 'Any frequency range with sudden onset above normal baseline',
+                    'characteristics' => 'Any new sharp metallic knock, deep rhythmic thud, or grinding sound not previously present — treat as urgent until diagnosed.',
+                    'zcr' => 'Sudden ZCR jump > 0.25 compared to previous baseline warrants immediate investigation.',
                     'spectral_centroid' => 'Spectral centroid shift > 1,500 Hz compared to established baseline — stop driving and seek inspection.',
                 ],
                 'vibration_signature' => [
-                    'peak_g'       => '> 5.0 g — stop driving immediately. Impulses this severe risk immediate mechanical failure.',
-                    'rms_g'        => '> 0.90 g sustained — abnormal structural vibration; do not ignore.',
+                    'peak_g' => '> 5.0 g — stop driving immediately. Impulses this severe risk immediate mechanical failure.',
+                    'rms_g' => '> 0.90 g sustained — abnormal structural vibration; do not ignore.',
                     'crest_factor' => '> 5.5 — extreme impulsiveness indicating imminent mechanical failure (bearing, connecting rod, or piston).',
-                    'pattern'      => 'Any vibration pattern that is felt through the steering wheel, seat, or floor at idle — not just audible — is a red flag.',
+                    'pattern' => 'Any vibration pattern that is felt through the steering wheel, seat, or floor at idle — not just audible — is a red flag.',
                 ],
                 'dtc_codes' => ['P0217', 'P0300', 'P0301', 'P0302', 'P0303', 'P0304', 'P0325', 'P0011', 'P0524'],
                 'root_causes' => [
@@ -437,25 +439,25 @@ class LearningController extends Controller
             ],
 
             'reading-haven-report' => [
-                'slug'           => 'reading-haven-report',
-                'title'          => 'Understanding Your HAVEN Diagnostic Report',
-                'category'       => 'Using HAVEN AI',
-                'severity'       => 'Info',
+                'slug' => 'reading-haven-report',
+                'title' => 'Understanding Your HAVEN Diagnostic Report',
+                'category' => 'Using HAVEN AI',
+                'severity' => 'Info',
                 'severity_color' => 'teal',
-                'read_time'      => '5 min read',
-                'summary'        => 'A complete guide to reading and interpreting HAVEN\'s AI diagnostic output — including classification labels, confidence scores, telemetry charts, and what actionable steps to take based on each result.',
-                'icon'           => 'file-text',
+                'read_time' => '5 min read',
+                'summary' => 'A complete guide to reading and interpreting HAVEN\'s AI diagnostic output — including classification labels, confidence scores, telemetry charts, and what actionable steps to take based on each result.',
+                'icon' => 'file-text',
                 'acoustic_signature' => [
-                    'frequency_range'   => 'Full spectrum 20 Hz – 22.05 kHz (displayed in HAVEN spectrogram view)',
-                    'characteristics'   => 'HAVEN extracts 13 MFCC coefficients + ZCR + Spectral Centroid as acoustic feature vector for ML classification.',
-                    'zcr'               => 'Shown in report as "Zero Crossing Rate" — higher values indicate more high-frequency content or noisy signal.',
+                    'frequency_range' => 'Full spectrum 20 Hz – 22.05 kHz (displayed in HAVEN spectrogram view)',
+                    'characteristics' => 'HAVEN extracts 13 MFCC coefficients + ZCR + Spectral Centroid as acoustic feature vector for ML classification.',
+                    'zcr' => 'Shown in report as "Zero Crossing Rate" — higher values indicate more high-frequency content or noisy signal.',
                     'spectral_centroid' => 'Report displays this as Hz value — low (< 1,500 Hz) means healthy smooth combustion; high (> 2,500 Hz) suggests metallic impact.',
                 ],
                 'vibration_signature' => [
-                    'peak_g'       => 'Shown on telemetry chart — single highest acceleration impulse recorded during the session.',
-                    'rms_g'        => 'Root Mean Square G — represents continuous average vibration energy level across the session.',
+                    'peak_g' => 'Shown on telemetry chart — single highest acceleration impulse recorded during the session.',
+                    'rms_g' => 'Root Mean Square G — represents continuous average vibration energy level across the session.',
                     'crest_factor' => 'Computed automatically as Peak G / RMS G — the most reliable single-number health indicator in HAVEN.',
-                    'pattern'      => 'Time-domain waveform displayed as oscilloscope chart in Step 2 of the diagnostic wizard — visual inspection of rhythm and impulse patterns.',
+                    'pattern' => 'Time-domain waveform displayed as oscilloscope chart in Step 2 of the diagnostic wizard — visual inspection of rhythm and impulse patterns.',
                 ],
                 'dtc_codes' => ['N/A (Report Interpretation Guide)'],
                 'root_causes' => [
@@ -494,25 +496,25 @@ class LearningController extends Controller
             ],
 
             'battery-charging-health' => [
-                'slug'           => 'battery-charging-health',
-                'title'          => 'Battery & Charging System Telemetry',
-                'category'       => 'Electrical Systems',
-                'severity'       => 'Medium',
+                'slug' => 'battery-charging-health',
+                'title' => 'Battery & Charging System Telemetry',
+                'category' => 'Electrical Systems',
+                'severity' => 'Medium',
                 'severity_color' => 'amber',
-                'read_time'      => '4 min read',
-                'summary'        => 'How the INA219 voltage and current sensor in the HAVEN ESP32 kit monitors your charging system health — and what deviations from 13.8V–14.4V mean for engine performance and acoustic baseline.',
-                'icon'           => 'battery',
+                'read_time' => '4 min read',
+                'summary' => 'How the INA219 voltage and current sensor in the HAVEN ESP32 kit monitors your charging system health — and what deviations from 13.8V–14.4V mean for engine performance and acoustic baseline.',
+                'icon' => 'battery',
                 'acoustic_signature' => [
-                    'frequency_range'   => '50 Hz – 300 Hz (Alternator ripple frequency)',
-                    'characteristics'   => 'A failing alternator introduces a 100–150 Hz electrical whine into the audio signal — appears as a harmonic overlay on top of normal engine combustion noise.',
-                    'zcr'               => 'Slightly elevated ZCR (0.10–0.18) from alternator ripple contamination — can be mistaken for early valve noise if not cross-referenced with voltage data.',
+                    'frequency_range' => '50 Hz – 300 Hz (Alternator ripple frequency)',
+                    'characteristics' => 'A failing alternator introduces a 100–150 Hz electrical whine into the audio signal — appears as a harmonic overlay on top of normal engine combustion noise.',
+                    'zcr' => 'Slightly elevated ZCR (0.10–0.18) from alternator ripple contamination — can be mistaken for early valve noise if not cross-referenced with voltage data.',
                     'spectral_centroid' => 'Alternator bearing failure shifts spectral centroid higher (> 2,000 Hz) with a distinct high-frequency whine at alternator pulley speed.',
                 ],
                 'vibration_signature' => [
-                    'peak_g'       => '0.8 g – 2.2 g (Low-amplitude, high-frequency pattern at alternator bearing frequency)',
-                    'rms_g'        => '0.10 g – 0.35 g (Moderate continuous energy from accessory belt system)',
+                    'peak_g' => '0.8 g – 2.2 g (Low-amplitude, high-frequency pattern at alternator bearing frequency)',
+                    'rms_g' => '0.10 g – 0.35 g (Moderate continuous energy from accessory belt system)',
                     'crest_factor' => '2.5 – 3.8 (Moderate — not impulse-type, distinguishes from valve knock)',
-                    'pattern'      => 'Steady high-frequency oscillation correlated with engine RPM × alternator pulley ratio (~2.5×). Increases with RPM, unlike combustion-cycle faults.',
+                    'pattern' => 'Steady high-frequency oscillation correlated with engine RPM × alternator pulley ratio (~2.5×). Increases with RPM, unlike combustion-cycle faults.',
                 ],
                 'dtc_codes' => ['P0562', 'P0563', 'P0620', 'P0622', 'P0625', 'P0626'],
                 'root_causes' => [
@@ -551,25 +553,25 @@ class LearningController extends Controller
             ],
 
             'cooling-thermal-management' => [
-                'slug'           => 'cooling-thermal-management',
-                'title'          => 'Cooling System & Thermal Management',
-                'category'       => 'Thermal Systems',
-                'severity'       => 'High',
+                'slug' => 'cooling-thermal-management',
+                'title' => 'Cooling System & Thermal Management',
+                'category' => 'Thermal Systems',
+                'severity' => 'High',
                 'severity_color' => 'amber',
-                'read_time'      => '5 min read',
-                'summary'        => 'How the DS18B20 temperature sensor in the HAVEN ESP32 kit tracks coolant or engine bay temperature — and the relationship between thermal management and acoustic/vibration fault signatures.',
-                'icon'           => 'thermometer',
+                'read_time' => '5 min read',
+                'summary' => 'How the DS18B20 temperature sensor in the HAVEN ESP32 kit tracks coolant or engine bay temperature — and the relationship between thermal management and acoustic/vibration fault signatures.',
+                'icon' => 'thermometer',
                 'acoustic_signature' => [
-                    'frequency_range'   => '80 Hz – 3.5 kHz (Detonation onset from overheating)',
-                    'characteristics'   => 'Overheated engines produce increasing knock signatures as end-gas auto-ignition becomes more likely at combustion chamber temperatures above 95°C coolant equivalent.',
-                    'zcr'               => 'ZCR increases progressively as thermal knock emerges — differentiated from cold-start knock by occurring after warm-up rather than during it.',
+                    'frequency_range' => '80 Hz – 3.5 kHz (Detonation onset from overheating)',
+                    'characteristics' => 'Overheated engines produce increasing knock signatures as end-gas auto-ignition becomes more likely at combustion chamber temperatures above 95°C coolant equivalent.',
+                    'zcr' => 'ZCR increases progressively as thermal knock emerges — differentiated from cold-start knock by occurring after warm-up rather than during it.',
                     'spectral_centroid' => 'Thermal detonation produces spectral centroid shift toward 4–6 kHz knock band — requires immediate engine shutdown.',
                 ],
                 'vibration_signature' => [
-                    'peak_g'       => '3.0 g – 5.5 g (Thermal knock onset — dangerous range)',
-                    'rms_g'        => '0.45 g – 0.80 g (Elevated from knock-induced piston crown stress)',
+                    'peak_g' => '3.0 g – 5.5 g (Thermal knock onset — dangerous range)',
+                    'rms_g' => '0.45 g – 0.80 g (Elevated from knock-induced piston crown stress)',
                     'crest_factor' => '4.0 – 6.0 (High impulsiveness from thermal detonation — emergency shutdown threshold)',
-                    'pattern'      => 'Gradual vibration amplitude increase correlated with rising DS18B20 temperature readings — the thermal fault signature builds over time unlike sudden mechanical failure.',
+                    'pattern' => 'Gradual vibration amplitude increase correlated with rising DS18B20 temperature readings — the thermal fault signature builds over time unlike sudden mechanical failure.',
                 ],
                 'dtc_codes' => ['P0115', 'P0116', 'P0117', 'P0118', 'P0128', 'P0217', 'P0218'],
                 'root_causes' => [
@@ -608,25 +610,25 @@ class LearningController extends Controller
             ],
 
             'safe-driving-active-fault' => [
-                'slug'           => 'safe-driving-active-fault',
-                'title'          => 'Safe Driving With an Active Fault',
-                'category'       => 'Safety & Preparation',
-                'severity'       => 'Critical',
+                'slug' => 'safe-driving-active-fault',
+                'title' => 'Safe Driving With an Active Fault',
+                'category' => 'Safety & Preparation',
+                'severity' => 'Critical',
                 'severity_color' => 'red',
-                'read_time'      => '4 min read',
-                'summary'        => 'What to do — and what NOT to do — when HAVEN AI detects a fault classification during or after a diagnostic session. Risk levels, driving restrictions, and emergency procedures.',
-                'icon'           => 'alert-octagon',
+                'read_time' => '4 min read',
+                'summary' => 'What to do — and what NOT to do — when HAVEN AI detects a fault classification during or after a diagnostic session. Risk levels, driving restrictions, and emergency procedures.',
+                'icon' => 'alert-octagon',
                 'acoustic_signature' => [
-                    'frequency_range'   => 'Any abnormal classification band',
-                    'characteristics'   => 'Any HAVEN classification other than "Normal" represents an acoustic anomaly that requires a defined response protocol based on severity.',
-                    'zcr'               => 'Elevated ZCR in the context of a fault classification indicates an active mechanical process — not a recording artifact.',
+                    'frequency_range' => 'Any abnormal classification band',
+                    'characteristics' => 'Any HAVEN classification other than "Normal" represents an acoustic anomaly that requires a defined response protocol based on severity.',
+                    'zcr' => 'Elevated ZCR in the context of a fault classification indicates an active mechanical process — not a recording artifact.',
                     'spectral_centroid' => 'A sudden spectral centroid shift during driving (heard as a new sound) that persists warrants immediate safe stopping.',
                 ],
                 'vibration_signature' => [
-                    'peak_g'       => '> 4.0 g felt as a harsh mechanical thud through the seat/floor — stop immediately.',
-                    'rms_g'        => '> 0.70 g sustained — structural vibration beyond acceptable limits for continued operation.',
+                    'peak_g' => '> 4.0 g felt as a harsh mechanical thud through the seat/floor — stop immediately.',
+                    'rms_g' => '> 0.70 g sustained — structural vibration beyond acceptable limits for continued operation.',
                     'crest_factor' => '> 5.0 — HAVEN red-zone threshold. Engine should not be operated until physically inspected.',
-                    'pattern'      => 'Vibration that is rhythmic and synchronized with RPM is usually engine-sourced. Vibration that is speed-dependent (faster when driving faster) is usually wheel/tyre/driveshaft sourced — outside HAVEN\'s classification scope.',
+                    'pattern' => 'Vibration that is rhythmic and synchronized with RPM is usually engine-sourced. Vibration that is speed-dependent (faster when driving faster) is usually wheel/tyre/driveshaft sourced — outside HAVEN\'s classification scope.',
                 ],
                 'dtc_codes' => ['P0300', 'P0301', 'P0302', 'P0303', 'P0304', 'P0217', 'P0524', 'P0011'],
                 'root_causes' => [
@@ -819,94 +821,94 @@ class LearningController extends Controller
 
         $topics = [
             'mechanical-faults' => [
-                'slug'        => 'mechanical-faults',
-                'title'       => 'Mechanical Faults',
-                'category'    => 'Mechanical Faults',
+                'slug' => 'mechanical-faults',
+                'title' => 'Mechanical Faults',
+                'category' => 'Mechanical Faults',
                 'description' => 'Valvetrain lash, camshaft lobe wear, lifter bleed-down, and engine mount resonance.',
-                'icon'        => 'wrench',
-                'color'       => 'amber',
-                'module_slugs'=> ['valve-clearance', 'loose-component'],
+                'icon' => 'wrench',
+                'color' => 'amber',
+                'module_slugs' => ['valve-clearance', 'loose-component'],
             ],
             'combustion-ignition' => [
-                'slug'        => 'combustion-ignition',
-                'title'       => 'Combustion & Ignition',
-                'category'    => 'Combustion & Ignition',
+                'slug' => 'combustion-ignition',
+                'title' => 'Combustion & Ignition',
+                'category' => 'Combustion & Ignition',
                 'description' => 'Cylinder misfires, unburnt fuel detection, spark plug wear, and cyclic torque deficits.',
-                'icon'        => 'flame',
-                'color'       => 'red',
-                'module_slugs'=> ['misfire'],
+                'icon' => 'flame',
+                'color' => 'red',
+                'module_slugs' => ['misfire'],
             ],
             'safety-preparation' => [
-                'slug'        => 'safety-preparation',
-                'title'       => 'Safety & Emergency Procedures',
-                'category'    => 'Safety & Preparation',
+                'slug' => 'safety-preparation',
+                'title' => 'Safety & Emergency Procedures',
+                'category' => 'Safety & Preparation',
                 'description' => 'Pre-diagnostic safety checks, active fault driving rules, and workshop referral guidance.',
-                'icon'        => 'shield',
-                'color'       => 'rose',
-                'module_slugs'=> ['pre-diagnostic-safety', 'when-to-see-mechanic', 'safe-driving-active-fault'],
+                'icon' => 'shield',
+                'color' => 'rose',
+                'module_slugs' => ['pre-diagnostic-safety', 'when-to-see-mechanic', 'safe-driving-active-fault'],
             ],
             'baseline-reference' => [
-                'slug'        => 'baseline-reference',
-                'title'       => 'Baseline Engine Reference',
-                'category'    => 'Baseline Reference',
+                'slug' => 'baseline-reference',
+                'title' => 'Baseline Engine Reference',
+                'category' => 'Baseline Reference',
                 'description' => 'Acoustic and vibration telemetry standards of healthy gasoline ICE at idle and revving.',
-                'icon'        => 'check-circle',
-                'color'       => 'teal',
-                'module_slugs'=> ['normal-operation'],
+                'icon' => 'check-circle',
+                'color' => 'teal',
+                'module_slugs' => ['normal-operation'],
             ],
             'signal-processing' => [
-                'slug'        => 'signal-processing',
-                'title'       => 'Signal Processing & DSP',
-                'category'    => 'Signal Processing',
+                'slug' => 'signal-processing',
+                'title' => 'Signal Processing & DSP',
+                'category' => 'Signal Processing',
                 'description' => 'Mel-Frequency Cepstral Coefficients (MFCCs), spectral centroid, and zero-crossing analysis.',
-                'icon'        => 'activity',
-                'color'       => 'cyan',
-                'module_slugs'=> ['acoustic-signal-analysis'],
+                'icon' => 'activity',
+                'color' => 'cyan',
+                'module_slugs' => ['acoustic-signal-analysis'],
             ],
             'hardware-iot' => [
-                'slug'        => 'hardware-iot',
-                'title'       => 'Hardware & ESP32 Telemetry',
-                'category'    => 'Hardware & IoT',
+                'slug' => 'hardware-iot',
+                'title' => 'Hardware & ESP32 Telemetry',
+                'category' => 'Hardware & IoT',
                 'description' => 'MPU6050/ADXL345 accelerometer mounting, ESP32 wiring, Peak G, and CSV logging.',
-                'icon'        => 'cpu',
-                'color'       => 'indigo',
-                'module_slugs'=> ['esp32-vibration-telemetry'],
+                'icon' => 'cpu',
+                'color' => 'indigo',
+                'module_slugs' => ['esp32-vibration-telemetry'],
             ],
             'preventive-maintenance' => [
-                'slug'        => 'preventive-maintenance',
-                'title'       => 'Preventive Fluid Maintenance',
-                'category'    => 'Preventive Maintenance',
+                'slug' => 'preventive-maintenance',
+                'title' => 'Preventive Fluid Maintenance',
+                'category' => 'Preventive Maintenance',
                 'description' => 'Engine oil degradation, viscosity breakdown, fluid contamination, and lubrication health.',
-                'icon'        => 'droplet',
-                'color'       => 'emerald',
-                'module_slugs'=> ['engine-oil-maintenance'],
+                'icon' => 'droplet',
+                'color' => 'emerald',
+                'module_slugs' => ['engine-oil-maintenance'],
             ],
             'electrical-systems' => [
-                'slug'        => 'electrical-systems',
-                'title'       => 'Electrical & Charging Systems',
-                'category'    => 'Electrical Systems',
+                'slug' => 'electrical-systems',
+                'title' => 'Electrical & Charging Systems',
+                'category' => 'Electrical Systems',
                 'description' => 'INA219 current sensing, alternator ripple frequencies, and battery voltage health.',
-                'icon'        => 'battery',
-                'color'       => 'amber',
-                'module_slugs'=> ['battery-charging-health'],
+                'icon' => 'battery',
+                'color' => 'amber',
+                'module_slugs' => ['battery-charging-health'],
             ],
             'thermal-systems' => [
-                'slug'        => 'thermal-systems',
-                'title'       => 'Thermal Management & Cooling',
-                'category'    => 'Thermal Systems',
+                'slug' => 'thermal-systems',
+                'title' => 'Thermal Management & Cooling',
+                'category' => 'Thermal Systems',
                 'description' => 'DS18B20 temperature tracking, coolant circulation, and thermal detonation hazards.',
-                'icon'        => 'thermometer',
-                'color'       => 'orange',
-                'module_slugs'=> ['cooling-thermal-management'],
+                'icon' => 'thermometer',
+                'color' => 'orange',
+                'module_slugs' => ['cooling-thermal-management'],
             ],
             'using-haven-ai' => [
-                'slug'        => 'using-haven-ai',
-                'title'       => 'Using HAVEN AI Diagnostics',
-                'category'    => 'Using HAVEN AI',
+                'slug' => 'using-haven-ai',
+                'title' => 'Using HAVEN AI Diagnostics',
+                'category' => 'Using HAVEN AI',
                 'description' => 'Interpreting AI classification scores, acoustic spectrograms, and comprehensive diagnostic reports.',
-                'icon'        => 'file-text',
-                'color'       => 'blue',
-                'module_slugs'=> ['reading-haven-report'],
+                'icon' => 'file-text',
+                'color' => 'blue',
+                'module_slugs' => ['reading-haven-report'],
             ],
         ];
 
@@ -931,8 +933,8 @@ class LearningController extends Controller
     public function index(Request $request): View
     {
         $allModules = $this->getModules();
-        $allTopics  = $this->getTopics();
-        $search     = strtolower(trim($request->query('q', '')));
+        $allTopics = $this->getTopics();
+        $search = strtolower(trim($request->query('q', '')));
 
         $topics = collect($allTopics)->filter(function ($t) use ($search) {
             if ($search) {
@@ -947,6 +949,7 @@ class LearningController extends Controller
 
                 return $matchTopic || $matchStudy;
             }
+
             return true;
         })->all();
 
@@ -960,17 +963,17 @@ class LearningController extends Controller
         }
 
         return view('learning.index', [
-            'topics'          => $topics,
-            'allTopics'       => $allTopics,
-            'search'          => $search,
-            'totalCount'      => count($allModules),
-            'topicCount'      => count($allTopics),
-            'dtcCount'        => count($this->getDtcList()),
+            'topics' => $topics,
+            'allTopics' => $allTopics,
+            'search' => $search,
+            'totalCount' => count($allModules),
+            'topicCount' => count($allTopics),
+            'dtcCount' => count($this->getDtcList()),
             'matchingStudies' => $matchingStudies,
-            'modules'         => $allModules,
-            'categories'      => collect($allModules)->pluck('category')->unique()->values()->all(),
-            'activeCategory'  => 'all',
-            'learningStats'   => auth()->check() ? auth()->user()->getLearningStats() : null,
+            'modules' => $allModules,
+            'categories' => collect($allModules)->pluck('category')->unique()->values()->all(),
+            'activeCategory' => 'all',
+            'learningStats' => auth()->check() ? auth()->user()->getLearningStats() : null,
         ]);
     }
 
@@ -987,11 +990,11 @@ class LearningController extends Controller
         $otherTopics = collect($allTopics)->where('slug', '!==', $slug)->all();
 
         return view('learning.topic', [
-            'topic'         => $topic,
-            'modules'       => $topic['modules'],
-            'otherTopics'   => $otherTopics,
-            'allTopics'     => $allTopics,
-            'dtcCount'      => count($this->getDtcList()),
+            'topic' => $topic,
+            'modules' => $topic['modules'],
+            'otherTopics' => $otherTopics,
+            'allTopics' => $allTopics,
+            'dtcCount' => count($this->getDtcList()),
             'learningStats' => auth()->check() ? auth()->user()->getLearningStats() : null,
         ]);
     }
@@ -1011,17 +1014,17 @@ class LearningController extends Controller
         // Auto-mark module as completed for authenticated user
         if (auth()->check()) {
             $user = auth()->user();
-            $progress = \App\Models\LearningProgress::firstOrCreate(
+            $progress = LearningProgress::firstOrCreate(
                 ['user_id' => $user->id],
                 [
                     'completed_modules' => [],
-                    'quiz_best_score'   => 0,
-                    'quiz_total'        => 10,
-                    'quiz_attempts'     => 0,
+                    'quiz_best_score' => 0,
+                    'quiz_total' => 10,
+                    'quiz_attempts' => 0,
                 ]
             );
             $completed = is_array($progress->completed_modules) ? $progress->completed_modules : [];
-            if (!in_array($slug, $completed, true)) {
+            if (! in_array($slug, $completed, true)) {
                 $completed[] = $slug;
                 $progress->update(['completed_modules' => $completed]);
             }
@@ -1047,17 +1050,19 @@ class LearningController extends Controller
         }
         if (count($related) < 3) {
             foreach ($modules as $mSlug => $m) {
-                if ($mSlug !== $slug && !isset($related[$mSlug])) {
+                if ($mSlug !== $slug && ! isset($related[$mSlug])) {
                     $related[$mSlug] = $m;
-                    if (count($related) >= 3) break;
+                    if (count($related) >= 3) {
+                        break;
+                    }
                 }
             }
         }
 
         return view('learning.show', [
-            'module'        => $module,
-            'parentTopic'   => $parentTopic,
-            'related'       => $related,
+            'module' => $module,
+            'parentTopic' => $parentTopic,
+            'related' => $related,
             'learningStats' => auth()->check() ? auth()->user()->getLearningStats() : null,
         ]);
     }
@@ -1216,7 +1221,7 @@ class LearningController extends Controller
         $learningStats = auth()->check() ? auth()->user()->getLearningStats() : null;
 
         return view('learning.quiz', [
-            'questions'     => $questions,
+            'questions' => $questions,
             'learningStats' => $learningStats,
         ]);
     }
@@ -1224,7 +1229,7 @@ class LearningController extends Controller
     /**
      * Submit and persist diagnostic quiz results.
      */
-    public function submitQuiz(Request $request): \Illuminate\Http\JsonResponse
+    public function submitQuiz(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'score' => 'required|integer|min:0|max:50',
@@ -1236,13 +1241,13 @@ class LearningController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        $progress = \App\Models\LearningProgress::firstOrCreate(
+        $progress = LearningProgress::firstOrCreate(
             ['user_id' => $user->id],
             [
                 'completed_modules' => [],
-                'quiz_best_score'   => 0,
-                'quiz_total'        => $validated['total'],
-                'quiz_attempts'     => 0,
+                'quiz_best_score' => 0,
+                'quiz_total' => $validated['total'],
+                'quiz_attempts' => 0,
             ]
         );
 
@@ -1255,34 +1260,34 @@ class LearningController extends Controller
 
         $progress->update([
             'quiz_best_score' => $newBest,
-            'quiz_total'      => $total,
-            'quiz_attempts'   => $attempts,
-            'last_quiz_at'    => now(),
+            'quiz_total' => $total,
+            'quiz_attempts' => $attempts,
+            'last_quiz_at' => now(),
         ]);
 
-        $tier = match(true) {
+        $tier = match (true) {
             $pct === 100 => 'Master Diagnostician',
-            $pct >= 80   => 'Senior Diagnostic Specialist',
-            $pct >= 60   => 'Field Technician',
-            default      => 'Diagnostic Apprentice',
+            $pct >= 80 => 'Senior Diagnostic Specialist',
+            $pct >= 60 => 'Field Technician',
+            default => 'Diagnostic Apprentice',
         };
 
         return response()->json([
-            'success'       => true,
-            'score'         => $score,
-            'total'         => $total,
-            'percentage'    => $pct,
-            'best_score'    => $newBest,
-            'attempts'      => $attempts,
-            'tier'          => $tier,
-            'message'       => 'Quiz performance saved to your vehicle engineer profile.',
+            'success' => true,
+            'score' => $score,
+            'total' => $total,
+            'percentage' => $pct,
+            'best_score' => $newBest,
+            'attempts' => $attempts,
+            'tier' => $tier,
+            'message' => 'Quiz performance saved to your vehicle engineer profile.',
         ]);
     }
 
     /**
      * Explicitly mark a learning module as completed.
      */
-    public function markCompleted(Request $request, string $slug): \Illuminate\Http\JsonResponse
+    public function markCompleted(Request $request, string $slug): JsonResponse
     {
         $modules = $this->getModules();
         abort_unless(isset($modules[$slug]), 404, 'Module not found');
@@ -1292,26 +1297,26 @@ class LearningController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        $progress = \App\Models\LearningProgress::firstOrCreate(
+        $progress = LearningProgress::firstOrCreate(
             ['user_id' => $user->id],
             [
                 'completed_modules' => [],
-                'quiz_best_score'   => 0,
-                'quiz_total'        => 10,
-                'quiz_attempts'     => 0,
+                'quiz_best_score' => 0,
+                'quiz_total' => 10,
+                'quiz_attempts' => 0,
             ]
         );
 
         $completed = is_array($progress->completed_modules) ? $progress->completed_modules : [];
-        if (!in_array($slug, $completed, true)) {
+        if (! in_array($slug, $completed, true)) {
             $completed[] = $slug;
             $progress->update(['completed_modules' => $completed]);
         }
 
         return response()->json([
-            'success'         => true,
+            'success' => true,
             'completed_count' => count($completed),
-            'completed'       => true,
+            'completed' => true,
         ]);
     }
 }

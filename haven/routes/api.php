@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\Api\TelemetryIngestController;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/user', function (Request $request) {
@@ -13,9 +16,9 @@ Route::prefix('v1/telemetry')->group(function () {
     Route::get('/ping', [TelemetryIngestController::class, 'ping'])->name('api.telemetry.ping');
 
     Route::middleware([
-        \Illuminate\Cookie\Middleware\EncryptCookies::class,
-        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-        \Illuminate\Session\Middleware\StartSession::class,
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
         'auth:sanctum,web',
     ])->group(function () {
         Route::get('/latest', [TelemetryIngestController::class, 'latest'])->name('api.telemetry.latest');

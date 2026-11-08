@@ -9,6 +9,7 @@ use Tests\TestCase;
 class HomepageEnhancementsTest extends TestCase
 {
     use RefreshDatabase;
+
     public function test_homepage_shows_baseline_demo_and_workflow_for_guests(): void
     {
         $response = $this->get('/');

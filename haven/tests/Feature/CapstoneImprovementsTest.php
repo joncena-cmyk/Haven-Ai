@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Admin;
-use App\Models\AuditLog;
 use App\Models\Diagnostic;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -19,14 +18,14 @@ class CapstoneImprovementsTest extends TestCase
     private function createVehicle(User $user): Vehicle
     {
         return Vehicle::create([
-            'user_id'      => $user->id,
-            'make'         => 'Toyota',
-            'model'        => 'Corolla',
-            'year'         => 2024,
-            'body_type'    => 'sedan',
+            'user_id' => $user->id,
+            'make' => 'Toyota',
+            'model' => 'Corolla',
+            'year' => 2024,
+            'body_type' => 'sedan',
             'plate_number' => 'ABC 1234',
-            'engine_type'  => '2.0L Dynamic Force',
-            'device_key'   => 'hvn_dev_testkey123456789',
+            'engine_type' => '2.0L Dynamic Force',
+            'device_key' => 'hvn_dev_testkey123456789',
         ]);
     }
 
@@ -40,42 +39,42 @@ class CapstoneImprovementsTest extends TestCase
 
         // Baseline diagnostic
         $baseline = Diagnostic::create([
-            'vehicle_id'       => $vehicle->id,
-            'user_id'          => $user->id,
-            'ml_condition'     => 'normal',
-            'ml_confidence'    => 0.95,
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'ml_condition' => 'normal',
+            'ml_confidence' => 0.95,
             'vibration_peak_g' => 1.2,
-            'vibration_rms_g'  => 0.25,
-            'temperature_c'    => 82.0,
-            'rpm'              => 800,
-            'voltage_v'        => 13.9,
-            'status'           => 'completed',
+            'vibration_rms_g' => 0.25,
+            'temperature_c' => 82.0,
+            'rpm' => 800,
+            'voltage_v' => 13.9,
+            'status' => 'completed',
         ]);
 
         // Current diagnostic with abnormal valvetrain lash
         $current = Diagnostic::create([
-            'vehicle_id'       => $vehicle->id,
-            'user_id'          => $user->id,
-            'ml_condition'     => 'valve_clearance',
-            'ml_confidence'    => 0.89,
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'ml_condition' => 'valve_clearance',
+            'ml_confidence' => 0.89,
             'vibration_peak_g' => 3.8,
-            'vibration_rms_g'  => 0.55,
-            'temperature_c'    => 90.0,
-            'rpm'              => 800,
-            'voltage_v'        => 13.7,
-            'ml_result_raw'    => [
+            'vibration_rms_g' => 0.55,
+            'temperature_c' => 90.0,
+            'rpm' => 800,
+            'voltage_v' => 13.7,
+            'ml_result_raw' => [
                 'feature_contributions' => [
                     [
-                        'feature'     => 'crest_factor',
-                        'label'       => 'Crest Factor (Impulsiveness)',
-                        'value'       => 4.5,
-                        'unit'        => 'ratio',
-                        'impact_pct'  => 44.2,
+                        'feature' => 'crest_factor',
+                        'label' => 'Crest Factor (Impulsiveness)',
+                        'value' => 4.5,
+                        'unit' => 'ratio',
+                        'impact_pct' => 44.2,
                         'explanation' => 'Extreme impulse-to-steady vibration ratio.',
                     ],
                 ],
             ],
-            'status'           => 'completed',
+            'status' => 'completed',
         ]);
 
         $response = $this->actingAs($user)->get(route('diagnostics.show', $current));
@@ -96,14 +95,14 @@ class CapstoneImprovementsTest extends TestCase
 
         for ($i = 0; $i < 3; $i++) {
             Diagnostic::create([
-                'vehicle_id'    => $vehicle->id,
-                'user_id'       => $user->id,
-                'ml_condition'  => 'normal',
-                'confidence'    => 0.90,
-                'peak_g'        => 1.2 + ($i * 0.1),
+                'vehicle_id' => $vehicle->id,
+                'user_id' => $user->id,
+                'ml_condition' => 'normal',
+                'confidence' => 0.90,
+                'peak_g' => 1.2 + ($i * 0.1),
                 'temperature_c' => 80.0 + $i,
-                'rpm'           => 750 + ($i * 10),
-                'status'        => 'completed',
+                'rpm' => 750 + ($i * 10),
+                'status' => 'completed',
             ]);
         }
 
@@ -122,7 +121,7 @@ class CapstoneImprovementsTest extends TestCase
         $user = User::factory()->create();
         $vehicle = $this->createVehicle($user);
 
-        $response = $this->actingAs($user)->get('/api/v1/telemetry/stream?vehicle_id=' . $vehicle->id);
+        $response = $this->actingAs($user)->get('/api/v1/telemetry/stream?vehicle_id='.$vehicle->id);
 
         $response->assertOk();
         $this->assertTrue(str_contains($response->headers->get('Content-Type'), 'text/event-stream'));
@@ -142,18 +141,18 @@ class CapstoneImprovementsTest extends TestCase
 
         $response->assertOk();
         $response->assertJson([
-            'success'    => true,
-            'score'      => 9,
-            'total'      => 10,
+            'success' => true,
+            'score' => 9,
+            'total' => 10,
             'percentage' => 90,
             'best_score' => 9,
-            'tier'       => 'Senior Diagnostic Specialist',
+            'tier' => 'Senior Diagnostic Specialist',
         ]);
 
         $this->assertDatabaseHas('learning_progress', [
-            'user_id'         => $user->id,
+            'user_id' => $user->id,
             'quiz_best_score' => 9,
-            'quiz_attempts'   => 1,
+            'quiz_attempts' => 1,
         ]);
 
         // Retake quiz with lower score - best score remains 9, attempts increments to 2
@@ -164,9 +163,9 @@ class CapstoneImprovementsTest extends TestCase
 
         $response2->assertOk();
         $this->assertDatabaseHas('learning_progress', [
-            'user_id'         => $user->id,
+            'user_id' => $user->id,
             'quiz_best_score' => 9,
-            'quiz_attempts'   => 2,
+            'quiz_attempts' => 2,
         ]);
 
         // Viewing a learning module auto-records completion
@@ -186,16 +185,16 @@ class CapstoneImprovementsTest extends TestCase
 
         $mockMl = Mockery::mock(MlBackendService::class);
         $mockMl->shouldReceive('getHealthAndInfo')->andReturn([
-            'online'       => true,
-            'url'          => 'http://127.0.0.1:8001',
-            'mode'         => 'random_forest_fft',
+            'online' => true,
+            'url' => 'http://127.0.0.1:8001',
+            'mode' => 'random_forest_fft',
             'model_loaded' => true,
         ]);
         $mockMl->shouldReceive('triggerRetrain')->andReturn([
-            'status'        => 'success',
+            'status' => 'success',
             'test_accuracy' => 0.988,
-            'n_samples'     => 400,
-            'message'       => 'Random Forest model retrained successfully',
+            'n_samples' => 400,
+            'message' => 'Random Forest model retrained successfully',
         ]);
         $this->app->instance(MlBackendService::class, $mockMl);
 
@@ -216,7 +215,7 @@ class CapstoneImprovementsTest extends TestCase
 
         $this->assertDatabaseHas('audit_logs', [
             'admin_id' => $admin->id,
-            'event'    => 'admin.ml_retrained',
+            'event' => 'admin.ml_retrained',
         ]);
     }
 
@@ -235,8 +234,8 @@ class CapstoneImprovementsTest extends TestCase
 
         // Rotate password
         $pwdResponse = $this->actingAs($admin, 'admin')->post(route('admin.security.password'), [
-            'current_password'      => 'AdminSecret123!',
-            'password'              => 'NewStrongPassword456!',
+            'current_password' => 'AdminSecret123!',
+            'password' => 'NewStrongPassword456!',
             'password_confirmation' => 'NewStrongPassword456!',
         ]);
 
@@ -244,14 +243,14 @@ class CapstoneImprovementsTest extends TestCase
 
         $this->assertDatabaseHas('audit_logs', [
             'admin_id' => $admin->id,
-            'event'    => 'admin.password_changed',
+            'event' => 'admin.password_changed',
         ]);
 
         // Provision new admin
         $storeResponse = $this->actingAs($admin, 'admin')->post(route('admin.security.store'), [
-            'name'                  => 'Second Administrator',
-            'email'                 => 'second.admin@haven.ai',
-            'password'              => 'AnotherSecret789!',
+            'name' => 'Second Administrator',
+            'email' => 'second.admin@haven.ai',
+            'password' => 'AnotherSecret789!',
             'password_confirmation' => 'AnotherSecret789!',
         ]);
 
@@ -269,12 +268,12 @@ class CapstoneImprovementsTest extends TestCase
     {
         $user = User::factory()->create();
         $vehicle = Vehicle::create([
-            'user_id'      => $user->id,
-            'make'         => 'Toyota',
-            'model'        => 'Corolla',
-            'year'         => 2022,
-            'body_type'    => 'sedan',
-            'engine_type'  => '1.8L 4-Cylinder Gasoline',
+            'user_id' => $user->id,
+            'make' => 'Toyota',
+            'model' => 'Corolla',
+            'year' => 2022,
+            'body_type' => 'sedan',
+            'engine_type' => '1.8L 4-Cylinder Gasoline',
             'transmission' => 'CVT',
             'plate_number' => 'ABC-1234',
         ]);

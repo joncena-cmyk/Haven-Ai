@@ -36,7 +36,7 @@ class CreateAdminCommand extends Command
         $password = $this->option('password');
         if (! $password) {
             $password = $this->secret('Password (min 10 chars, mixed case + number)');
-            $confirm  = $this->secret('Confirm password');
+            $confirm = $this->secret('Confirm password');
 
             if ($password !== $confirm) {
                 $this->error('Passwords do not match.');
@@ -63,8 +63,8 @@ class CreateAdminCommand extends Command
             $event = 'admin.password_reset_cli';
         } else {
             $admin = Admin::create([
-                'name'     => $this->option('name') ?: ucfirst(strtok($email, '@')),
-                'email'    => $email,
+                'name' => $this->option('name') ?: ucfirst(strtok($email, '@')),
+                'email' => $email,
                 'password' => $password,
             ]);
             $event = 'admin.account_created_cli';
@@ -78,4 +78,3 @@ class CreateAdminCommand extends Command
         return self::SUCCESS;
     }
 }
-

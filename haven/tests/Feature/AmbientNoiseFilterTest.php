@@ -6,7 +6,6 @@ use App\Models\Diagnostic;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Services\DiagnosticAiService;
-use App\Services\MlBackendService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
@@ -19,10 +18,10 @@ class AmbientNoiseFilterTest extends TestCase
     {
         $user = User::factory()->create();
         $vehicle = Vehicle::create([
-            'user_id'   => $user->id,
-            'make'      => 'Toyota',
-            'model'     => 'Corolla',
-            'year'      => 2022,
+            'user_id' => $user->id,
+            'make' => 'Toyota',
+            'model' => 'Corolla',
+            'year' => 2022,
             'body_type' => 'sedan',
         ]);
 
@@ -30,8 +29,8 @@ class AmbientNoiseFilterTest extends TestCase
 
         // Post without vibration or active telemetry (i.e. recorded in open place)
         $response = $this->actingAs($user)->post(route('diagnostics.store'), [
-            'vehicle_id'       => $vehicle->id,
-            'audio_file'       => $audio,
+            'vehicle_id' => $vehicle->id,
+            'audio_file' => $audio,
             'vibration_source' => 'skipped',
         ]);
 
@@ -58,10 +57,10 @@ class AmbientNoiseFilterTest extends TestCase
     {
         $user = User::factory()->create();
         $vehicle = Vehicle::create([
-            'user_id'   => $user->id,
-            'make'      => 'Toyota',
-            'model'     => 'Corolla',
-            'year'      => 2022,
+            'user_id' => $user->id,
+            'make' => 'Toyota',
+            'model' => 'Corolla',
+            'year' => 2022,
             'body_type' => 'sedan',
         ]);
 
@@ -70,12 +69,12 @@ class AmbientNoiseFilterTest extends TestCase
         $vibration = UploadedFile::fake()->createWithContent('vib.csv', $csvContent);
 
         $response = $this->actingAs($user)->post(route('diagnostics.store'), [
-            'vehicle_id'       => $vehicle->id,
-            'audio_file'       => $audio,
-            'vibration_file'   => $vibration,
+            'vehicle_id' => $vehicle->id,
+            'audio_file' => $audio,
+            'vibration_file' => $vibration,
             'vibration_source' => 'device_sensor',
-            'rpm'              => 850,
-            'temperature_c'    => 88.0,
+            'rpm' => 850,
+            'temperature_c' => 88.0,
         ]);
 
         $diagnostic = Diagnostic::latest()->first();
@@ -85,4 +84,3 @@ class AmbientNoiseFilterTest extends TestCase
         $this->assertEquals('normal', $diagnostic->ml_condition);
     }
 }
-

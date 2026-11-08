@@ -89,9 +89,9 @@ class AdminAuthenticationTest extends TestCase
     public function test_driver_registration_never_creates_an_administrator(): void
     {
         $this->post('/register', [
-            'name'                  => 'First Driver',
-            'email'                 => 'first@haven.test',
-            'password'              => 'Password123!',
+            'name' => 'First Driver',
+            'email' => 'first@haven.test',
+            'password' => 'Password123!',
             'password_confirmation' => 'Password123!',
         ]);
 
@@ -117,4 +117,3 @@ class AdminAuthenticationTest extends TestCase
         $this->assertSame(0, Admin::count());
     }
 }
-

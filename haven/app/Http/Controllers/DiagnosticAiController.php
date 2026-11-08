@@ -10,9 +10,7 @@ use Illuminate\Support\Facades\Auth;
 
 class DiagnosticAiController extends Controller
 {
-    public function __construct(protected DiagnosticAiService $aiService)
-    {
-    }
+    public function __construct(protected DiagnosticAiService $aiService) {}
 
     /**
      * Answer interactive AI Copilot question about a specific diagnostic session.

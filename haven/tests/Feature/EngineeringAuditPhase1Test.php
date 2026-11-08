@@ -21,13 +21,13 @@ class EngineeringAuditPhase1Test extends TestCase
     private function createVehicle(User $user): Vehicle
     {
         return Vehicle::create([
-            'user_id'      => $user->id,
-            'make'         => 'Honda',
-            'model'        => 'Civic',
-            'year'         => 2023,
-            'body_type'    => 'sedan',
+            'user_id' => $user->id,
+            'make' => 'Honda',
+            'model' => 'Civic',
+            'year' => 2023,
+            'body_type' => 'sedan',
             'plate_number' => 'ABC 9999',
-            'engine_type'  => '1.5L Turbo',
+            'engine_type' => '1.5L Turbo',
         ]);
     }
 
@@ -41,17 +41,17 @@ class EngineeringAuditPhase1Test extends TestCase
 
         // 1. Simulated Diagnostic
         $simDiagnostic = Diagnostic::create([
-            'user_id'                => $user->id,
-            'vehicle_id'             => $vehicle->id,
-            'audio_path'             => 'diagnostics/test/audio.webm',
-            'vibration_path'         => 'diagnostics/test/sim.csv',
-            'vibration_source'       => 'simulated',
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'audio_path' => 'diagnostics/test/audio.webm',
+            'vibration_path' => 'diagnostics/test/sim.csv',
+            'vibration_source' => 'simulated',
             'vibration_sample_count' => 150,
-            'vibration_peak_g'       => 1.35,
-            'vibration_rms_g'        => 0.22,
-            'status'                 => 'completed',
-            'ml_condition'           => 'normal',
-            'ml_confidence'          => 0.92,
+            'vibration_peak_g' => 1.35,
+            'vibration_rms_g' => 0.22,
+            'status' => 'completed',
+            'ml_condition' => 'normal',
+            'ml_confidence' => 0.92,
         ]);
 
         $this->assertEquals('Simulated Waveform (Demo)', $simDiagnostic->vibration_source_label);
@@ -64,14 +64,14 @@ class EngineeringAuditPhase1Test extends TestCase
 
         // 2. Skipped Diagnostic
         $skipDiagnostic = Diagnostic::create([
-            'user_id'          => $user->id,
-            'vehicle_id'       => $vehicle->id,
-            'audio_path'       => 'diagnostics/test/audio2.webm',
-            'vibration_path'   => null,
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'audio_path' => 'diagnostics/test/audio2.webm',
+            'vibration_path' => null,
             'vibration_source' => 'skipped',
-            'status'           => 'completed',
-            'ml_condition'     => 'misfiring',
-            'ml_confidence'    => 0.88,
+            'status' => 'completed',
+            'ml_condition' => 'misfiring',
+            'ml_confidence' => 0.88,
         ]);
 
         $this->assertEquals('Skipped (Audio Only)', $skipDiagnostic->vibration_source_label);
@@ -91,36 +91,36 @@ class EngineeringAuditPhase1Test extends TestCase
 
         // Physical record (device sensor)
         $realDiag = Diagnostic::create([
-            'user_id'                => $user->id,
-            'vehicle_id'             => $vehicle->id,
-            'audio_path'             => 'diagnostics/test/audio_real.webm',
-            'vibration_path'         => 'diagnostics/test/real.csv',
-            'vibration_source'       => 'device_sensor',
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'audio_path' => 'diagnostics/test/audio_real.webm',
+            'vibration_path' => 'diagnostics/test/real.csv',
+            'vibration_source' => 'device_sensor',
             'vibration_sample_count' => 500,
-            'vibration_peak_g'       => 1.45,
-            'vibration_rms_g'        => 0.30,
-            'status'                 => 'completed',
-            'ml_condition'           => 'knocking',
-            'ml_confidence'          => 0.94,
-            'true_condition'         => 'valve_clearance',
-            'is_training_sample'     => true,
+            'vibration_peak_g' => 1.45,
+            'vibration_rms_g' => 0.30,
+            'status' => 'completed',
+            'ml_condition' => 'knocking',
+            'ml_confidence' => 0.94,
+            'true_condition' => 'valve_clearance',
+            'is_training_sample' => true,
         ]);
 
         // Simulated record
         $simDiag = Diagnostic::create([
-            'user_id'                => $user->id,
-            'vehicle_id'             => $vehicle->id,
-            'audio_path'             => 'diagnostics/test/audio_sim.webm',
-            'vibration_path'         => 'diagnostics/test/sim.csv',
-            'vibration_source'       => 'simulated',
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'audio_path' => 'diagnostics/test/audio_sim.webm',
+            'vibration_path' => 'diagnostics/test/sim.csv',
+            'vibration_source' => 'simulated',
             'vibration_sample_count' => 150,
-            'vibration_peak_g'       => 1.20,
-            'vibration_rms_g'        => 0.20,
-            'status'                 => 'completed',
-            'ml_condition'           => 'normal',
-            'ml_confidence'          => 0.91,
-            'true_condition'         => 'normal',
-            'is_training_sample'     => true,
+            'vibration_peak_g' => 1.20,
+            'vibration_rms_g' => 0.20,
+            'status' => 'completed',
+            'ml_condition' => 'normal',
+            'ml_confidence' => 0.91,
+            'true_condition' => 'normal',
+            'is_training_sample' => true,
         ]);
 
         // 1. User Dataset Export
@@ -135,10 +135,10 @@ class EngineeringAuditPhase1Test extends TestCase
 
         // 2. Admin Dataset Export
         $admin = Admin::create([
-            'name'     => 'Lead Auditor',
-            'email'    => 'lead.audit@haven.ph',
+            'name' => 'Lead Auditor',
+            'email' => 'lead.audit@haven.ph',
             'password' => bcrypt('AuditorPass2026!'),
-            'role'     => 'superadmin',
+            'role' => 'superadmin',
         ]);
 
         $adminExport = $this->actingAs($admin, 'admin')->get(route('admin.ml.export'));
@@ -154,14 +154,14 @@ class EngineeringAuditPhase1Test extends TestCase
         $mlMock->shouldReceive('triggerRetrain')
             ->once()
             ->with(
-                Mockery::on(fn($records) => count($records) === 1 && $records[0]['condition'] === 'valve_clearance'),
+                Mockery::on(fn ($records) => count($records) === 1 && $records[0]['condition'] === 'valve_clearance'),
                 Mockery::any(),
                 Mockery::any()
             )
             ->andReturn([
-                'status'        => 'success',
+                'status' => 'success',
                 'test_accuracy' => 0.985,
-                'n_samples'     => 1,
+                'n_samples' => 1,
             ]);
         $this->app->instance(MlBackendService::class, $mlMock);
 
@@ -182,17 +182,17 @@ class EngineeringAuditPhase1Test extends TestCase
         $audioFile = UploadedFile::fake()->create('engine_sample.wav', 64, 'audio/wav');
 
         $response = $this->actingAs($user)->post(route('diagnostics.store'), [
-            'vehicle_id'       => $vehicle->id,
-            'audio_file'       => $audioFile,
-            'audio_duration'   => 10,
+            'vehicle_id' => $vehicle->id,
+            'audio_file' => $audioFile,
+            'audio_duration' => 10,
             'vibration_source' => 'skipped',
-            'recording_mode'   => 'idle',
+            'recording_mode' => 'idle',
         ]);
 
         $this->assertDatabaseHas('diagnostics', [
-            'vehicle_id'       => $vehicle->id,
+            'vehicle_id' => $vehicle->id,
             'vibration_source' => 'skipped',
-            'vibration_path'   => null,
+            'vibration_path' => null,
         ]);
 
         $diag = Diagnostic::where('vehicle_id', $vehicle->id)->first();
@@ -210,12 +210,12 @@ class EngineeringAuditPhase1Test extends TestCase
         $vehicle = $this->createVehicle($user);
 
         $diagnostic = Diagnostic::create([
-            'user_id'          => $user->id,
-            'vehicle_id'       => $vehicle->id,
-            'audio_path'       => 'diagnostics/test/audio.webm',
-            'vibration_path'   => null,
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'audio_path' => 'diagnostics/test/audio.webm',
+            'vibration_path' => null,
             'vibration_source' => 'skipped',
-            'status'           => 'submitted',
+            'status' => 'submitted',
         ]);
 
         $response = $this->actingAs($user)->get(route('diagnostics.show', $diagnostic));
@@ -227,7 +227,7 @@ class EngineeringAuditPhase1Test extends TestCase
         $statusResp = $this->actingAs($user)->get(route('diagnostics.status', $diagnostic));
         $statusResp->assertOk();
         $statusResp->assertJson([
-            'id'     => $diagnostic->id,
+            'id' => $diagnostic->id,
             'status' => 'submitted',
         ]);
 
@@ -235,10 +235,10 @@ class EngineeringAuditPhase1Test extends TestCase
         $mlMock = Mockery::mock(MlBackendService::class);
         $mlMock->shouldReceive('analyze')
             ->once()
-            ->with(Mockery::on(fn($d) => $d->id === $diagnostic->id))
+            ->with(Mockery::on(fn ($d) => $d->id === $diagnostic->id))
             ->andReturn([
-                'condition'      => 'normal',
-                'confidence'     => 0.96,
+                'condition' => 'normal',
+                'confidence' => 0.96,
                 'confidence_pct' => '96%',
             ]);
         $this->app->instance(MlBackendService::class, $mlMock);
@@ -249,8 +249,8 @@ class EngineeringAuditPhase1Test extends TestCase
 
         $analyzeResp->assertRedirect(route('diagnostics.show', $diagnostic));
         $this->assertDatabaseHas('diagnostics', [
-            'id'           => $diagnostic->id,
-            'status'       => 'completed',
+            'id' => $diagnostic->id,
+            'status' => 'completed',
             'ml_condition' => 'normal',
         ]);
     }
@@ -264,12 +264,12 @@ class EngineeringAuditPhase1Test extends TestCase
         $vehicle = $this->createVehicle($user);
 
         $diagnostic = Diagnostic::create([
-            'user_id'          => $user->id,
-            'vehicle_id'       => $vehicle->id,
-            'audio_path'       => 'diagnostics/test/audio.webm',
-            'vibration_path'   => null,
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'audio_path' => 'diagnostics/test/audio.webm',
+            'vibration_path' => null,
             'vibration_source' => 'skipped',
-            'status'           => 'processing',
+            'status' => 'processing',
         ]);
 
         $job = new AnalyzeDiagnosticJob($diagnostic);

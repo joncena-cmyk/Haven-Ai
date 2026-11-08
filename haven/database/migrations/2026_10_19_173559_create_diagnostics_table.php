@@ -26,7 +26,7 @@ return new class extends Migration
 
             // ── Session metadata ──
             $table->enum('status', ['draft', 'submitted', 'processing', 'completed', 'failed'])
-                  ->default('draft');
+                ->default('draft');
             $table->text('notes')->nullable();
 
             // ── ML result (Stage 5) ──

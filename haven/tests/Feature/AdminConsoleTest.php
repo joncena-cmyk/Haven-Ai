@@ -22,14 +22,14 @@ class AdminConsoleTest extends TestCase
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $user->id,
-            'event'   => 'admin.access_denied',
-            'status'  => 'failure',
+            'event' => 'admin.access_denied',
+            'status' => 'failure',
         ]);
     }
 
     public function test_admin_can_view_dashboard_users_and_user_detail(): void
     {
-        $admin  = Admin::factory()->create();
+        $admin = Admin::factory()->create();
         $target = User::factory()->create(['name' => 'Target Person']);
 
         $this->actingAs($admin, 'admin')->get(route('admin.dashboard'))->assertOk()->assertSee('System Overview');
@@ -50,7 +50,7 @@ class AdminConsoleTest extends TestCase
 
     public function test_admin_can_suspend_and_reinstate_user_with_audit_trail(): void
     {
-        $admin  = Admin::factory()->create();
+        $admin = Admin::factory()->create();
         $target = User::factory()->create();
 
         $this->actingAs($admin, 'admin')->post(route('admin.users.suspend', $target))->assertRedirect();
@@ -65,7 +65,7 @@ class AdminConsoleTest extends TestCase
     public function test_suspended_user_cannot_log_in_and_existing_session_is_ended(): void
     {
         $user = User::factory()->create([
-            'email'        => 'blocked@haven.test',
+            'email' => 'blocked@haven.test',
             'suspended_at' => now(),
         ]);
 

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class UserController extends Controller
@@ -35,9 +36,9 @@ class UserController extends Controller
         $user->loadCount(['vehicles', 'diagnostics']);
 
         return view('admin.users.show', [
-            'user'     => $user,
+            'user' => $user,
             'vehicles' => $user->vehicles()->withCount('diagnostics')->latest('id')->get(),
-            'events'   => AuditLog::where('user_id', $user->id)->latest('created_at')->latest('id')->limit(20)->get(),
+            'events' => AuditLog::where('user_id', $user->id)->latest('created_at')->latest('id')->limit(20)->get(),
         ]);
     }
 
@@ -52,10 +53,10 @@ class UserController extends Controller
         // Invalidate persistent sessions/tokens immediately.
         $user->forceFill(['remember_token' => null])->save();
         $user->tokens()->delete();
-        \Illuminate\Support\Facades\DB::table('sessions')->where('user_id', $user->id)->delete();
+        DB::table('sessions')->where('user_id', $user->id)->delete();
 
         AuditLogger::log('admin.user_suspended', [
-            'target_user_id'    => $user->id,
+            'target_user_id' => $user->id,
             'target_user_email' => $user->email,
         ]);
 
@@ -71,7 +72,7 @@ class UserController extends Controller
         $user->forceFill(['suspended_at' => null])->save();
 
         AuditLogger::log('admin.user_unsuspended', [
-            'target_user_id'    => $user->id,
+            'target_user_id' => $user->id,
             'target_user_email' => $user->email,
         ]);
 

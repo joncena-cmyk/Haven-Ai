@@ -37,30 +37,30 @@ return [
 
     // HAVEN ML Backend (FastAPI)
     'ml_backend' => [
-        'url'     => env('ML_BACKEND_URL', env('ML_API_URL', 'http://127.0.0.1:8001')),
+        'url' => env('ML_BACKEND_URL', env('ML_API_URL', 'http://127.0.0.1:8001')),
         'timeout' => env('ML_BACKEND_TIMEOUT', 30),
-        'secret'  => env('ML_API_SECRET', ''),
+        'secret' => env('ML_API_SECRET', ''),
     ],
 
     // NHTSA vPIC vehicle catalog (free, no key)
     'nhtsa' => [
-        'url'     => env('NHTSA_VPIC_URL', 'https://vpic.nhtsa.dot.gov/api/vehicles'),
+        'url' => env('NHTSA_VPIC_URL', 'https://vpic.nhtsa.dot.gov/api/vehicles'),
         'timeout' => env('NHTSA_VPIC_TIMEOUT', 20),
     ],
 
     // HAVEN AI Assistant LLM Providers (Optional - built-in offline engine active by default)
     'gemini' => [
-        'key'   => env('GEMINI_API_KEY'),
+        'key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
     ],
 
     'openai' => [
-        'key'   => env('OPENAI_API_KEY'),
+        'key' => env('OPENAI_API_KEY'),
         'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
     ],
 
     'groq' => [
-        'key'   => env('GROQ_API_KEY'),
+        'key' => env('GROQ_API_KEY'),
         'model' => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
     ],
 

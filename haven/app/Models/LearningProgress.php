@@ -23,10 +23,10 @@ class LearningProgress extends Model
 
     protected $casts = [
         'completed_modules' => 'array',
-        'quiz_best_score'   => 'integer',
-        'quiz_total'        => 'integer',
-        'quiz_attempts'     => 'integer',
-        'last_quiz_at'      => 'datetime',
+        'quiz_best_score' => 'integer',
+        'quiz_total' => 'integer',
+        'quiz_attempts' => 'integer',
+        'last_quiz_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -34,4 +34,3 @@ class LearningProgress extends Model
         return $this->belongsTo(User::class);
     }
 }
-

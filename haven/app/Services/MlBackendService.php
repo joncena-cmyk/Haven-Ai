@@ -7,6 +7,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Process;
 
 /**
  * HTTP client wrapper for the HAVEN FastAPI ML backend.
@@ -17,14 +18,16 @@ use Illuminate\Support\Facades\Storage;
 class MlBackendService
 {
     private string $baseUrl;
-    private int    $timeoutSec;
+
+    private int $timeoutSec;
+
     private string $apiSecret;
 
     public function __construct()
     {
-        $this->baseUrl    = rtrim(config('services.ml_backend.url', 'http://localhost:8001'), '/');
+        $this->baseUrl = rtrim(config('services.ml_backend.url', 'http://localhost:8001'), '/');
         $this->timeoutSec = (int) config('services.ml_backend.timeout', 30);
-        $this->apiSecret  = (string) config('services.ml_backend.secret', '');
+        $this->apiSecret = (string) config('services.ml_backend.secret', '');
     }
 
     /* ─────────────────────────────────────────────
@@ -38,6 +41,7 @@ class MlBackendService
     {
         try {
             $response = Http::timeout(3)->get("{$this->baseUrl}/health");
+
             return $response->successful();
         } catch (\Throwable) {
             return false;
@@ -53,22 +57,22 @@ class MlBackendService
 
         if (! $this->isAlive()) {
             return [
-                'online'       => false,
-                'status'       => 'offline',
-                'url'          => $this->baseUrl,
-                'mode'         => 'rule_based_fallback',
-                'model_loaded' => !empty($localMeta),
-                'model'        => $this->normalizeModelMetadata(array_merge([
-                    'type'        => !empty($localMeta) ? 'trained_sklearn_on_disk' : 'fallback_heuristics',
+                'online' => false,
+                'status' => 'offline',
+                'url' => $this->baseUrl,
+                'mode' => 'rule_based_fallback',
+                'model_loaded' => ! empty($localMeta),
+                'model' => $this->normalizeModelMetadata(array_merge([
+                    'type' => ! empty($localMeta) ? 'trained_sklearn_on_disk' : 'fallback_heuristics',
                     'description' => 'FastAPI ML server is offline. Built-in multi-sensor fallback heuristic classifier is active (trained model.pkl ready on disk).',
                 ], $localMeta)),
-                'classes'      => ['normal', 'misfire', 'loose_component', 'valve_clearance'],
+                'classes' => ['normal', 'misfire', 'loose_component', 'valve_clearance'],
             ];
         }
 
         try {
             $health = Http::timeout(3)->get("{$this->baseUrl}/health")->json() ?? [];
-            $info   = Http::timeout(3)->get("{$this->baseUrl}/info")->json() ?? [];
+            $info = Http::timeout(3)->get("{$this->baseUrl}/info")->json() ?? [];
             $remoteModel = is_array($info['model'] ?? null) ? $info['model'] : [];
             if (isset($remoteModel['meta']) && is_array($remoteModel['meta'])) {
                 $nestedMeta = $remoteModel['meta'];
@@ -79,8 +83,8 @@ class MlBackendService
             $secretConfigured = (bool) ($health['secret_configured'] ?? true) && ($this->apiSecret !== '');
 
             $merged = array_merge([
-                'online'            => true,
-                'url'               => $this->baseUrl,
+                'online' => true,
+                'url' => $this->baseUrl,
                 'secret_configured' => $secretConfigured,
             ], $health, $info);
             $merged['secret_configured'] = $secretConfigured;
@@ -93,9 +97,9 @@ class MlBackendService
             return [
                 'online' => false,
                 'status' => 'error',
-                'error'  => $e->getMessage(),
-                'url'    => $this->baseUrl,
-                'model'  => $this->normalizeModelMetadata($localMeta),
+                'error' => $e->getMessage(),
+                'url' => $this->baseUrl,
+                'model' => $this->normalizeModelMetadata($localMeta),
             ];
         }
     }
@@ -113,7 +117,7 @@ class MlBackendService
         }
 
         // Normalize feature_importances: support both list-of-dicts and associative map
-        if (!empty($meta['feature_importances']) && is_array($meta['feature_importances'])) {
+        if (! empty($meta['feature_importances']) && is_array($meta['feature_importances'])) {
             $normalizedImps = [];
             foreach ($meta['feature_importances'] as $key => $val) {
                 if (is_array($val) && isset($val['feature'])) {
@@ -122,25 +126,25 @@ class MlBackendService
                     $normalizedImps[$key] = (float) $val;
                 }
             }
-            if (!empty($normalizedImps)) {
+            if (! empty($normalizedImps)) {
                 $meta['feature_importances_list'] = $meta['feature_importances'];
                 $meta['feature_importances'] = $normalizedImps;
             }
         }
 
         // Normalize per_class_metrics so both 'f1' and 'f1_score' keys exist
-        if (!empty($meta['per_class_metrics']) && is_array($meta['per_class_metrics'])) {
+        if (! empty($meta['per_class_metrics']) && is_array($meta['per_class_metrics'])) {
             foreach ($meta['per_class_metrics'] as $cls => $metrics) {
                 if (is_array($metrics)) {
                     $f1 = (float) ($metrics['f1_score'] ?? $metrics['f1'] ?? 0.0);
-                    $meta['per_class_metrics'][$cls]['f1']       = $f1;
+                    $meta['per_class_metrics'][$cls]['f1'] = $f1;
                     $meta['per_class_metrics'][$cls]['f1_score'] = $f1;
                 }
             }
         }
 
         // Compute test_samples and train_samples from confusion matrix / n_samples when omitted
-        if (!isset($meta['test_samples']) && !empty($meta['confusion_matrix']) && is_array($meta['confusion_matrix'])) {
+        if (! isset($meta['test_samples']) && ! empty($meta['confusion_matrix']) && is_array($meta['confusion_matrix'])) {
             $cmSum = 0;
             foreach ($meta['confusion_matrix'] as $row) {
                 if (is_array($row)) {
@@ -170,6 +174,7 @@ class MlBackendService
                 return $decoded;
             }
         }
+
         return [];
     }
 
@@ -190,14 +195,14 @@ class MlBackendService
                         '--samples',
                         (string) $syntheticPerClass,
                     ];
-                    if (!empty($records)) {
-                        $tmpJson = tempnam(sys_get_temp_dir(), 'haven_records_') . '.json';
+                    if (! empty($records)) {
+                        $tmpJson = tempnam(sys_get_temp_dir(), 'haven_records_').'.json';
                         file_put_contents($tmpJson, json_encode($records));
                         $cmd[] = '--records-json';
                         $cmd[] = $tmpJson;
                     }
 
-                    $process = new \Symfony\Component\Process\Process($cmd);
+                    $process = new Process($cmd);
                     $process->setTimeout(120);
                     $process->run();
 
@@ -207,29 +212,30 @@ class MlBackendService
 
                     if ($process->isSuccessful()) {
                         $meta = $this->readLocalModelMeta();
+
                         return [
-                            'status'        => 'success',
-                            'success'       => true,
-                            'message'       => 'Random Forest model retrained successfully via Python pipeline with FFT & Explainable AI.',
-                            'output'        => trim($process->getOutput()),
+                            'status' => 'success',
+                            'success' => true,
+                            'message' => 'Random Forest model retrained successfully via Python pipeline with FFT & Explainable AI.',
+                            'output' => trim($process->getOutput()),
                             'test_accuracy' => $meta['accuracy'] ?? 0.985,
-                            'f1_macro'      => $meta['f1_macro'] ?? 0.985,
-                            'n_samples'     => $meta['n_samples'] ?? ($syntheticPerClass * 4),
-                            'meta'          => $meta,
+                            'f1_macro' => $meta['f1_macro'] ?? 0.985,
+                            'n_samples' => $meta['n_samples'] ?? ($syntheticPerClass * 4),
+                            'meta' => $meta,
                         ];
                     }
                 } catch (\Throwable $ex) {
                     if ($tmpJson && file_exists($tmpJson)) {
                         @unlink($tmpJson);
                     }
-                    Log::warning('Local ML retrain process failed: ' . $ex->getMessage());
+                    Log::warning('Local ML retrain process failed: '.$ex->getMessage());
                 }
             }
 
             return [
-                'status'  => 'failure',
+                'status' => 'failure',
                 'success' => false,
-                'error'   => 'ML Backend (FastAPI) is offline at ' . $this->baseUrl . '. Ensure "uvicorn main:app --port 8001" or python is running.',
+                'error' => 'ML Backend (FastAPI) is offline at '.$this->baseUrl.'. Ensure "uvicorn main:app --port 8001" or python is running.',
             ];
         }
 
@@ -237,33 +243,34 @@ class MlBackendService
             $response = Http::timeout(90)
                 ->withHeaders(['X-ML-API-Secret' => $this->apiSecret])
                 ->post("{$this->baseUrl}/train", [
-                    'records'             => $records,
-                    'augment_synthetic'   => $augmentSynthetic,
+                    'records' => $records,
+                    'augment_synthetic' => $augmentSynthetic,
                     'synthetic_per_class' => $syntheticPerClass,
                 ]);
 
             if ($response->successful()) {
                 $json = $response->json() ?? [];
                 $meta = $json['meta'] ?? [];
+
                 return array_merge($json, [
-                    'status'        => 'success',
-                    'success'       => true,
+                    'status' => 'success',
+                    'success' => true,
                     'test_accuracy' => $meta['accuracy'] ?? ($json['test_accuracy'] ?? 0.985),
-                    'f1_macro'      => $meta['f1_macro'] ?? ($json['f1_macro'] ?? 0.985),
-                    'n_samples'     => $meta['n_samples'] ?? ($json['n_samples'] ?? 0),
+                    'f1_macro' => $meta['f1_macro'] ?? ($json['f1_macro'] ?? 0.985),
+                    'n_samples' => $meta['n_samples'] ?? ($json['n_samples'] ?? 0),
                 ]);
             }
 
             return [
-                'status'  => 'failure',
+                'status' => 'failure',
                 'success' => false,
-                'error'   => 'Retraining failed: HTTP ' . $response->status() . ' ' . $response->body(),
+                'error' => 'Retraining failed: HTTP '.$response->status().' '.$response->body(),
             ];
         } catch (\Throwable $e) {
             return [
-                'status'  => 'failure',
+                'status' => 'failure',
                 'success' => false,
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -285,6 +292,7 @@ class MlBackendService
                 throw new \RuntimeException("ML backend unavailable at {$this->baseUrl} for diagnostic #{$diagnostic->id}");
             }
             Log::info("ML backend unavailable — using mock classifier for diagnostic #{$diagnostic->id}");
+
             return $this->mockAnalysis($diagnostic);
         }
 
@@ -331,25 +339,25 @@ class MlBackendService
                 ['name' => 'diagnostic_id', 'contents' => (string) $diagnostic->id],
                 ['name' => 'vehicle_id',    'contents' => (string) $diagnostic->vehicle_id],
             ];
-            if (!is_null($diagnostic->temperature_c)) {
+            if (! is_null($diagnostic->temperature_c)) {
                 $params[] = ['name' => 'temperature_c', 'contents' => (string) $diagnostic->temperature_c];
             }
-            if (!is_null($diagnostic->rpm)) {
+            if (! is_null($diagnostic->rpm)) {
                 $params[] = ['name' => 'rpm', 'contents' => (string) $diagnostic->rpm];
             }
-            if (!is_null($diagnostic->voltage_v)) {
+            if (! is_null($diagnostic->voltage_v)) {
                 $params[] = ['name' => 'voltage_v', 'contents' => (string) $diagnostic->voltage_v];
             }
-            if (!is_null($diagnostic->current_ma)) {
+            if (! is_null($diagnostic->current_ma)) {
                 $params[] = ['name' => 'current_ma', 'contents' => (string) $diagnostic->current_ma];
             }
-            if (!empty($diagnostic->recording_mode)) {
+            if (! empty($diagnostic->recording_mode)) {
                 $params[] = ['name' => 'recording_mode', 'contents' => (string) $diagnostic->recording_mode];
             }
-            if (!empty($diagnostic->vibration_source)) {
+            if (! empty($diagnostic->vibration_source)) {
                 $params[] = ['name' => 'vibration_source', 'contents' => (string) $diagnostic->vibration_source];
             }
-            if (!is_null($diagnostic->sample_rate_hz)) {
+            if (! is_null($diagnostic->sample_rate_hz)) {
                 $params[] = ['name' => 'sample_rate_hz', 'contents' => (string) $diagnostic->sample_rate_hz];
             }
 
@@ -375,12 +383,14 @@ class MlBackendService
             if (! $allowTransientFallback) {
                 throw $e;
             }
+
             return $this->mockAnalysis($diagnostic, 'connection_error');
         } catch (\Throwable $e) {
             Log::error("ML backend unexpected error: {$e->getMessage()}");
             if (! $allowTransientFallback) {
                 throw $e;
             }
+
             return $this->mockAnalysis($diagnostic, 'unexpected_error');
         }
     }
@@ -392,14 +402,14 @@ class MlBackendService
     ───────────────────────────────────────────── */
     private function mockAnalysis(Diagnostic $diagnostic, string $reason = 'server_offline'): array
     {
-        $peakG   = $diagnostic->vibration_peak_g ?? 0.0;
-        $rmsG    = $diagnostic->vibration_rms_g  ?? 0.0;
-        $crest   = $rmsG > 0 ? round($peakG / $rmsG, 2) : 0.0;
+        $peakG = $diagnostic->vibration_peak_g ?? 0.0;
+        $rmsG = $diagnostic->vibration_rms_g ?? 0.0;
+        $crest = $rmsG > 0 ? round($peakG / $rmsG, 2) : 0.0;
         $samples = $diagnostic->vibration_sample_count ?? 0;
-        $tempC   = $diagnostic->temperature_c;
-        $rpm     = $diagnostic->rpm;
+        $tempC = $diagnostic->temperature_c;
+        $rpm = $diagnostic->rpm;
         $voltage = $diagnostic->voltage_v;
-        $mode    = $diagnostic->recording_mode ?? 'idle';
+        $mode = $diagnostic->recording_mode ?? 'idle';
 
         // Rule-based mock using stored vibration & hardware sensor stats
         [$condition, $confidence, $topClasses, $sensorWarnings] = $this->mockRules(
@@ -407,51 +417,57 @@ class MlBackendService
         );
 
         $featuresUsed = ['peak_g', 'rms_g', 'crest_factor'];
-        if (!is_null($tempC))   $featuresUsed[] = 'ds18b20_temperature';
-        if (!is_null($rpm))     $featuresUsed[] = 'hall_tachometer_rpm';
-        if (!is_null($voltage)) $featuresUsed[] = 'ina219_battery_voltage';
+        if (! is_null($tempC)) {
+            $featuresUsed[] = 'ds18b20_temperature';
+        }
+        if (! is_null($rpm)) {
+            $featuresUsed[] = 'hall_tachometer_rpm';
+        }
+        if (! is_null($voltage)) {
+            $featuresUsed[] = 'ina219_battery_voltage';
+        }
 
-        $domHz   = round(($rpm ? ($rpm / 60.0) : 14.0) * (match($condition) {
+        $domHz = round(($rpm ? ($rpm / 60.0) : 14.0) * (match ($condition) {
             'valve_clearance' => 0.5,
             'loose_component' => 2.0,
-            default           => 1.0,
+            default => 1.0,
         }), 1);
-        $entropy = match($condition) {
-            'misfire'         => 0.65,
+        $entropy = match ($condition) {
+            'misfire' => 0.65,
             'valve_clearance' => 0.45,
             'loose_component' => 0.32,
-            default           => 0.25,
+            default => 0.25,
         };
 
         $featureContributions = $this->mockExplainability($condition, $peakG, $rmsG, $crest, $domHz, $tempC, $rpm);
 
         return [
-            'condition'            => $condition,
-            'confidence'           => $confidence,
-            'confidence_pct'       => round($confidence * 100, 1) . '%',
-            'top_classes'          => $topClasses,
-            'feature_contributions'=> $featureContributions,
-            'features_used'        => $featuresUsed,
-            'audio_features'       => [],
-            'vibration_features'   => [
-                'peak_g'           => $peakG,
-                'rms_g'            => $rmsG,
-                'crest_factor'     => $crest,
+            'condition' => $condition,
+            'confidence' => $confidence,
+            'confidence_pct' => round($confidence * 100, 1).'%',
+            'top_classes' => $topClasses,
+            'feature_contributions' => $featureContributions,
+            'features_used' => $featuresUsed,
+            'audio_features' => [],
+            'vibration_features' => [
+                'peak_g' => $peakG,
+                'rms_g' => $rmsG,
+                'crest_factor' => $crest,
                 'dominant_freq_hz' => $domHz,
                 'spectral_entropy' => $entropy,
-                'sample_count'     => $samples,
+                'sample_count' => $samples,
             ],
             'hardware_telemetry' => [
                 'temperature_c' => $tempC,
-                'rpm'           => $rpm,
-                'voltage_v'     => $voltage,
+                'rpm' => $rpm,
+                'voltage_v' => $voltage,
             ],
-            'mode'             => "mock_{$reason}",
-            'warnings'         => array_merge(
+            'mode' => "mock_{$reason}",
+            'warnings' => array_merge(
                 ["ML server offline ({$reason}). Multi-sensor heuristic analysis applied."],
                 $sensorWarnings
             ),
-            'processed_at'     => now()->toISOString(),
+            'processed_at' => now()->toISOString(),
         ];
     }
 
@@ -466,7 +482,7 @@ class MlBackendService
                 'value' => round($rmsG, 2),
                 'unit' => 'g RMS',
                 'impact_pct' => 45.0,
-                'explanation' => "0.00g mechanical vibration confirms sensor was uncoupled from an operating internal combustion engine.",
+                'explanation' => '0.00g mechanical vibration confirms sensor was uncoupled from an operating internal combustion engine.',
             ];
             $contributions[] = [
                 'feature' => 'ambient_acoustic_profile',
@@ -474,7 +490,7 @@ class MlBackendService
                 'value' => 0,
                 'unit' => 'orders',
                 'impact_pct' => 35.0,
-                'explanation' => "Microphone signal contains diffuse ambient/crowd noise without periodic cylinder firing harmonics.",
+                'explanation' => 'Microphone signal contains diffuse ambient/crowd noise without periodic cylinder firing harmonics.',
             ];
             $contributions[] = [
                 'feature' => 'hardware_telemetry',
@@ -482,8 +498,9 @@ class MlBackendService
                 'value' => 0,
                 'unit' => 'sensors',
                 'impact_pct' => 20.0,
-                'explanation' => "No active engine coolant thermal signature (>45°C) or alternator bus voltage (>12.2V) verified.",
+                'explanation' => 'No active engine coolant thermal signature (>45°C) or alternator bus voltage (>12.2V) verified.',
             ];
+
             return $contributions;
         }
 
@@ -510,7 +527,7 @@ class MlBackendService
                 'value' => round($domHz, 1),
                 'unit' => 'Hz',
                 'impact_pct' => 26.0,
-                'explanation' => "Spectral energy concentrated around 0.5x crankshaft rotation speed.",
+                'explanation' => 'Spectral energy concentrated around 0.5x crankshaft rotation speed.',
             ];
         } elseif ($condition === 'misfire') {
             $contributions[] = [
@@ -527,7 +544,7 @@ class MlBackendService
                 'value' => round($crest, 2),
                 'unit' => 'ratio',
                 'impact_pct' => 32.0,
-                'explanation' => "Intermittent torque deficit spikes relative to baseline RMS energy.",
+                'explanation' => 'Intermittent torque deficit spikes relative to baseline RMS energy.',
             ];
             $contributions[] = [
                 'feature' => 'dominant_freq_hz',
@@ -535,7 +552,7 @@ class MlBackendService
                 'value' => round($domHz, 1),
                 'unit' => 'Hz',
                 'impact_pct' => 26.0,
-                'explanation' => "Low-frequency cyclic lurch detected across consecutive 720° crank rotations.",
+                'explanation' => 'Low-frequency cyclic lurch detected across consecutive 720° crank rotations.',
             ];
         } elseif ($condition === 'loose_component') {
             $contributions[] = [
@@ -560,7 +577,7 @@ class MlBackendService
                 'value' => round($crest, 2),
                 'unit' => 'ratio',
                 'impact_pct' => 20.0,
-                'explanation' => "Low impulsiveness confirms continuous vibration rather than isolated impact taps.",
+                'explanation' => 'Low impulsiveness confirms continuous vibration rather than isolated impact taps.',
             ];
         } else {
             $contributions[] = [
@@ -577,7 +594,7 @@ class MlBackendService
                 'value' => round($crest, 2),
                 'unit' => 'ratio',
                 'impact_pct' => 34.0,
-                'explanation' => "Harmonic waveform confirms smooth engine balance without abnormal impact shocks.",
+                'explanation' => 'Harmonic waveform confirms smooth engine balance without abnormal impact shocks.',
             ];
             $contributions[] = [
                 'feature' => 'peak_g',
@@ -599,12 +616,13 @@ class MlBackendService
         // when physically coupled to the engine block via real hardware accelerometer (device_sensor or csv_import),
         // or operating engine coolant temperature (>45°C), or alternator charging (>12.2V), or active RPM (>=300).
         // Browser-simulated synthetic vibration (synthetic JS math) does NOT represent physical engine block coupling.
-        $isHardwareVibration  = (in_array($vibrationSource, ['adxl345_live', 'device_sensor', 'csv_import'], true) || (is_null($vibrationSource) && $rmsG > 0.04));
+        $isHardwareVibration = (in_array($vibrationSource, ['adxl345_live', 'device_sensor', 'csv_import'], true) || (is_null($vibrationSource) && $rmsG > 0.04));
         $hasMechanicalCoupling = $isHardwareVibration && ($peakG >= 0.08 || $rmsG >= 0.04);
-        $hasActiveTelemetry   = (!is_null($tempC) && $tempC >= 45.0) || (!is_null($voltage) && $voltage >= 12.2) || (!is_null($rpm) && $rpm >= 300);
+        $hasActiveTelemetry = (! is_null($tempC) && $tempC >= 45.0) || (! is_null($voltage) && $voltage >= 12.2) || (! is_null($rpm) && $rpm >= 300);
 
-        if (!$hasMechanicalCoupling && !$hasActiveTelemetry) {
-            $gateWarning = "SIGNAL GATE: No physical engine block vibration (hardware uncoupled) or operating telemetry detected. Ambient noise filter engaged.";
+        if (! $hasMechanicalCoupling && ! $hasActiveTelemetry) {
+            $gateWarning = 'SIGNAL GATE: No physical engine block vibration (hardware uncoupled) or operating telemetry detected. Ambient noise filter engaged.';
+
             return [
                 'ambient_noise',
                 0.95,
@@ -618,11 +636,11 @@ class MlBackendService
 
         // 4 Thesis-Approved Engine Fault Classes (UMak CET Capstone Scope)
         $classes = ['normal', 'misfire', 'loose_component', 'valve_clearance'];
-        $scores  = array_fill_keys($classes, 0.0);
+        $scores = array_fill_keys($classes, 0.0);
         $warnings = [];
 
         // Temperature Telemetry Heuristics (DS18B20: Pin D4)
-        if (!is_null($tempC)) {
+        if (! is_null($tempC)) {
             if ($tempC >= 105.0) {
                 $warnings[] = "CRITICAL: Engine coolant temperature reached {$tempC}°C exceeding thermal threshold (105°C).";
                 $scores['loose_component'] += 0.30;
@@ -632,7 +650,7 @@ class MlBackendService
         }
 
         // Electrical Voltage Heuristics (INA219: Pins D21/D22)
-        if (!is_null($voltage)) {
+        if (! is_null($voltage)) {
             if ($voltage < 12.2) {
                 $warnings[] = "ELECTRICAL ALERT: Battery voltage low ({$voltage}V). Alternator charging system underperforming.";
                 $scores['misfire'] += 0.15;
@@ -661,7 +679,7 @@ class MlBackendService
         }
 
         // Tachometer correlation (Hall Sensor D23)
-        if (!is_null($rpm) && $rpm > 0) {
+        if (! is_null($rpm) && $rpm > 0) {
             if ($scores['valve_clearance'] > 0.3) {
                 $warnings[] = "Tachometer correlation: Valvetrain harmonic impacts detected at {$rpm} RPM.";
             }
@@ -670,7 +688,7 @@ class MlBackendService
         // 4. Normal Engine Operation: Gravity-removed baseline reading within healthy envelope (Idle vs Revving mode)
         $isRevving = ($mode === 'revving');
         $normalPeakLimit = $isRevving ? 0.85 : 0.55;
-        $normalRmsLimit  = $isRevving ? 0.28 : 0.22;
+        $normalRmsLimit = $isRevving ? 0.28 : 0.22;
 
         if ($peakG <= $normalPeakLimit && $rmsG <= $normalRmsLimit && $crest <= 3.6) {
             $scores['normal'] += 0.50;
@@ -679,21 +697,21 @@ class MlBackendService
         }
 
         $total = array_sum($scores) ?: 1.0;
-        $probs = array_map(fn($v) => round($v / $total, 4), $scores);
+        $probs = array_map(fn ($v) => round($v / $total, 4), $scores);
 
         arsort($probs);
-        $condition  = array_key_first($probs);
+        $condition = array_key_first($probs);
         $confidence = $probs[$condition];
 
         // Ensure realistic minimum confidence
         if ($confidence < 0.40) {
             $confidence = round(0.40 + ($peakG * 0.05), 4);
-            $condition  = 'normal';
+            $condition = 'normal';
         }
 
         $topClasses = array_slice(
             array_map(
-                fn($k, $v) => ['condition' => $k, 'confidence' => $v],
+                fn ($k, $v) => ['condition' => $k, 'confidence' => $v],
                 array_keys($probs), array_values($probs)
             ),
             0, 3

@@ -3,14 +3,13 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Models\Vehicle;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
-
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -22,7 +21,7 @@ class User extends Authenticatable
     {
         static::deleting(function (User $user) {
             foreach ($user->vehicles as $vehicle) {
-                if (!empty($vehicle->image_path)) {
+                if (! empty($vehicle->image_path)) {
                     Storage::disk('public')->delete($vehicle->image_path);
                 }
             }
@@ -102,7 +101,7 @@ class User extends Authenticatable
     /**
      * Get learning hub progress & quiz records for this user.
      */
-    public function learningProgress(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function learningProgress(): HasOne
     {
         return $this->hasOne(LearningProgress::class);
     }
@@ -122,15 +121,15 @@ class User extends Authenticatable
         $quizPercentage = $quizTotal > 0 ? (int) round(($quizBestScore / $quizTotal) * 100) : 0;
 
         return [
-            'completed_slugs'   => $completed,
+            'completed_slugs' => $completed,
             'completed_modules' => $completed,
-            'completed_count'   => $completedCount,
-            'total_modules'     => $totalModules,
-            'quiz_best_score'   => $quizBestScore,
-            'quiz_total'        => $quizTotal,
-            'quiz_attempts'     => $quizAttempts,
-            'quiz_percentage'   => $quizPercentage,
-            'last_quiz_at'      => $progress?->last_quiz_at,
+            'completed_count' => $completedCount,
+            'total_modules' => $totalModules,
+            'quiz_best_score' => $quizBestScore,
+            'quiz_total' => $quizTotal,
+            'quiz_attempts' => $quizAttempts,
+            'quiz_percentage' => $quizPercentage,
+            'last_quiz_at' => $progress?->last_quiz_at,
         ];
     }
 }

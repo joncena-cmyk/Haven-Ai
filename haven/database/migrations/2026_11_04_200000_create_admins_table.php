@@ -34,9 +34,9 @@ return new class extends Migration
             DB::table('users')->where('is_admin', true)->orderBy('id')->get()->each(
                 function ($u) use ($now) {
                     DB::table('admins')->insert([
-                        'name'       => $u->name,
-                        'email'      => $u->email,
-                        'password'   => $u->password,
+                        'name' => $u->name,
+                        'email' => $u->email,
+                        'password' => $u->password,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ]);
@@ -54,4 +54,3 @@ return new class extends Migration
         Schema::dropIfExists('admins');
     }
 };
-

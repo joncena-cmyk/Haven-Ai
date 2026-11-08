@@ -17,50 +17,50 @@ return new class extends Migration
     {
         Schema::table('diagnostics', function (Blueprint $table) {
             $table->enum('true_condition', ['normal', 'misfire', 'loose_component', 'valve_clearance'])
-                  ->nullable()
-                  ->after('notes')
-                  ->comment('Verified ground-truth engine condition label for supervised training');
+                ->nullable()
+                ->after('notes')
+                ->comment('Verified ground-truth engine condition label for supervised training');
             $table->string('session_id', 100)
-                  ->nullable()
-                  ->index()
-                  ->after('true_condition')
-                  ->comment('Recording session identifier grouping captures');
+                ->nullable()
+                ->index()
+                ->after('true_condition')
+                ->comment('Recording session identifier grouping captures');
             $table->text('fault_detail')
-                  ->nullable()
-                  ->after('session_id')
-                  ->comment('Specific mechanical fault description or diagnostic notes');
+                ->nullable()
+                ->after('session_id')
+                ->comment('Specific mechanical fault description or diagnostic notes');
             $table->unsignedInteger('target_rpm')
-                  ->nullable()
-                  ->after('fault_detail')
-                  ->comment('Target engine speed in RPM during capture');
+                ->nullable()
+                ->after('fault_detail')
+                ->comment('Target engine speed in RPM during capture');
             $table->string('load_state', 100)
-                  ->nullable()
-                  ->after('target_rpm')
-                  ->comment('Engine load condition (e.g., idle_neutral, ac_on, rev_hold)');
+                ->nullable()
+                ->after('target_rpm')
+                ->comment('Engine load condition (e.g., idle_neutral, ac_on, rev_hold)');
             $table->string('sensor_position', 150)
-                  ->nullable()
-                  ->after('load_state')
-                  ->comment('Mounting location/orientation of accelerometer on engine');
+                ->nullable()
+                ->after('load_state')
+                ->comment('Mounting location/orientation of accelerometer on engine');
             $table->string('mic_position', 150)
-                  ->nullable()
-                  ->after('sensor_position')
-                  ->comment('Microphone placement position and distance');
+                ->nullable()
+                ->after('sensor_position')
+                ->comment('Microphone placement position and distance');
             $table->string('operator', 150)
-                  ->nullable()
-                  ->after('mic_position')
-                  ->comment('Name/ID of operator who recorded the session');
+                ->nullable()
+                ->after('mic_position')
+                ->comment('Name/ID of operator who recorded the session');
             $table->string('verified_by', 150)
-                  ->nullable()
-                  ->after('operator')
-                  ->comment('Mechanic or engineer who verified the ground-truth condition');
+                ->nullable()
+                ->after('operator')
+                ->comment('Mechanic or engineer who verified the ground-truth condition');
             $table->unsignedInteger('sample_rate_hz')
-                  ->nullable()
-                  ->after('verified_by')
-                  ->comment('Actual vibration sensor sampling rate in Hz');
+                ->nullable()
+                ->after('verified_by')
+                ->comment('Actual vibration sensor sampling rate in Hz');
             $table->boolean('is_training_sample')
-                  ->default(false)
-                  ->after('sample_rate_hz')
-                  ->comment('Whether this session is approved for ML training/evaluation');
+                ->default(false)
+                ->after('sample_rate_hz')
+                ->comment('Whether this session is approved for ML training/evaluation');
         });
     }
 
@@ -87,4 +87,3 @@ return new class extends Migration
         });
     }
 };
-

@@ -53,10 +53,10 @@ class AnalyzeDiagnosticJob implements ShouldQueue
 
             $vibFeats = is_array($result['vibration_features'] ?? null) ? $result['vibration_features'] : [];
             $updatePayload = [
-                'status'          => 'completed',
-                'ml_condition'    => $result['condition']    ?? 'normal',
-                'ml_confidence'   => $result['confidence']   ?? null,
-                'ml_result_raw'   => $result,
+                'status' => 'completed',
+                'ml_condition' => $result['condition'] ?? 'normal',
+                'ml_confidence' => $result['confidence'] ?? null,
+                'ml_result_raw' => $result,
                 'ml_processed_at' => now(),
             ];
             if (isset($vibFeats['peak_g']) && is_numeric($vibFeats['peak_g']) && (float) $vibFeats['peak_g'] > 0) {
@@ -65,7 +65,7 @@ class AnalyzeDiagnosticJob implements ShouldQueue
             if (isset($vibFeats['rms_g']) && is_numeric($vibFeats['rms_g']) && (float) $vibFeats['rms_g'] > 0) {
                 $updatePayload['vibration_rms_g'] = round((float) $vibFeats['rms_g'], 4);
             }
-            if (empty($this->diagnostic->sample_rate_hz) && !empty($vibFeats['sample_rate_hz']) && (float) $vibFeats['sample_rate_hz'] > 0) {
+            if (empty($this->diagnostic->sample_rate_hz) && ! empty($vibFeats['sample_rate_hz']) && (float) $vibFeats['sample_rate_hz'] > 0) {
                 $updatePayload['sample_rate_hz'] = (int) round((float) $vibFeats['sample_rate_hz']);
             }
 
@@ -80,9 +80,9 @@ class AnalyzeDiagnosticJob implements ShouldQueue
             // Only mark failed if all retry attempts have been exhausted
             if ($attempt >= $this->tries) {
                 $this->diagnostic->update([
-                    'status'        => 'failed',
+                    'status' => 'failed',
                     'ml_result_raw' => [
-                        'error'     => $e->getMessage(),
+                        'error' => $e->getMessage(),
                         'failed_at' => now()->toIso8601String(),
                     ],
                 ]);
@@ -100,9 +100,9 @@ class AnalyzeDiagnosticJob implements ShouldQueue
         Log::error("AnalyzeDiagnosticJob permanently failed for Diagnostic #{$this->diagnostic->id}: {$exception->getMessage()}");
 
         $this->diagnostic->update([
-            'status'        => 'failed',
+            'status' => 'failed',
             'ml_result_raw' => [
-                'error'     => $exception->getMessage(),
+                'error' => $exception->getMessage(),
                 'failed_at' => now()->toIso8601String(),
             ],
         ]);

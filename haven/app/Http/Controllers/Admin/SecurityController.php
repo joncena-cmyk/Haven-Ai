@@ -26,9 +26,9 @@ class SecurityController extends Controller
             ->get();
 
         return view('admin.security.index', [
-            'admins'            => $admins,
+            'admins' => $admins,
             'recentAdminAudits' => $recentAdminAudits,
-            'currentAdmin'      => auth('admin')->user(),
+            'currentAdmin' => auth('admin')->user(),
         ]);
     }
 
@@ -39,7 +39,7 @@ class SecurityController extends Controller
     {
         $validated = $request->validate([
             'current_password' => ['required', 'current_password:admin'],
-            'password'         => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
         $admin = auth('admin')->user();
@@ -49,7 +49,7 @@ class SecurityController extends Controller
 
         AuditLogger::log('admin.password_changed', [
             'admin_id' => $admin->id,
-            'email'    => $admin->email,
+            'email' => $admin->email,
         ], null, 'success', $admin->id);
 
         return back()->with('status', 'Your administrator password has been updated securely.');
@@ -61,24 +61,23 @@ class SecurityController extends Controller
     public function storeAdmin(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'string', 'email', 'max:255', 'unique:admins,email'],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:admins,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
         $newAdmin = Admin::create([
-            'name'     => $validated['name'],
-            'email'    => $validated['email'],
+            'name' => $validated['name'],
+            'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
         ]);
 
         AuditLogger::log('admin.account_created', [
             'new_admin_id' => $newAdmin->id,
-            'email'        => $newAdmin->email,
-            'created_by'   => auth('admin')->user()?->email,
+            'email' => $newAdmin->email,
+            'created_by' => auth('admin')->user()?->email,
         ], null, 'success', auth('admin')->id());
 
         return back()->with('status', "New administrator account [{$newAdmin->email}] successfully provisioned.");
     }
 }
-

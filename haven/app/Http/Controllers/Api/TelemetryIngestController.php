@@ -7,11 +7,14 @@ use App\Jobs\AnalyzeDiagnosticJob;
 use App\Models\Diagnostic;
 use App\Models\Vehicle;
 use App\Services\AuditLogger;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TelemetryIngestController extends Controller
 {
@@ -24,25 +27,25 @@ class TelemetryIngestController extends Controller
     {
         // 1. Validate request payload (with strict size limits to prevent disk exhaustion)
         $validated = $request->validate([
-            'vehicle_id'     => 'required|integer|exists:vehicles,id',
-            'device_id'      => 'nullable|string|max:100',
-            'device_key'     => 'nullable|string|max:100',
-            'samples'        => 'nullable|array|max:5000',
-            'csv_data'       => 'nullable|string|max:512000',
-            'audio_base64'   => 'nullable|string|max:7000000',
-            'audio_mime'     => 'nullable|string|in:audio/webm,audio/wav,audio/ogg,audio/mpeg',
-            'peak_g'         => 'nullable|numeric',
-            'rms_g'          => 'nullable|numeric',
-            'crest_factor'   => 'nullable|numeric',
+            'vehicle_id' => 'required|integer|exists:vehicles,id',
+            'device_id' => 'nullable|string|max:100',
+            'device_key' => 'nullable|string|max:100',
+            'samples' => 'nullable|array|max:5000',
+            'csv_data' => 'nullable|string|max:512000',
+            'audio_base64' => 'nullable|string|max:7000000',
+            'audio_mime' => 'nullable|string|in:audio/webm,audio/wav,audio/ogg,audio/mpeg',
+            'peak_g' => 'nullable|numeric',
+            'rms_g' => 'nullable|numeric',
+            'crest_factor' => 'nullable|numeric',
             'sample_rate_hz' => 'nullable|integer|min:1|max:48000',
-            'temperature_c'  => 'nullable|numeric',
-            'temp_c'         => 'nullable|numeric',
-            'rpm'            => 'nullable|numeric',
-            'voltage_v'      => 'nullable|numeric',
-            'battery_v'      => 'nullable|numeric',
-            'current_ma'     => 'nullable|numeric',
-            'sensor_data'    => 'nullable|array|max:32',
-            'auto_analyze'   => 'nullable|boolean',
+            'temperature_c' => 'nullable|numeric',
+            'temp_c' => 'nullable|numeric',
+            'rpm' => 'nullable|numeric',
+            'voltage_v' => 'nullable|numeric',
+            'battery_v' => 'nullable|numeric',
+            'current_ma' => 'nullable|numeric',
+            'sensor_data' => 'nullable|array|max:32',
+            'auto_analyze' => 'nullable|boolean',
         ]);
 
         $vehicle = Vehicle::with('user')->findOrFail($validated['vehicle_id']);
@@ -61,14 +64,14 @@ class TelemetryIngestController extends Controller
         if (! $isAuthenticatedOwner && ! $isValidDeviceKey) {
             AuditLogger::log('iot.auth_failed', [
                 'vehicle_id' => $vehicle->id,
-                'device_id'  => $validated['device_id'] ?? 'unknown',
-                'reason'     => 'Missing or invalid X-Haven-Device-Key header',
+                'device_id' => $validated['device_id'] ?? 'unknown',
+                'reason' => 'Missing or invalid X-Haven-Device-Key header',
             ], $vehicle->user_id, 'failure');
 
             return response()->json([
-                'success'       => false,
-                'error'         => 'Unauthorized IoT Device: Invalid or missing X-Haven-Device-Key header.',
-                'iso_standard'  => 'ISO/SAE 21434 §9 (Automotive Cybersecurity Hardware Authentication Required)',
+                'success' => false,
+                'error' => 'Unauthorized IoT Device: Invalid or missing X-Haven-Device-Key header.',
+                'iso_standard' => 'ISO/SAE 21434 §9 (Automotive Cybersecurity Hardware Authentication Required)',
                 'authorization' => 'Include header "X-Haven-Device-Key: <your_vehicle_device_key>" or Bearer token.',
             ], 401);
         }
@@ -82,8 +85,8 @@ class TelemetryIngestController extends Controller
         $xyzRows = [];
         $scalarRows = [];
 
-        if (!empty($validated['csv_data'])) {
-            $filename = 'vibration/' . Str::uuid() . '.csv';
+        if (! empty($validated['csv_data'])) {
+            $filename = 'vibration/'.Str::uuid().'.csv';
             Storage::disk('local')->put($filename, $validated['csv_data']);
             $vibrationPath = $filename;
 
@@ -94,7 +97,7 @@ class TelemetryIngestController extends Controller
                         continue;
                     }
                     $cols = str_getcsv($line);
-                    if (empty($cols) || !is_numeric(trim((string) $cols[0]))) {
+                    if (empty($cols) || ! is_numeric(trim((string) $cols[0]))) {
                         continue;
                     }
                     if (count($cols) >= 4) {
@@ -104,8 +107,8 @@ class TelemetryIngestController extends Controller
                     }
                 }
             }
-        } elseif (!empty($validated['samples']) && is_array($validated['samples'])) {
-            $filename = 'vibration/' . Str::uuid() . '.json';
+        } elseif (! empty($validated['samples']) && is_array($validated['samples'])) {
+            $filename = 'vibration/'.Str::uuid().'.json';
             Storage::disk('local')->put($filename, json_encode($validated['samples'], JSON_PRETTY_PRINT));
             $vibrationPath = $filename;
 
@@ -122,7 +125,7 @@ class TelemetryIngestController extends Controller
             }
         }
 
-        if (!empty($xyzRows)) {
+        if (! empty($xyzRows)) {
             // Per-axis mean subtraction cancels the static 1 g gravity vector.
             $n = count($xyzRows);
             $mx = array_sum(array_column($xyzRows, 0)) / $n;
@@ -131,18 +134,18 @@ class TelemetryIngestController extends Controller
             foreach ($xyzRows as [$x, $y, $z]) {
                 $mags[] = sqrt((($x - $mx) ** 2) + (($y - $my) ** 2) + (($z - $mz) ** 2));
             }
-        } elseif (!empty($scalarRows)) {
+        } elseif (! empty($scalarRows)) {
             $mean = array_sum($scalarRows) / count($scalarRows);
-            $mags = array_map(fn($v) => abs($v - $mean), $scalarRows);
+            $mags = array_map(fn ($v) => abs($v - $mean), $scalarRows);
         }
 
         $sampleCount = count($mags);
-        $peakG = $validated['peak_g'] ?? (!empty($mags) ? round(max($mags), 4) : null);
-        $rmsG = $validated['rms_g'] ?? (!empty($mags) ? round(sqrt(array_sum(array_map(fn($v) => $v ** 2, $mags)) / $sampleCount), 4) : null);
+        $peakG = $validated['peak_g'] ?? (! empty($mags) ? round(max($mags), 4) : null);
+        $rmsG = $validated['rms_g'] ?? (! empty($mags) ? round(sqrt(array_sum(array_map(fn ($v) => $v ** 2, $mags)) / $sampleCount), 4) : null);
 
         // 4. Process Audio (INMP441 I2S MEMS Mic: D18/D19/D5) — stored on private disk
         $audioPath = null;
-        if (!empty($validated['audio_base64'])) {
+        if (! empty($validated['audio_base64'])) {
             $base64Payload = $validated['audio_base64'];
             if (str_contains($base64Payload, ',')) {
                 $base64Payload = substr($base64Payload, strpos($base64Payload, ',') + 1);
@@ -151,18 +154,18 @@ class TelemetryIngestController extends Controller
             if ($rawAudio === false || strlen($rawAudio) > 5 * 1024 * 1024) {
                 return response()->json([
                     'success' => false,
-                    'error'   => 'Invalid or oversized audio_base64 payload (maximum 5 MB decoded).',
+                    'error' => 'Invalid or oversized audio_base64 payload (maximum 5 MB decoded).',
                 ], 422);
             }
             if (strlen($rawAudio) > 0) {
                 $mimeStr = strtolower((string) ($validated['audio_mime'] ?? ''));
                 $ext = match (true) {
-                    str_contains($mimeStr, 'wav')  => 'wav',
-                    str_contains($mimeStr, 'ogg')  => 'ogg',
+                    str_contains($mimeStr, 'wav') => 'wav',
+                    str_contains($mimeStr, 'ogg') => 'ogg',
                     str_contains($mimeStr, 'mpeg') || str_contains($mimeStr, 'mp3') => 'mp3',
-                    default                        => 'webm',
+                    default => 'webm',
                 };
-                $audioFilename = 'audio/' . Str::uuid() . '.' . $ext;
+                $audioFilename = 'audio/'.Str::uuid().'.'.$ext;
                 Storage::disk('local')->put($audioFilename, $rawAudio);
                 $audioPath = $audioFilename;
             }
@@ -178,109 +181,109 @@ class TelemetryIngestController extends Controller
         $audioPeak = $request->input('sensor_data.inmp441.peak');
 
         $sensorData = $validated['sensor_data'] ?? [
-            'ds18b20'  => ['pin' => 'D4', 'temp_c' => $tempC ? (float)$tempC : null],
-            'hall_rpm' => ['pin' => 'D23', 'rpm' => $rpm ? (int)$rpm : null],
-            'mpu6050'  => ['pins' => 'D21/D22', 'peak_g' => $peakG, 'rms_g' => $rmsG],
-            'ina219'   => ['pins' => 'D21/D22', 'voltage_v' => $voltageV ? (float)$voltageV : null, 'current_ma' => $currentMa ? (float)$currentMa : null],
-            'inmp441'  => ['pins' => 'D18/D19/D5', 'has_audio' => !empty($audioPath)],
+            'ds18b20' => ['pin' => 'D4', 'temp_c' => $tempC ? (float) $tempC : null],
+            'hall_rpm' => ['pin' => 'D23', 'rpm' => $rpm ? (int) $rpm : null],
+            'mpu6050' => ['pins' => 'D21/D22', 'peak_g' => $peakG, 'rms_g' => $rmsG],
+            'ina219' => ['pins' => 'D21/D22', 'voltage_v' => $voltageV ? (float) $voltageV : null, 'current_ma' => $currentMa ? (float) $currentMa : null],
+            'inmp441' => ['pins' => 'D18/D19/D5', 'has_audio' => ! empty($audioPath)],
         ];
 
         // 6. Compute Component Pluggability & Health Status
         $healthInput = $request->input('health', []);
-        $ds18Ok = filter_var($healthInput['ds18b20'] ?? true, FILTER_VALIDATE_BOOLEAN) && !is_null($tempC) && $tempC > -50 && $tempC < 125;
+        $ds18Ok = filter_var($healthInput['ds18b20'] ?? true, FILTER_VALIDATE_BOOLEAN) && ! is_null($tempC) && $tempC > -50 && $tempC < 125;
         // MPU health: trust the firmware's explicit health flag. Peak is now gravity-removed,
         // so a stationary but connected sensor legitimately reports ~0 g.
-        $mpuOk = filter_var($healthInput['mpu6050'] ?? true, FILTER_VALIDATE_BOOLEAN) && !is_null($peakG);
-        $inaReported = filter_var($healthInput['ina219'] ?? true, FILTER_VALIDATE_BOOLEAN) && !is_null($voltageV);
-        $micOk = filter_var($healthInput['inmp441'] ?? true, FILTER_VALIDATE_BOOLEAN) && !is_null($audioRms) && $audioRms > 0;
+        $mpuOk = filter_var($healthInput['mpu6050'] ?? true, FILTER_VALIDATE_BOOLEAN) && ! is_null($peakG);
+        $inaReported = filter_var($healthInput['ina219'] ?? true, FILTER_VALIDATE_BOOLEAN) && ! is_null($voltageV);
+        $micOk = filter_var($healthInput['inmp441'] ?? true, FILTER_VALIDATE_BOOLEAN) && ! is_null($audioRms) && $audioRms > 0;
 
         $componentsHealth = [
             'ds18b20' => [
-                'name'      => 'Temperature Sensor (DS18B20)',
-                'pin'       => 'D4 (OneWire)',
+                'name' => 'Temperature Sensor (DS18B20)',
+                'pin' => 'D4 (OneWire)',
                 'connected' => $ds18Ok,
-                'status'    => $ds18Ok ? 'CONNECTED' : 'DISCONNECTED / PIN UNPLUGGED',
-                'value'     => $ds18Ok ? (round($tempC, 1) . ' °C') : 'DISCONNECTED',
-                'hint'      => $ds18Ok ? 'Reading room/ambient temp' : 'Signal lost on D4. Check jumper wire & 4.7kΩ pull-up.',
+                'status' => $ds18Ok ? 'CONNECTED' : 'DISCONNECTED / PIN UNPLUGGED',
+                'value' => $ds18Ok ? (round($tempC, 1).' °C') : 'DISCONNECTED',
+                'hint' => $ds18Ok ? 'Reading room/ambient temp' : 'Signal lost on D4. Check jumper wire & 4.7kΩ pull-up.',
             ],
             'mpu6050' => [
-                'name'      => 'Vibration / Accelerometer (MPU6050)',
-                'pins'      => 'D21 (SDA) / D22 (SCL)',
+                'name' => 'Vibration / Accelerometer (MPU6050)',
+                'pins' => 'D21 (SDA) / D22 (SCL)',
                 'connected' => $mpuOk,
-                'status'    => $mpuOk ? 'CONNECTED' : 'DISCONNECTED / PIN UNPLUGGED',
-                'value'     => $mpuOk ? (round($peakG, 3) . ' g') : 'DISCONNECTED',
-                'hint'      => $mpuOk ? 'Dynamic vibration (gravity removed). ~0 g when stationary.' : 'I2C line lost. Check D21 (SDA) / D22 (SCL) jumper wire.',
+                'status' => $mpuOk ? 'CONNECTED' : 'DISCONNECTED / PIN UNPLUGGED',
+                'value' => $mpuOk ? (round($peakG, 3).' g') : 'DISCONNECTED',
+                'hint' => $mpuOk ? 'Dynamic vibration (gravity removed). ~0 g when stationary.' : 'I2C line lost. Check D21 (SDA) / D22 (SCL) jumper wire.',
             ],
             'ina219' => [
-                'name'      => 'Battery / Power Monitor (INA219)',
-                'pins'      => 'D21 (SDA) / D22 (SCL)',
+                'name' => 'Battery / Power Monitor (INA219)',
+                'pins' => 'D21 (SDA) / D22 (SCL)',
                 'connected' => $inaReported,
-                'status'    => !$inaReported ? 'DISCONNECTED / PIN UNPLUGGED' : ($voltageV > 1.0 ? 'CONNECTED (VOLTAGE DETECTED)' : 'CONNECTED (NO BATTERY ON VIN)'),
-                'value'     => $inaReported ? (round($voltageV, 2) . ' V · ' . round($currentMa, 1) . ' mA') : 'DISCONNECTED',
-                'hint'      => !$inaReported ? 'I2C line lost. Check D21 (SDA) / D22 (SCL) jumper wire.' : ($voltageV > 1.0 ? 'Reading vehicle battery' : 'Module is active, but Vin+/- screw terminals have no battery connected'),
+                'status' => ! $inaReported ? 'DISCONNECTED / PIN UNPLUGGED' : ($voltageV > 1.0 ? 'CONNECTED (VOLTAGE DETECTED)' : 'CONNECTED (NO BATTERY ON VIN)'),
+                'value' => $inaReported ? (round($voltageV, 2).' V · '.round($currentMa, 1).' mA') : 'DISCONNECTED',
+                'hint' => ! $inaReported ? 'I2C line lost. Check D21 (SDA) / D22 (SCL) jumper wire.' : ($voltageV > 1.0 ? 'Reading vehicle battery' : 'Module is active, but Vin+/- screw terminals have no battery connected'),
             ],
             'inmp441' => [
-                'name'      => 'Acoustic MEMS Mic (INMP441)',
-                'pins'      => 'D18 (BCLK), D19 (WS), D5 (SD)',
+                'name' => 'Acoustic MEMS Mic (INMP441)',
+                'pins' => 'D18 (BCLK), D19 (WS), D5 (SD)',
                 'connected' => $micOk,
-                'status'    => $micOk ? 'CONNECTED' : 'DISCONNECTED / PIN UNPLUGGED',
-                'value'     => $micOk ? (number_format((int)$audioRms) . ' RMS') : 'DISCONNECTED',
-                'hint'      => $micOk ? 'Capturing ambient audio' : 'I2S bus lost. Check pins D18, D19, and D5.',
+                'status' => $micOk ? 'CONNECTED' : 'DISCONNECTED / PIN UNPLUGGED',
+                'value' => $micOk ? (number_format((int) $audioRms).' RMS') : 'DISCONNECTED',
+                'hint' => $micOk ? 'Capturing ambient audio' : 'I2S bus lost. Check pins D18, D19, and D5.',
             ],
             'hall_rpm' => [
-                'name'      => 'Tachometer / Speed (Hall Sensor)',
-                'pin'       => 'D23 (Digital Interrupt)',
+                'name' => 'Tachometer / Speed (Hall Sensor)',
+                'pin' => 'D23 (Digital Interrupt)',
                 'connected' => true,
-                'status'    => $rpm > 0 ? 'PULSES DETECTED' : 'IDLE / READY',
-                'value'     => number_format((int)$rpm) . ' RPM',
-                'hint'      => $rpm > 0 ? 'Pulses registering (if not on engine, consider 10kΩ pull-up to stop noise)' : 'Waiting for magnet pass',
+                'status' => $rpm > 0 ? 'PULSES DETECTED' : 'IDLE / READY',
+                'value' => number_format((int) $rpm).' RPM',
+                'hint' => $rpm > 0 ? 'Pulses registering (if not on engine, consider 10kΩ pull-up to stop noise)' : 'Waiting for magnet pass',
             ],
         ];
 
         // 7. Live Telemetry Cache (Always updated for live hardware verification)
         $livePayload = [
-            'online'            => true,
-            'diff_seconds'      => 0,
-            'last_seen_human'   => 'Just now',
-            'device_id'         => $validated['device_id'] ?? 'ESP32-5SENSOR-NODE',
-            'vehicle_name'      => $vehicle->display_name,
-            'vehicle_id'        => $vehicle->id,
-            'temperature_c'     => $tempC ? (float)$tempC : null,
-            'rpm'               => $rpm ? (int)$rpm : 0,
-            'voltage_v'         => $voltageV ? (float)$voltageV : null,
-            'current_ma'        => $currentMa ? (float)$currentMa : null,
-            'power_mw'          => $powerMw ? (float)$powerMw : null,
-            'peak_g'            => !is_null($peakG) ? (float)$peakG : null,
-            'accel_x'           => $request->input('sensor_data.mpu6050.ax'),
-            'accel_y'           => $request->input('sensor_data.mpu6050.ay'),
-            'accel_z'           => $request->input('sensor_data.mpu6050.az'),
-            'audio_rms'         => $audioRms ? (float)$audioRms : null,
-            'audio_peak'        => $audioPeak ? (float)$audioPeak : null,
+            'online' => true,
+            'diff_seconds' => 0,
+            'last_seen_human' => 'Just now',
+            'device_id' => $validated['device_id'] ?? 'ESP32-5SENSOR-NODE',
+            'vehicle_name' => $vehicle->display_name,
+            'vehicle_id' => $vehicle->id,
+            'temperature_c' => $tempC ? (float) $tempC : null,
+            'rpm' => $rpm ? (int) $rpm : 0,
+            'voltage_v' => $voltageV ? (float) $voltageV : null,
+            'current_ma' => $currentMa ? (float) $currentMa : null,
+            'power_mw' => $powerMw ? (float) $powerMw : null,
+            'peak_g' => ! is_null($peakG) ? (float) $peakG : null,
+            'accel_x' => $request->input('sensor_data.mpu6050.ax'),
+            'accel_y' => $request->input('sensor_data.mpu6050.ay'),
+            'accel_z' => $request->input('sensor_data.mpu6050.az'),
+            'audio_rms' => $audioRms ? (float) $audioRms : null,
+            'audio_peak' => $audioPeak ? (float) $audioPeak : null,
             'components_health' => $componentsHealth,
-            'mode'              => 'live_check',
-            'timestamp'         => now()->toIso8601String(),
+            'mode' => 'live_check',
+            'timestamp' => now()->toIso8601String(),
         ];
 
-        \Illuminate\Support\Facades\Cache::put('telemetry:live:' . $vehicle->id, $livePayload, 15);
+        Cache::put('telemetry:live:'.$vehicle->id, $livePayload, 15);
         if ($vehicle->user_id) {
-            \Illuminate\Support\Facades\Cache::put('telemetry:live:user:' . $vehicle->user_id, $livePayload, 15);
+            Cache::put('telemetry:live:user:'.$vehicle->user_id, $livePayload, 15);
         }
 
         // Rolling 30-packet history buffer for live oscilloscope chart
-        $historyKey = 'telemetry:history:' . $vehicle->id;
-        $history = \Illuminate\Support\Facades\Cache::get($historyKey, []);
+        $historyKey = 'telemetry:history:'.$vehicle->id;
+        $history = Cache::get($historyKey, []);
         $history[] = [
             'time' => now()->format('H:i:s'),
-            'rpm'  => $rpm ? (int)$rpm : 0,
-            'temp' => $tempC ? (float)$tempC : null,
-            'peak' => !is_null($peakG) ? (float)$peakG : null,
+            'rpm' => $rpm ? (int) $rpm : 0,
+            'temp' => $tempC ? (float) $tempC : null,
+            'peak' => ! is_null($peakG) ? (float) $peakG : null,
         ];
         if (count($history) > 30) {
             $history = array_slice($history, -30);
         }
-        \Illuminate\Support\Facades\Cache::put($historyKey, $history, 60);
+        Cache::put($historyKey, $history, 60);
         if ($vehicle->user_id) {
-            \Illuminate\Support\Facades\Cache::put('telemetry:history:user:' . $vehicle->user_id, $history, 60);
+            Cache::put('telemetry:history:user:'.$vehicle->user_id, $history, 60);
         }
 
         // 8. Session Persistence Decision:
@@ -288,17 +291,17 @@ class TelemetryIngestController extends Controller
         // Only persist if save_session=true was explicitly passed.
         $saveSession = $request->boolean('save_session', false);
 
-        if (!$saveSession) {
+        if (! $saveSession) {
             return response()->json([
-                'success'           => true,
-                'mode'              => 'live_check',
-                'message'           => 'Hardware checkup received & cached. No diagnostic session created.',
+                'success' => true,
+                'mode' => 'live_check',
+                'message' => 'Hardware checkup received & cached. No diagnostic session created.',
                 'components_health' => $componentsHealth,
-                'metrics'           => [
+                'metrics' => [
                     'temperature_c' => $tempC,
-                    'rpm'           => $rpm,
-                    'voltage_v'     => $voltageV,
-                    'peak_g'        => $peakG,
+                    'rpm' => $rpm,
+                    'voltage_v' => $voltageV,
+                    'peak_g' => $peakG,
                 ],
             ], 200);
         }
@@ -308,70 +311,78 @@ class TelemetryIngestController extends Controller
         $deviceId = $validated['device_id'] ?? 'ESP32-Automotive-DAQ';
 
         $notesList = ["ESP32 Wi-Fi DAQ Node [{$deviceId}]."];
-        if ($tempC) $notesList[] = "Temp: {$tempC}°C (DS18B20/D4).";
-        if ($rpm) $notesList[] = "RPM: {$rpm} (Hall/D23).";
-        if ($voltageV) $notesList[] = "Battery: {$voltageV}V (INA219/D21-D22).";
-        if ($peakG) $notesList[] = "Peak G: {$peakG}g (MPU6050/D21-D22).";
+        if ($tempC) {
+            $notesList[] = "Temp: {$tempC}°C (DS18B20/D4).";
+        }
+        if ($rpm) {
+            $notesList[] = "RPM: {$rpm} (Hall/D23).";
+        }
+        if ($voltageV) {
+            $notesList[] = "Battery: {$voltageV}V (INA219/D21-D22).";
+        }
+        if ($peakG) {
+            $notesList[] = "Peak G: {$peakG}g (MPU6050/D21-D22).";
+        }
 
         $diagnostic = Diagnostic::create([
-            'vehicle_id'              => $vehicle->id,
-            'user_id'                 => $user->id,
-            'status'                  => $autoAnalyze ? 'processing' : 'submitted',
-            'audio_path'              => $audioPath,
-            'vibration_path'          => $vibrationPath,
-            'vibration_source'        => !empty($vibrationPath) ? 'device_sensor' : null,
-            'vibration_sample_count'  => $sampleCount,
-            'vibration_peak_g'        => $peakG,
-            'vibration_rms_g'         => $rmsG,
-            'sample_rate_hz'          => isset($validated['sample_rate_hz'])
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'status' => $autoAnalyze ? 'processing' : 'submitted',
+            'audio_path' => $audioPath,
+            'vibration_path' => $vibrationPath,
+            'vibration_source' => ! empty($vibrationPath) ? 'device_sensor' : null,
+            'vibration_sample_count' => $sampleCount,
+            'vibration_peak_g' => $peakG,
+            'vibration_rms_g' => $rmsG,
+            'sample_rate_hz' => isset($validated['sample_rate_hz'])
                 ? (int) $validated['sample_rate_hz']
-                : (!empty($vibrationPath) ? 100 : null),
-            'temperature_c'           => $tempC ? (float)$tempC : null,
-            'rpm'                     => $rpm ? (int)$rpm : null,
-            'voltage_v'               => $voltageV ? (float)$voltageV : null,
-            'current_ma'              => $currentMa ? (float)$currentMa : null,
-            'sensor_data'             => $sensorData,
-            'notes'                   => implode(' ', $notesList),
+                : (! empty($vibrationPath) ? 100 : null),
+            'temperature_c' => $tempC ? (float) $tempC : null,
+            'rpm' => $rpm ? (int) $rpm : null,
+            'voltage_v' => $voltageV ? (float) $voltageV : null,
+            'current_ma' => $currentMa ? (float) $currentMa : null,
+            'sensor_data' => $sensorData,
+            'notes' => implode(' ', $notesList),
         ]);
 
         // 7. Record ISO 27001 Audit Trail
         AuditLogger::log('iot.telemetry_ingested', [
-            'vehicle_id'    => $vehicle->id,
+            'vehicle_id' => $vehicle->id,
             'diagnostic_id' => $diagnostic->id,
-            'device_id'     => $deviceId,
-            'sample_count'  => $sampleCount,
-            'peak_g'        => $peakG,
+            'device_id' => $deviceId,
+            'sample_count' => $sampleCount,
+            'peak_g' => $peakG,
             'temperature_c' => $tempC,
-            'rpm'           => $rpm,
-            'voltage_v'     => $voltageV,
-            'auto_analyze'  => $autoAnalyze,
+            'rpm' => $rpm,
+            'voltage_v' => $voltageV,
+            'auto_analyze' => $autoAnalyze,
         ], $user->id, 'success');
 
         // 8. Dispatch Background ML Analysis Job if requested
-        if ($autoAnalyze && ($audioPath || $vibrationPath || !is_null($tempC) || !is_null($rpm))) {
+        if ($autoAnalyze && ($audioPath || $vibrationPath || ! is_null($tempC) || ! is_null($rpm))) {
             AnalyzeDiagnosticJob::dispatch($diagnostic);
         }
 
         Log::info("ESP32 multi-sensor telemetry ingested for vehicle #{$vehicle->id} -> Diagnostic #{$diagnostic->id}");
 
         return response()->json([
-            'success'        => true,
-            'message'        => 'ESP32 Multi-Sensor Telemetry successfully authenticated and ingested.',
-            'diagnostic_id'  => $diagnostic->id,
-            'status'         => $diagnostic->status,
-            'show_url'       => route('diagnostics.show', $diagnostic),
-            'status_url'     => route('diagnostics.status', $diagnostic),
-            'metrics'        => [
-                'sample_count'   => $sampleCount,
-                'peak_g'         => $peakG,
-                'rms_g'          => $rmsG,
-                'temperature_c'  => $tempC ? (float)$tempC : null,
-                'rpm'            => $rpm ? (int)$rpm : null,
-                'voltage_v'      => $voltageV ? (float)$voltageV : null,
-                'current_ma'     => $currentMa ? (float)$currentMa : null,
-                'device_id'      => $deviceId,
-                'auto_analyzed'  => $autoAnalyze,
-                'authenticated'  => true,
+            'success' => true,
+            'message' => 'ESP32 Multi-Sensor Telemetry successfully authenticated and ingested.',
+            'diagnostic_id' => $diagnostic->id,
+            'status' => $diagnostic->status,
+            'show_url' => route('diagnostics.show', $diagnostic),
+            'status_url' => route('diagnostics.status', $diagnostic),
+            'metrics' => [
+                'sample_count' => $sampleCount,
+                'peak_g' => $peakG,
+                'rms_g' => $rmsG,
+                'temperature_c' => $tempC ? (float) $tempC : null,
+                'rpm' => $rpm ? (int) $rpm : null,
+                'voltage_v' => $voltageV ? (float) $voltageV : null,
+                'current_ma' => $currentMa ? (float) $currentMa : null,
+                'device_id' => $deviceId,
+                'auto_analyzed' => $autoAnalyze,
+                'authenticated' => true,
             ],
         ], 201);
     }
@@ -383,15 +394,15 @@ class TelemetryIngestController extends Controller
     public function ping(Request $request): JsonResponse
     {
         return response()->json([
-            'status'           => 'online',
-            'service'          => 'HAVEN AI IoT Telemetry Ingest',
-            'version'          => '2.5.0',
-            'server_time'      => now()->toIso8601String(),
-            'supported_modes'  => ['csv', 'json', 'audio_base64'],
-            'iso_standards'    => ['ISO/IEC 27001:2022', 'ISO/SAE 21434'],
-            'auth_required'    => 'X-Haven-Device-Key or Bearer token on POST /ingest',
+            'status' => 'online',
+            'service' => 'HAVEN AI IoT Telemetry Ingest',
+            'version' => '2.5.0',
+            'server_time' => now()->toIso8601String(),
+            'supported_modes' => ['csv', 'json', 'audio_base64'],
+            'iso_standards' => ['ISO/IEC 27001:2022', 'ISO/SAE 21434'],
+            'auth_required' => 'X-Haven-Device-Key or Bearer token on POST /ingest',
             'recommended_baud' => 115200,
-            'recommended_hz'   => 50,
+            'recommended_hz' => 50,
         ]);
     }
 
@@ -412,32 +423,32 @@ class TelemetryIngestController extends Controller
             $vehicle = Vehicle::where('user_id', $user->id)->find($vehicleId);
             if (! $vehicle) {
                 return response()->json([
-                    'online'  => false,
-                    'status'  => 'forbidden',
+                    'online' => false,
+                    'status' => 'forbidden',
                     'message' => 'Unauthorized vehicle access.',
                 ], 403);
             }
-            $cached = \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id);
+            $cached = Cache::get('telemetry:live:'.$vehicle->id);
         } else {
             $vehicle = Vehicle::where('user_id', $user->id)->first();
-            $cached = \Illuminate\Support\Facades\Cache::get('telemetry:live:user:' . $user->id)
-                ?? ($vehicle ? \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id) : null);
+            $cached = Cache::get('telemetry:live:user:'.$user->id)
+                ?? ($vehicle ? Cache::get('telemetry:live:'.$vehicle->id) : null);
         }
 
         if ($cached) {
             // Revalidate freshness from stored timestamp: ESP32 sends every 5s; 10s = timeout
             $ts = $cached['timestamp'] ?? null;
-            $diffSec = $ts ? abs(now()->diffInSeconds(\Carbon\Carbon::parse($ts))) : 999;
+            $diffSec = $ts ? abs(now()->diffInSeconds(Carbon::parse($ts))) : 999;
             $isLive = ($diffSec <= 10);
 
             $cached['diff_seconds'] = $diffSec;
             $cached['online'] = $isLive;
             $cached['last_seen_human'] = $isLive
                 ? 'Live (Streaming)'
-                : ($ts ? \Carbon\Carbon::parse($ts)->diffForHumans() : 'Offline');
+                : ($ts ? Carbon::parse($ts)->diffForHumans() : 'Offline');
 
             // If hardware is offline/unplugged, clear active component health so UI shows disconnected
-            if (!$isLive) {
+            if (! $isLive) {
                 $cached['temperature_c'] = null;
                 $cached['voltage_v'] = null;
                 $cached['current_ma'] = null;
@@ -446,40 +457,41 @@ class TelemetryIngestController extends Controller
                 $cached['rpm'] = 0;
             }
 
-            $activeVid = !empty($cached['vehicle_id']) ? (int) $cached['vehicle_id'] : ($vehicle?->id);
-            $historyKey = $activeVid ? ('telemetry:history:' . $activeVid) : ('telemetry:history:user:' . $user->id);
-            $cached['history'] = \Illuminate\Support\Facades\Cache::get($historyKey, []);
+            $activeVid = ! empty($cached['vehicle_id']) ? (int) $cached['vehicle_id'] : ($vehicle?->id);
+            $historyKey = $activeVid ? ('telemetry:history:'.$activeVid) : ('telemetry:history:user:'.$user->id);
+            $cached['history'] = Cache::get($historyKey, []);
 
             return response()->json($cached);
         }
 
         // Hardware is currently offline / not sending
         $historyKey = ($vehicleId !== null && $vehicleId !== '' && $vehicle)
-            ? ('telemetry:history:' . $vehicle->id)
-            : ('telemetry:history:user:' . $user->id);
+            ? ('telemetry:history:'.$vehicle->id)
+            : ('telemetry:history:user:'.$user->id);
+
         return response()->json([
-            'online'            => false,
-            'diff_seconds'      => 999,
-            'last_seen_human'   => 'Offline / Standby',
-            'device_id'         => 'ESP32-5SENSOR-NODE',
-            'vehicle_name'      => $vehicle?->display_name ?? 'Vehicle',
-            'vehicle_id'        => $vehicle?->id,
-            'temperature_c'     => null,
-            'rpm'               => 0,
-            'voltage_v'         => null,
-            'current_ma'        => null,
-            'power_mw'          => null,
-            'peak_g'            => null,
-            'accel_x'           => null,
-            'accel_y'           => null,
-            'accel_z'           => null,
-            'audio_rms'         => null,
-            'audio_peak'        => null,
+            'online' => false,
+            'diff_seconds' => 999,
+            'last_seen_human' => 'Offline / Standby',
+            'device_id' => 'ESP32-5SENSOR-NODE',
+            'vehicle_name' => $vehicle?->display_name ?? 'Vehicle',
+            'vehicle_id' => $vehicle?->id,
+            'temperature_c' => null,
+            'rpm' => 0,
+            'voltage_v' => null,
+            'current_ma' => null,
+            'power_mw' => null,
+            'peak_g' => null,
+            'accel_x' => null,
+            'accel_y' => null,
+            'accel_z' => null,
+            'audio_rms' => null,
+            'audio_peak' => null,
             'components_health' => null,
-            'mode'              => 'standby',
-            'status'            => 'standby',
-            'timestamp'         => null,
-            'history'           => \Illuminate\Support\Facades\Cache::get($historyKey, []),
+            'mode' => 'standby',
+            'status' => 'standby',
+            'timestamp' => null,
+            'history' => Cache::get($historyKey, []),
         ]);
     }
 
@@ -487,7 +499,7 @@ class TelemetryIngestController extends Controller
      * Server-Sent Events (SSE) stream for live ESP32 telemetry & rolling waveform.
      * GET /api/v1/telemetry/stream
      */
-    public function stream(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function stream(Request $request): StreamedResponse
     {
         $user = $request->user();
         if (! $user) {
@@ -505,38 +517,42 @@ class TelemetryIngestController extends Controller
         return response()->stream(function () use ($user, $vehicle) {
             // Send initial ping event
             echo ": connected\n\n";
-            if (ob_get_level() > 0) ob_flush();
+            if (ob_get_level() > 0) {
+                ob_flush();
+            }
             flush();
 
             $cached = ($vehicleId && $vehicle)
-                ? \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id)
-                : (\Illuminate\Support\Facades\Cache::get('telemetry:live:user:' . $user->id)
-                    ?? ($vehicle ? \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id) : null));
+                ? Cache::get('telemetry:live:'.$vehicle->id)
+                : (Cache::get('telemetry:live:user:'.$user->id)
+                    ?? ($vehicle ? Cache::get('telemetry:live:'.$vehicle->id) : null));
 
-            $activeVid = !empty($cached['vehicle_id']) ? (int) $cached['vehicle_id'] : ($vehicle?->id);
-            $historyKey = $activeVid ? ('telemetry:history:' . $activeVid) : ('telemetry:history:user:' . $user->id);
-            $history = \Illuminate\Support\Facades\Cache::get($historyKey, []);
+            $activeVid = ! empty($cached['vehicle_id']) ? (int) $cached['vehicle_id'] : ($vehicle?->id);
+            $historyKey = $activeVid ? ('telemetry:history:'.$activeVid) : ('telemetry:history:user:'.$user->id);
+            $history = Cache::get($historyKey, []);
 
             $payload = $cached ?: [
-                'online'          => false,
+                'online' => false,
                 'last_seen_human' => 'Standby',
-                'vehicle_name'    => $vehicle?->display_name ?? 'Vehicle',
-                'temperature_c'   => null,
-                'rpm'             => 0,
-                'voltage_v'       => null,
-                'peak_g'          => null,
+                'vehicle_name' => $vehicle?->display_name ?? 'Vehicle',
+                'temperature_c' => null,
+                'rpm' => 0,
+                'voltage_v' => null,
+                'peak_g' => null,
             ];
             $payload['history'] = $history;
 
             echo "event: telemetry\n";
-            echo "data: " . json_encode($payload) . "\n\n";
+            echo 'data: '.json_encode($payload)."\n\n";
 
-            if (ob_get_level() > 0) ob_flush();
+            if (ob_get_level() > 0) {
+                ob_flush();
+            }
             flush();
         }, 200, [
-            'Content-Type'      => 'text/event-stream',
-            'Cache-Control'     => 'no-cache, no-transform',
-            'Connection'        => 'keep-alive',
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache, no-transform',
+            'Connection' => 'keep-alive',
             'X-Accel-Buffering' => 'no',
         ]);
     }
@@ -567,7 +583,7 @@ class TelemetryIngestController extends Controller
         }
 
         if (empty($vehicle->device_key)) {
-            $vehicle->update(['device_key' => 'hvn_dev_' . bin2hex(random_bytes(16))]);
+            $vehicle->update(['device_key' => 'hvn_dev_'.bin2hex(random_bytes(16))]);
         }
 
         $deviceKey = $vehicle->device_key;
@@ -681,11 +697,11 @@ void loop() {
 CPP;
 
         return response()->json([
-            'language'   => 'cpp',
-            'platform'   => 'ESP32 / Arduino',
-            'filename'   => 'Haven_ESP32_Telemetry.ino',
+            'language' => 'cpp',
+            'platform' => 'ESP32 / Arduino',
+            'filename' => 'Haven_ESP32_Telemetry.ino',
             'vehicle_id' => $vId,
-            'sketch'     => $code,
+            'sketch' => $code,
         ]);
     }
 }

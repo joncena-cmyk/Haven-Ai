@@ -26,27 +26,27 @@ class StorageCleanupOnDeleteTest extends TestCase
         $photoPath = $photo->store('vehicles', 'public');
 
         $vehicle = Vehicle::create([
-            'user_id'    => $user->id,
-            'make'       => 'Honda',
-            'model'      => 'Civic',
-            'year'       => 2023,
+            'user_id' => $user->id,
+            'make' => 'Honda',
+            'model' => 'Civic',
+            'year' => 2023,
             'image_path' => $photoPath,
         ]);
 
         Storage::disk('public')->assertExists($photoPath);
 
         // 2. Create diagnostics with audio & vibration files
-        $audioPath = 'diagnostics/' . $vehicle->id . '/audio/sample.webm';
-        $vibPath   = 'diagnostics/' . $vehicle->id . '/vibration/sample.csv';
+        $audioPath = 'diagnostics/'.$vehicle->id.'/audio/sample.webm';
+        $vibPath = 'diagnostics/'.$vehicle->id.'/vibration/sample.csv';
         Storage::disk('local')->put($audioPath, 'fake-audio-bytes');
         Storage::disk('local')->put($vibPath, "timestamp,x,y,z\n0,0.1,0.2,1.0\n");
 
         $diagnostic = Diagnostic::create([
-            'user_id'        => $user->id,
-            'vehicle_id'     => $vehicle->id,
-            'audio_path'     => $audioPath,
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'audio_path' => $audioPath,
             'vibration_path' => $vibPath,
-            'status'         => 'completed',
+            'status' => 'completed',
         ]);
 
         Storage::disk('local')->assertExists($audioPath);
@@ -77,24 +77,24 @@ class StorageCleanupOnDeleteTest extends TestCase
 
         $photoPath = UploadedFile::fake()->create('car.jpg', 50, 'image/jpeg')->store('vehicles', 'public');
         $vehicle = Vehicle::create([
-            'user_id'    => $user->id,
-            'make'       => 'Toyota',
-            'model'      => 'Vios',
-            'year'       => 2022,
+            'user_id' => $user->id,
+            'make' => 'Toyota',
+            'model' => 'Vios',
+            'year' => 2022,
             'image_path' => $photoPath,
         ]);
 
-        $audioPath = 'diagnostics/' . $vehicle->id . '/audio/engine.webm';
-        $vibPath   = 'diagnostics/' . $vehicle->id . '/vibration/vib.csv';
+        $audioPath = 'diagnostics/'.$vehicle->id.'/audio/engine.webm';
+        $vibPath = 'diagnostics/'.$vehicle->id.'/vibration/vib.csv';
         Storage::disk('local')->put($audioPath, 'fake-audio-bytes');
         Storage::disk('local')->put($vibPath, "timestamp,x,y,z\n0,0,0,1\n");
 
         Diagnostic::create([
-            'user_id'        => $user->id,
-            'vehicle_id'     => $vehicle->id,
-            'audio_path'     => $audioPath,
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'audio_path' => $audioPath,
             'vibration_path' => $vibPath,
-            'status'         => 'completed',
+            'status' => 'completed',
         ]);
 
         // Delete user account

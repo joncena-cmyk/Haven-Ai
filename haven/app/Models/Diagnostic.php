@@ -22,10 +22,10 @@ class Diagnostic extends Model
     {
         foreach (['local', 'private', 'public'] as $disk) {
             try {
-                if (!empty($this->audio_path) && Storage::disk($disk)->exists($this->audio_path)) {
+                if (! empty($this->audio_path) && Storage::disk($disk)->exists($this->audio_path)) {
                     Storage::disk($disk)->delete($this->audio_path);
                 }
-                if (!empty($this->vibration_path) && Storage::disk($disk)->exists($this->vibration_path)) {
+                if (! empty($this->vibration_path) && Storage::disk($disk)->exists($this->vibration_path)) {
                     Storage::disk($disk)->delete($this->vibration_path);
                 }
             } catch (\Throwable) {
@@ -33,6 +33,7 @@ class Diagnostic extends Model
             }
         }
     }
+
     protected $fillable = [
         'user_id',
         'vehicle_id',
@@ -70,18 +71,18 @@ class Diagnostic extends Model
     ];
 
     protected $casts = [
-        'ml_result_raw'      => 'array',
-        'ml_processed_at'    => 'datetime',
-        'vibration_peak_g'   => 'float',
-        'vibration_rms_g'    => 'float',
-        'temperature_c'      => 'float',
-        'rpm'                => 'integer',
-        'voltage_v'          => 'float',
-        'current_ma'         => 'float',
-        'sensor_data'        => 'array',
-        'ml_confidence'      => 'float',
-        'target_rpm'         => 'integer',
-        'sample_rate_hz'     => 'integer',
+        'ml_result_raw' => 'array',
+        'ml_processed_at' => 'datetime',
+        'vibration_peak_g' => 'float',
+        'vibration_rms_g' => 'float',
+        'temperature_c' => 'float',
+        'rpm' => 'integer',
+        'voltage_v' => 'float',
+        'current_ma' => 'float',
+        'sensor_data' => 'array',
+        'ml_confidence' => 'float',
+        'target_rpm' => 'integer',
+        'sample_rate_hz' => 'integer',
         'is_training_sample' => 'boolean',
     ];
 
@@ -94,12 +95,12 @@ class Diagnostic extends Model
 
     public function hasMultiSensor(): bool
     {
-        return !is_null($this->temperature_c) || !is_null($this->rpm) || !is_null($this->voltage_v) || !empty($this->sensor_data);
+        return ! is_null($this->temperature_c) || ! is_null($this->rpm) || ! is_null($this->voltage_v) || ! empty($this->sensor_data);
     }
 
     public function getTemperatureFAttribute(): ?float
     {
-        return !is_null($this->temperature_c) ? round(($this->temperature_c * 9/5) + 32, 1) : null;
+        return ! is_null($this->temperature_c) ? round(($this->temperature_c * 9 / 5) + 32, 1) : null;
     }
 
     /**
@@ -115,6 +116,7 @@ class Diagnostic extends Model
         if ($this->vibration_rms_g !== null && $this->vibration_rms_g > 0 && $this->vibration_peak_g !== null && $this->vibration_peak_g > 0) {
             return round((float) $this->vibration_peak_g / (float) $this->vibration_rms_g, 2);
         }
+
         return null;
     }
 
@@ -122,7 +124,7 @@ class Diagnostic extends Model
     {
         return match ($this->recording_mode) {
             'revving' => 'Baseline Revving (2,000–2,500 RPM)',
-            default   => 'Baseline Idle (750–900 RPM)',
+            default => 'Baseline Idle (750–900 RPM)',
         };
     }
 
@@ -146,12 +148,12 @@ class Diagnostic extends Model
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {
-            'draft'      => 'Draft',
-            'submitted'  => 'Submitted',
+            'draft' => 'Draft',
+            'submitted' => 'Submitted',
             'processing' => 'Processing',
-            'completed'  => 'Completed',
-            'failed'     => 'Failed',
-            default      => ucfirst($this->status),
+            'completed' => 'Completed',
+            'failed' => 'Failed',
+            default => ucfirst($this->status),
         };
     }
 
@@ -161,24 +163,24 @@ class Diagnostic extends Model
     public function getStatusBadgeAttribute(): string
     {
         return match ($this->status) {
-            'draft'      => 'h-badge-gray',
-            'submitted'  => 'h-badge-teal',
+            'draft' => 'h-badge-gray',
+            'submitted' => 'h-badge-teal',
             'processing' => 'h-badge-amber',
-            'completed'  => 'h-badge-green',
-            'failed'     => 'h-badge-red',
-            default      => 'h-badge-gray',
+            'completed' => 'h-badge-green',
+            'failed' => 'h-badge-red',
+            default => 'h-badge-gray',
         };
     }
 
     public function getVibrationSourceLabelAttribute(): string
     {
         return match ($this->vibration_source) {
-            'adxl345_live'  => 'ADXL345 Hardware Stream',
+            'adxl345_live' => 'ADXL345 Hardware Stream',
             'device_sensor' => 'Device Motion Accelerometer',
-            'csv_import'    => 'Imported CSV Telemetry',
-            'simulated'     => 'Simulated Waveform (Demo)',
-            'skipped'       => 'Skipped (Audio Only)',
-            default         => $this->hasVibration() ? 'Vibration Telemetry' : 'None',
+            'csv_import' => 'Imported CSV Telemetry',
+            'simulated' => 'Simulated Waveform (Demo)',
+            'skipped' => 'Skipped (Audio Only)',
+            default => $this->hasVibration() ? 'Vibration Telemetry' : 'None',
         };
     }
 
@@ -186,10 +188,10 @@ class Diagnostic extends Model
     {
         return match ($this->vibration_source) {
             'adxl345_live', 'device_sensor' => 'h-badge-teal',
-            'csv_import'                    => 'h-badge-teal',
-            'simulated'                     => 'h-badge-amber',
-            'skipped'                       => 'h-badge-gray',
-            default                         => $this->hasVibration() ? 'h-badge-teal' : 'h-badge-gray',
+            'csv_import' => 'h-badge-teal',
+            'simulated' => 'h-badge-amber',
+            'skipped' => 'h-badge-gray',
+            default => $this->hasVibration() ? 'h-badge-teal' : 'h-badge-gray',
         };
     }
 
@@ -223,7 +225,7 @@ class Diagnostic extends Model
     public function getConfidencePercentAttribute(): ?string
     {
         return $this->ml_confidence !== null
-            ? round($this->ml_confidence * 100, 1) . '%'
+            ? round($this->ml_confidence * 100, 1).'%'
             : null;
     }
 
@@ -232,54 +234,54 @@ class Diagnostic extends Model
      */
     public const CONDITIONS = [
         'normal' => [
-            'key'       => 'normal',
-            'label'     => 'Normal Engine Operation',
+            'key' => 'normal',
+            'label' => 'Normal Engine Operation',
             'sub_label' => 'Baseline Idling & Revving',
-            'badge'     => 'h-badge-green',
-            'color'     => '#22c55e',
-            'bg'        => 'var(--h-green-bg)',
-            'border'    => 'rgba(34,197,94,0.25)',
-            'status'    => 'OPTIMAL HEALTH · SAFE TO DRIVE',
+            'badge' => 'h-badge-green',
+            'color' => '#22c55e',
+            'bg' => 'var(--h-green-bg)',
+            'border' => 'rgba(34,197,94,0.25)',
+            'status' => 'OPTIMAL HEALTH · SAFE TO DRIVE',
         ],
         'misfire' => [
-            'key'       => 'misfire',
-            'label'     => 'Engine Misfire',
+            'key' => 'misfire',
+            'label' => 'Engine Misfire',
             'sub_label' => 'Combustion Dropout Anomaly',
-            'badge'     => 'h-badge-amber',
-            'color'     => '#f59e0b',
-            'bg'        => 'var(--h-amber-bg)',
-            'border'    => 'rgba(245,158,11,0.25)',
-            'status'    => 'HIGH ATTENTION · DRIVE WITH CAUTION',
+            'badge' => 'h-badge-amber',
+            'color' => '#f59e0b',
+            'bg' => 'var(--h-amber-bg)',
+            'border' => 'rgba(245,158,11,0.25)',
+            'status' => 'HIGH ATTENTION · DRIVE WITH CAUTION',
         ],
         'loose_component' => [
-            'key'       => 'loose_component',
-            'label'     => 'Loose or Worn Component Vibration',
+            'key' => 'loose_component',
+            'label' => 'Loose or Worn Component Vibration',
             'sub_label' => 'Structural Mount / Accessory Harmonic',
-            'badge'     => 'h-badge-amber',
-            'color'     => '#f59e0b',
-            'bg'        => 'var(--h-amber-bg)',
-            'border'    => 'rgba(245,158,11,0.25)',
-            'status'    => 'MODERATE CAUTION · SERVICE RECOMMENDED',
+            'badge' => 'h-badge-amber',
+            'color' => '#f59e0b',
+            'bg' => 'var(--h-amber-bg)',
+            'border' => 'rgba(245,158,11,0.25)',
+            'status' => 'MODERATE CAUTION · SERVICE RECOMMENDED',
         ],
         'valve_clearance' => [
-            'key'       => 'valve_clearance',
-            'label'     => 'Improper Valve Clearance',
+            'key' => 'valve_clearance',
+            'label' => 'Improper Valve Clearance',
             'sub_label' => 'Valvetrain Lash / Acoustic Tap Anomaly',
-            'badge'     => 'h-badge-red',
-            'color'     => '#ef4444',
-            'bg'        => 'var(--h-red-bg)',
-            'border'    => 'rgba(239,68,68,0.25)',
-            'status'    => 'MECHANICAL WEAR · ADJUSTMENT REQUIRED',
+            'badge' => 'h-badge-red',
+            'color' => '#ef4444',
+            'bg' => 'var(--h-red-bg)',
+            'border' => 'rgba(239,68,68,0.25)',
+            'status' => 'MECHANICAL WEAR · ADJUSTMENT REQUIRED',
         ],
         'ambient_noise' => [
-            'key'       => 'ambient_noise',
-            'label'     => 'Ambient / Environmental Noise',
+            'key' => 'ambient_noise',
+            'label' => 'Ambient / Environmental Noise',
             'sub_label' => 'No Engine Acoustic or Vibrational Signature Detected',
-            'badge'     => 'h-badge-amber',
-            'color'     => '#f59e0b',
-            'bg'        => 'var(--h-amber-bg)',
-            'border'    => 'rgba(245,158,11,0.25)',
-            'status'    => 'INVALID CAPTURE · ENGINE NOT DETECTED',
+            'badge' => 'h-badge-amber',
+            'color' => '#f59e0b',
+            'bg' => 'var(--h-amber-bg)',
+            'border' => 'rgba(245,158,11,0.25)',
+            'status' => 'INVALID CAPTURE · ENGINE NOT DETECTED',
         ],
     ];
 
@@ -289,13 +291,14 @@ class Diagnostic extends Model
     public static function canonicalCondition(?string $raw): string
     {
         $raw = strtolower(trim((string) $raw));
+
         return match ($raw) {
             'ambient_noise', 'ambient', 'no_engine', 'environmental_noise', 'crowd_noise' => 'ambient_noise',
-            'misfiring', 'misfire'                           => 'misfire',
+            'misfiring', 'misfire' => 'misfire',
             'idling_rough', 'rough_idle', 'loose_component' => 'loose_component',
-            'knocking', 'knock', 'valve_clearance'          => 'valve_clearance',
-            'overheating'                                    => 'loose_component',
-            default                                          => 'normal',
+            'knocking', 'knock', 'valve_clearance' => 'valve_clearance',
+            'overheating' => 'loose_component',
+            default => 'normal',
         };
     }
 
@@ -305,6 +308,7 @@ class Diagnostic extends Model
     public function getConditionLabelAttribute(): string
     {
         $key = self::canonicalCondition($this->ml_condition);
+
         return self::CONDITIONS[$key]['label'] ?? 'Normal Engine Operation';
     }
 
@@ -314,6 +318,7 @@ class Diagnostic extends Model
     public function getConditionSubLabelAttribute(): string
     {
         $key = self::canonicalCondition($this->ml_condition);
+
         return self::CONDITIONS[$key]['sub_label'] ?? 'Baseline Idling & Revving';
     }
 
@@ -323,6 +328,7 @@ class Diagnostic extends Model
     public function getConditionBadgeAttribute(): string
     {
         $key = self::canonicalCondition($this->ml_condition);
+
         return self::CONDITIONS[$key]['badge'] ?? 'h-badge-green';
     }
 
@@ -332,6 +338,7 @@ class Diagnostic extends Model
     public function getConditionMetaAttribute(): array
     {
         $key = self::canonicalCondition($this->ml_condition);
+
         return self::CONDITIONS[$key] ?? self::CONDITIONS['normal'];
     }
 
@@ -343,6 +350,7 @@ class Diagnostic extends Model
         if (empty($this->true_condition)) {
             return null;
         }
+
         return self::CONDITIONS[$this->true_condition]['label'] ?? ucfirst(str_replace('_', ' ', $this->true_condition));
     }
 }
