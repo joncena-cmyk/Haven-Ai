@@ -4,6 +4,7 @@ namespace App\Http\Requests\Auth;
 
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\BrevoService;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -37,10 +38,11 @@ class LoginRequest extends FormRequest
 
     /**
      * Attempt to authenticate the request's credentials.
+     * Returns true if 2FA verification is required before full authentication.
      *
      * @throws ValidationException
      */
-    public function authenticate(): void
+    public function authenticate(): bool
     {
         $this->ensureIsNotRateLimited();
 
@@ -57,7 +59,10 @@ class LoginRequest extends FormRequest
             ]);
         }
 
-        if (Auth::user()?->isSuspended()) {
+        /** @var User $user */
+        $user = Auth::user();
+
+        if ($user->isSuspended()) {
             $suspendedId = Auth::id();
             Auth::logout();
 
@@ -71,6 +76,37 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+
+        // Check if user has enabled Two-Factor Authentication
+        if ($user->two_factor_enabled) {
+            $userId = $user->id;
+            $remember = $this->boolean('remember');
+
+            // Log out temporarily until 2FA challenge is solved
+            Auth::logout();
+
+            $this->session()->put('auth.two_factor_user_id', $userId);
+            $this->session()->put('auth.two_factor_remember', $remember);
+
+            // Generate 6-digit OTP and dispatch via Brevo
+            $code = $user->generateTwoFactorCode();
+            $brevo = app(BrevoService::class);
+
+            if ($user->two_factor_channel === 'sms' && ! empty($user->phone)) {
+                $brevo->sendSmsOtp($user->phone, $code, '2FA Login');
+            } else {
+                $brevo->sendEmailOtp($user->email, $user->name, $code, 'Two-Factor Authentication');
+            }
+
+            AuditLogger::log('auth.2fa_challenge_prompted', [
+                'email' => $user->email,
+                'channel' => $user->two_factor_channel,
+            ], $user->id);
+
+            return true;
+        }
+
+        return false;
     }
 
     /**

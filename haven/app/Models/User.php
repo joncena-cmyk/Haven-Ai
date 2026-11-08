@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -39,7 +40,12 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
+        'two_factor_enabled',
+        'two_factor_channel',
+        'two_factor_code',
+        'two_factor_expires_at',
     ];
 
     /**
@@ -50,6 +56,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_code',
     ];
 
     /**
@@ -63,7 +70,51 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'suspended_at' => 'datetime',
+            'two_factor_enabled' => 'boolean',
+            'two_factor_expires_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Generate a new 6-digit two-factor OTP code, store its hash, and set 10-minute expiration.
+     */
+    public function generateTwoFactorCode(): string
+    {
+        $code = (string) random_int(100000, 999999);
+
+        $this->forceFill([
+            'two_factor_code' => Hash::make($code),
+            'two_factor_expires_at' => now()->addMinutes(10),
+        ])->save();
+
+        return $code;
+    }
+
+    /**
+     * Clear active two-factor code and expiration.
+     */
+    public function resetTwoFactorCode(): void
+    {
+        $this->forceFill([
+            'two_factor_code' => null,
+            'two_factor_expires_at' => null,
+        ])->save();
+    }
+
+    /**
+     * Check if the provided code matches and has not expired.
+     */
+    public function verifyTwoFactorCode(string $code): bool
+    {
+        if (empty($this->two_factor_code) || empty($this->two_factor_expires_at)) {
+            return false;
+        }
+
+        if (now()->isAfter($this->two_factor_expires_at)) {
+            return false;
+        }
+
+        return Hash::check($code, $this->two_factor_code);
     }
 
     /**

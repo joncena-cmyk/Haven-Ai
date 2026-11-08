@@ -186,4 +186,33 @@ class SecurityAndStorageFixesTest extends TestCase
             ->get(route('diagnostics.vibration', $diagnostic))
             ->assertStatus(403);
     }
+
+    public function test_telemetry_ingest_preserves_zero_readings_and_handles_null_current(): void
+    {
+        Cache::flush();
+
+        $owner = User::factory()->create();
+        $vehicle = Vehicle::create([
+            'user_id' => $owner->id,
+            'make' => 'Toyota',
+            'model' => 'Vios',
+            'year' => 2022,
+            'device_key' => 'hvn_dev_zero_test_key_1234567890abcdef',
+        ]);
+
+        $this->postJson('/api/v1/telemetry/ingest', [
+            'vehicle_id' => $vehicle->id,
+            'temperature_c' => 0,
+            'rpm' => 0,
+            'voltage_v' => 0,
+            'save_session' => true,
+            'auto_analyze' => false,
+        ], ['X-Haven-Device-Key' => $vehicle->device_key])->assertStatus(201);
+
+        $diag = Diagnostic::latest('id')->firstOrFail();
+        $this->assertSame(0.0, $diag->temperature_c);
+        $this->assertSame(0, $diag->rpm);
+        $this->assertSame(0.0, $diag->voltage_v);
+        $this->assertNull($diag->current_ma);
+    }
 }

@@ -55,6 +55,45 @@ class ProfileController extends Controller
     }
 
     /**
+     * Update the user's Two-Factor Authentication (2FA) settings.
+     */
+    public function updateTwoFactor(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'two_factor_enabled' => ['required', 'boolean'],
+            'two_factor_channel' => ['required', 'string', 'in:email,sms'],
+            'phone' => ['nullable', 'string', 'max:25'],
+        ]);
+
+        $channel = $validated['two_factor_channel'];
+        $phone = ! empty($validated['phone']) ? trim($validated['phone']) : null;
+
+        // If user enables SMS 2FA, phone is strictly required
+        if ((bool) $validated['two_factor_enabled'] && $channel === 'sms' && empty($phone) && empty($request->user()->phone)) {
+            return Redirect::route('profile.edit')
+                ->withErrors(['phone' => 'A valid mobile phone number with country code is required when choosing SMS (Firebase) 2FA.'])
+                ->withFragment('security-2fa');
+        }
+
+        $user = $request->user();
+        $user->forceFill([
+            'two_factor_enabled' => (bool) $validated['two_factor_enabled'],
+            'two_factor_channel' => $channel,
+            'phone' => $phone ?? $user->phone,
+        ])->save();
+
+        AuditLogger::log('profile.2fa_updated', [
+            'two_factor_enabled' => $user->two_factor_enabled,
+            'two_factor_channel' => $user->two_factor_channel,
+            'phone' => $user->phone ? substr($user->phone, 0, 4) . '****' : null,
+        ]);
+
+        return Redirect::route('profile.edit')
+            ->with('status', 'two-factor-updated')
+            ->withFragment('security-2fa');
+    }
+
+    /**
      * Delete the user's account.
      */
     public function destroy(Request $request): RedirectResponse

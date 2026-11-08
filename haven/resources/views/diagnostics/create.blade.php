@@ -170,11 +170,15 @@
             <div class="h-diag-pipeline-ticker" id="diag-pipeline-ticker">
                 <div class="h-ticker-item active" id="tick-audio">
                     <span class="h-ticker-bullet"></span>
-                    <span class="h-ticker-txt">ACOUSTIC INMP441</span>
+                    <span class="h-ticker-txt">ACOUSTIC INMP441 (ML)</span>
                 </div>
                 <div class="h-ticker-item" id="tick-vib">
                     <span class="h-ticker-bullet"></span>
-                    <span class="h-ticker-txt">VIBRATION ADXL345</span>
+                    <span class="h-ticker-txt">VIBRATION ADXL345 (ML)</span>
+                </div>
+                <div class="h-ticker-item active" id="tick-aux">
+                    <span class="h-ticker-bullet"></span>
+                    <span class="h-ticker-txt">AUX DAQ: DS18B20 · HALL · INA219 (DB)</span>
                 </div>
                 <div class="h-ticker-item" id="tick-ml">
                     <span class="h-ticker-bullet"></span>
@@ -328,25 +332,36 @@
                     </div>
                 </div>
 
-                {{-- Pin 3: INA219 Power & Battery Bus --}}
-                <div class="h-diag-pin battery-pin" style="top:62%; left:62%;" onclick="focusPin('battery')" title="INA219 Voltage Sensor">
+                {{-- Pin 3: DS18B20 Coolant / Block Temperature Sensor (Contextual DB Recorded) --}}
+                <div class="h-diag-pin temp-pin" style="top:38%; left:48%;" onclick="focusPin('temp')" title="DS18B20 Thermal Probe (Click to adjust contextual telemetry)">
+                    <div class="h-diag-pin-core orange">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+                    </div>
+                    <div class="h-diag-pin-tooltip">
+                        <strong>DS18B20 Thermal Probe</strong>
+                        <span>OneWire D4 · 88.5°C Recorded (Non-ML)</span>
+                    </div>
+                </div>
+
+                {{-- Pin 4: INA219 Power & Battery Bus (Contextual DB Recorded) --}}
+                <div class="h-diag-pin battery-pin" style="top:62%; left:62%;" onclick="focusPin('battery')" title="INA219 Voltage & Current Sensor">
                     <div class="h-diag-pin-core dark">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="10" x2="23" y2="14"/></svg>
                     </div>
                     <div class="h-diag-pin-tooltip">
                         <strong>INA219 Power Monitor</strong>
-                        <span>13.8V Bus · Alternator Charging</span>
+                        <span>I2C 0x40 · 13.8V / 420mA (Non-ML)</span>
                     </div>
                 </div>
 
-                {{-- Pin 4: Hall Tachometer RPM (Contextual) --}}
+                {{-- Pin 5: Hall Tachometer RPM (Contextual DB Recorded) --}}
                 <div class="h-diag-pin rpm-pin" style="top:44%; left:78%;" onclick="focusPin('rpm')" title="Hall RPM Tachometer Sensor">
                     <div class="h-diag-pin-core green">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg>
                     </div>
                     <div class="h-diag-pin-tooltip">
                         <strong>Hall Tachometer</strong>
-                        <span>Contextual RPM Speed Indicator</span>
+                        <span>GPIO D23 · Crankshaft RPM (Non-ML)</span>
                     </div>
                 </div>
             </div>
@@ -483,18 +498,18 @@
             </div>
         </div>
 
-        {{-- CARD 3: CONTEXTUAL GAUGES (Speedometer Arc Voltage & Tachometer Wave) --}}
+        {{-- CARD 3: AUXILIARY HARDWARE TELEMETRY (DS18B20 · Hall RPM · INA219 — DB Recorded, Non-ML) --}}
         <div class="h-diag-card">
             <div class="h-diag-card-head">
-                <span class="h-diag-card-title">CONTEXTUAL INDICATORS</span>
-                <span class="h-diag-card-subinfo">(Non-ML Scope)</span>
+                <span class="h-diag-card-title">AUXILIARY HARDWARE DAQ</span>
+                <span class="h-diag-card-status-badge ok" title="Recorded into database for every session; excluded from ML feature vector per thesis scope">DB RECORDED · NON-ML</span>
             </div>
 
             <div class="h-diag-gauges-row">
-                {{-- Voltage Arc Speedometer --}}
+                {{-- INA219 Voltage Arc Speedometer --}}
                 <div class="h-diag-gauge-cell">
                     <div class="h-diag-gauge-top">
-                        <span class="name">VOLTAGE</span>
+                        <span class="name">INA219 VOLTAGE</span>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                     </div>
                     <div class="h-diag-arc-wrap">
@@ -504,13 +519,13 @@
                         </svg>
                         <div class="h-diag-arc-val" id="gauge-voltage-num">13.8</div>
                     </div>
-                    <div class="h-diag-gauge-lbl">Alternator DC Output</div>
+                    <div class="h-diag-gauge-lbl">I2C 0x40 · DC Bus (V)</div>
                 </div>
 
-                {{-- RPM Sine Wave Tachometer --}}
+                {{-- Hall-Effect RPM Sine Wave Tachometer --}}
                 <div class="h-diag-gauge-cell">
                     <div class="h-diag-gauge-top">
-                        <span class="name">TACHOMETER</span>
+                        <span class="name">HALL TACH</span>
                         <span class="unit">RPM</span>
                     </div>
                     <div class="h-diag-rpm-wave-wrap">
@@ -520,14 +535,31 @@
                             <circle cx="60" cy="17" r="4" fill="#0284c7"/>
                         </svg>
                     </div>
-                    <div class="h-diag-gauge-lbl" id="gauge-rpm-mode">Idling (750–900)</div>
+                    <div class="h-diag-gauge-lbl" id="gauge-rpm-mode">GPIO D23 · Idling</div>
+                </div>
+            </div>
+
+            {{-- DS18B20 Temperature & INA219 Current Strip --}}
+            <div class="h-diag-card-footer-metrics" style="margin-top:0.35rem;margin-bottom:0.45rem;">
+                <div class="h-diag-footer-metric">
+                    <span class="lbl">DS18B20 Temp (D4)</span>
+                    <span class="val" style="color:#ea580c;" id="gauge-temp-num">88.5°C</span>
+                </div>
+                <div class="h-diag-footer-metric">
+                    <span class="lbl">INA219 Current</span>
+                    <span class="val" id="gauge-curr-num">420 mA</span>
+                </div>
+                <div class="h-diag-footer-metric">
+                    <button type="button" onclick="openManualTelemetryDrawer()" style="background:rgba(2,132,199,0.1);color:#0284c7;border:1px solid rgba(2,132,199,0.28);border-radius:6px;padding:0.22rem 0.5rem;font-size:0.68rem;font-weight:700;cursor:pointer;">
+                        Edit DAQ
+                    </button>
                 </div>
             </div>
 
             {{-- Mode Switcher Pill inside Card --}}
             <div class="h-diag-mode-selector-strip">
                 <button type="button" class="h-mode-btn active" id="btn-mode-idle" onclick="setRecordingMode('idle')">
-                    Baseline Idle (800 RPM)
+                    Baseline Idle (850 RPM)
                 </button>
                 <button type="button" class="h-mode-btn" id="btn-mode-revving" onclick="setRecordingMode('revving')">
                     Baseline Revving (2,200 RPM)
@@ -3134,7 +3166,7 @@
         } else if (type === 'vibration') {
             document.getElementById('recording-workbench').scrollIntoView({ behavior: 'smooth' });
             startVibrationRecording();
-        } else if (type === 'battery' || type === 'rpm') {
+        } else if (type === 'battery' || type === 'rpm' || type === 'temp') {
             openManualTelemetryDrawer();
         }
     };
@@ -3818,10 +3850,12 @@
     window.setRecordingMode = function(mode) {
         document.getElementById('form_recording_mode').value = mode;
         const isIdle = (mode === 'idle');
+        const targetRpm = isIdle ? 850 : 2200;
         document.getElementById('btn-mode-idle').classList.toggle('active', isIdle);
         document.getElementById('btn-mode-revving').classList.toggle('active', !isIdle);
         document.getElementById('gauge-rpm-num').textContent = isIdle ? '850' : '2,200';
-        document.getElementById('gauge-rpm-mode').textContent = isIdle ? 'Idling (750–900)' : 'Revving (2,000–2,500)';
+        document.getElementById('gauge-rpm-mode').textContent = isIdle ? 'GPIO D23 · Idling' : 'GPIO D23 · Revving';
+        document.getElementById('probe-rpm-val').textContent = targetRpm + ' RPM';
     };
 
     // 7. Modals & Sample Uploads
@@ -3948,6 +3982,15 @@
         document.getElementById('probe-volt-val').textContent = volt + ' V';
         document.getElementById('gauge-voltage-num').textContent = volt;
         document.getElementById('gauge-rpm-num').textContent = rpm;
+        const gTemp = document.getElementById('gauge-temp-num');
+        if (gTemp) gTemp.textContent = temp + '°C';
+        const gCurr = document.getElementById('gauge-curr-num');
+        if (gCurr) gCurr.textContent = curr + ' mA';
+        const tickAux = document.getElementById('tick-aux');
+        if (tickAux) {
+            tickAux.classList.add('active');
+            tickAux.classList.add('completed');
+        }
 
         closeManualTelemetryDrawer();
         window.setDiagnosisFlowStep('capture');
@@ -4038,6 +4081,8 @@
         }
         advanceStepper();
 
+        // Auxiliary values (DS18B20, Hall RPM, INA219) are only submitted when they come from the
+        // live ESP32 stream or the Manual DAQ drawer; never fabricate defaults (they would defeat the ambient-noise gate).
         // Perform asynchronous submission with CSRF auto-recovery
         const formData = new FormData(form);
         const metaCsrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -4185,14 +4230,26 @@
                     document.getElementById('daq-status-text').textContent = 'ESP32 STREAMING';
                     document.getElementById('daq-status-pill').style.background = '#f0fdf4';
                     document.getElementById('sensor-bus-badge').textContent = 'HARDWARE NODE CONNECTED';
-                    if (data.temperature_c) document.getElementById('probe-temp-val').textContent = data.temperature_c + '°C';
-                    if (data.rpm) {
+                    if (data.temperature_c !== null && data.temperature_c !== undefined) {
+                        document.getElementById('probe-temp-val').textContent = data.temperature_c + '°C';
+                        const gTemp = document.getElementById('gauge-temp-num');
+                        if (gTemp) gTemp.textContent = data.temperature_c + '°C';
+                        document.getElementById('form_temperature_c').value = data.temperature_c;
+                    }
+                    if (data.rpm !== null && data.rpm !== undefined) {
                         document.getElementById('probe-rpm-val').textContent = data.rpm + ' RPM';
                         document.getElementById('gauge-rpm-num').textContent = data.rpm;
+                        document.getElementById('form_rpm').value = data.rpm;
                     }
-                    if (data.voltage_v) {
+                    if (data.voltage_v !== null && data.voltage_v !== undefined) {
                         document.getElementById('probe-volt-val').textContent = data.voltage_v + ' V';
                         document.getElementById('gauge-voltage-num').textContent = data.voltage_v;
+                        document.getElementById('form_voltage_v').value = data.voltage_v;
+                    }
+                    if (data.current_ma !== null && data.current_ma !== undefined) {
+                        const gCurr = document.getElementById('gauge-curr-num');
+                        if (gCurr) gCurr.textContent = data.current_ma + ' mA';
+                        document.getElementById('form_current_ma').value = data.current_ma;
                     }
                     if (data.peak_g !== null && data.peak_g !== undefined) {
                         const fmtG = Number(data.peak_g).toFixed(3);

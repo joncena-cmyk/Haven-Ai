@@ -8,6 +8,8 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Auth\RegisterOtpController;
+use App\Http\Controllers\Auth\TwoFactorChallengeController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,6 +37,33 @@ Route::middleware('guest')->group(function () {
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
+
+    // Registration 6-Digit OTP Verification
+    Route::get('register/verify-otp', [RegisterOtpController::class, 'create'])
+        ->name('register.verify-otp');
+
+    Route::post('register/verify-otp', [RegisterOtpController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('register.verify-otp.store');
+
+    Route::post('register/resend-otp', [RegisterOtpController::class, 'resend'])
+        ->middleware('throttle:5,1')
+        ->name('register.resend-otp');
+
+    // Two-Factor Authentication (2FA) Challenge
+    Route::get('two-factor-challenge', [TwoFactorChallengeController::class, 'create'])
+        ->name('two-factor.challenge');
+
+    Route::post('two-factor-challenge', [TwoFactorChallengeController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('two-factor.challenge.store');
+
+    Route::post('two-factor-challenge/resend', [TwoFactorChallengeController::class, 'resend'])
+        ->middleware('throttle:5,1')
+        ->name('two-factor.challenge.resend');
+
+    Route::post('two-factor-challenge/switch', [TwoFactorChallengeController::class, 'switchChannel'])
+        ->name('two-factor.challenge.switch');
 });
 
 Route::middleware('auth')->group(function () {

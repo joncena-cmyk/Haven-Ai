@@ -26,7 +26,19 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse|JsonResponse
     {
-        $request->authenticate();
+        $requires2fa = $request->authenticate();
+
+        if ($requires2fa) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'requires_2fa' => true,
+                    'redirect' => route('two-factor.challenge', absolute: false),
+                ]);
+            }
+
+            return redirect()->route('two-factor.challenge');
+        }
 
         $request->session()->regenerate();
 

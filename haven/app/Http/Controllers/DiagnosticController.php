@@ -138,17 +138,31 @@ class DiagnosticController extends Controller
             'is_training_sample' => $request->boolean('is_training_sample') && ! empty($trueCondition),
         ];
 
+        $liveCache = \Illuminate\Support\Facades\Cache::get('telemetry:live:'.$vehicle->id)
+            ?? \Illuminate\Support\Facades\Cache::get('telemetry:live:user:'.Auth::id());
+
         if ($request->filled('temperature_c')) {
-            $data['temperature_c'] = $request->temperature_c;
+            $data['temperature_c'] = (float) $request->temperature_c;
+        } elseif (is_array($liveCache) && isset($liveCache['temperature_c']) && $liveCache['temperature_c'] !== null) {
+            $data['temperature_c'] = (float) $liveCache['temperature_c'];
         }
+
         if ($request->filled('rpm')) {
-            $data['rpm'] = $request->rpm;
+            $data['rpm'] = (int) $request->rpm;
+        } elseif (is_array($liveCache) && isset($liveCache['rpm']) && $liveCache['rpm'] !== null) {
+            $data['rpm'] = (int) $liveCache['rpm'];
         }
+
         if ($request->filled('voltage_v')) {
-            $data['voltage_v'] = $request->voltage_v;
+            $data['voltage_v'] = (float) $request->voltage_v;
+        } elseif (is_array($liveCache) && isset($liveCache['voltage_v']) && $liveCache['voltage_v'] !== null) {
+            $data['voltage_v'] = (float) $liveCache['voltage_v'];
         }
+
         if ($request->filled('current_ma')) {
-            $data['current_ma'] = $request->current_ma;
+            $data['current_ma'] = (float) $request->current_ma;
+        } elseif (is_array($liveCache) && isset($liveCache['current_ma']) && $liveCache['current_ma'] !== null) {
+            $data['current_ma'] = (float) $liveCache['current_ma'];
         }
 
         // ── Audio file: prefer blob (recorded) over uploaded file ──
@@ -194,6 +208,40 @@ class DiagnosticController extends Controller
         $hasData = ! empty($data['audio_path']) || ! empty($data['vibration_path']) || ! empty($data['temperature_c']) || ! empty($data['rpm']);
         if ($hasData) {
             $data['status'] = 'submitted';
+        }
+
+        $hasAuxTelemetry = isset($data['temperature_c']) || isset($data['rpm']) || isset($data['voltage_v']) || isset($data['current_ma']);
+        if ($hasAuxTelemetry) {
+            $data['sensor_data'] = [
+                'ds18b20' => [
+                    'pin' => 'D4',
+                    'temp_c' => $data['temperature_c'] ?? null,
+                    'role' => 'contextual_non_ml',
+                ],
+                'hall_rpm' => [
+                    'pin' => 'D23',
+                    'rpm' => $data['rpm'] ?? null,
+                    'role' => 'contextual_non_ml',
+                ],
+                'ina219' => [
+                    'pins' => 'D21/D22',
+                    'voltage_v' => $data['voltage_v'] ?? null,
+                    'current_ma' => $data['current_ma'] ?? null,
+                    'role' => 'contextual_non_ml',
+                ],
+                'mpu6050' => [
+                    'pins' => 'D21/D22',
+                    'peak_g' => $data['vibration_peak_g'] ?? null,
+                    'rms_g' => $data['vibration_rms_g'] ?? null,
+                    'role' => 'ml_feature',
+                ],
+                'inmp441' => [
+                    'pins' => 'D18/D19/D5',
+                    'has_audio' => ! empty($data['audio_path']),
+                    'duration_sec' => $data['audio_duration_sec'] ?? null,
+                    'role' => 'ml_feature',
+                ],
+            ];
         }
 
         $diagnostic = Diagnostic::create($data);

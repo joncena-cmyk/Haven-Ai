@@ -64,4 +64,18 @@ return [
         'model' => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
     ],
 
+    'brevo' => [
+        'api_key' => env('BREVO_API_KEY'),
+        'sms_sender' => env('BREVO_SMS_SENDER', 'HavenAI'),
+        'from_email' => env('BREVO_MAIL_FROM_ADDRESS', env('MAIL_FROM_ADDRESS', 'noreply@haven.local')),
+        'from_name' => env('BREVO_MAIL_FROM_NAME', env('APP_NAME', 'Haven AI')),
+    ],
+
+    'firebase' => [
+        'api_key' => env('FIREBASE_API_KEY'),
+        'auth_domain' => env('FIREBASE_AUTH_DOMAIN'),
+        'project_id' => env('FIREBASE_PROJECT_ID'),
+        'app_id' => env('FIREBASE_APP_ID'),
+    ],
+
 ];

@@ -217,6 +217,10 @@
                     <span class="h-ticker-bullet"></span>
                     <span class="h-ticker-txt">VIB: {{ $diagnostic->hasVibration() ? ($diagnostic->vibration_peak_g . 'g PEAK') : 'NONE' }}</span>
                 </div>
+                <div class="h-ticker-item active">
+                    <span class="h-ticker-bullet"></span>
+                    <span class="h-ticker-txt">AUX DAQ: {{ $diagnostic->temperature_c !== null ? number_format($diagnostic->temperature_c, 1) . '°C' : '88.5°C' }} · {{ $diagnostic->rpm !== null ? number_format($diagnostic->rpm) . ' RPM' : '850 RPM' }} · {{ $diagnostic->voltage_v !== null ? number_format($diagnostic->voltage_v, 1) . 'V' : '13.8V' }}</span>
+                </div>
                 <div class="h-ticker-item {{ $diagnostic->status === 'completed' ? 'active' : '' }}">
                     <span class="h-ticker-bullet"></span>
                     <span class="h-ticker-txt">FASTAPI: {{ $isMock ? 'SIMULATED' : 'LIVE ML' }}</span>
@@ -346,25 +350,36 @@
                     </div>
                 </div>
 
-                {{-- Pin 3: INA219 Voltage & Power --}}
+                {{-- Pin 3: DS18B20 Thermal Probe (Contextual DB Recorded) --}}
+                <div class="h-diag-pin temp-pin" style="top:38%; left:48%;">
+                    <div class="h-diag-pin-core orange">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+                    </div>
+                    <div class="h-diag-pin-tooltip">
+                        <strong>DS18B20 Thermal Probe</strong>
+                        <span>OneWire D4 · {{ $diagnostic->temperature_c !== null ? number_format($diagnostic->temperature_c, 1) . '°C' : '88.5°C' }} (Non-ML)</span>
+                    </div>
+                </div>
+
+                {{-- Pin 4: INA219 Voltage & Power (Contextual DB Recorded) --}}
                 <div class="h-diag-pin battery-pin" style="top:62%; left:62%;">
                     <div class="h-diag-pin-core dark">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="10" x2="23" y2="14"/></svg>
                     </div>
                     <div class="h-diag-pin-tooltip">
-                        <strong>INA219 Contextual Bus</strong>
-                        <span>{{ $diagnostic->voltage_v ? number_format($diagnostic->voltage_v, 2) . 'V DC' : '13.8V Nominal' }}</span>
+                        <strong>INA219 Power Monitor</strong>
+                        <span>{{ $diagnostic->voltage_v ? number_format($diagnostic->voltage_v, 2) . 'V DC' : '13.8V Nominal' }} · {{ $diagnostic->current_ma ? round($diagnostic->current_ma) . ' mA' : '420 mA' }} (Non-ML)</span>
                     </div>
                 </div>
 
-                {{-- Pin 4: Hall Tachometer RPM --}}
+                {{-- Pin 5: Hall Tachometer RPM (Contextual DB Recorded) --}}
                 <div class="h-diag-pin rpm-pin" style="top:44%; left:78%;">
                     <div class="h-diag-pin-core green">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg>
                     </div>
                     <div class="h-diag-pin-tooltip">
                         <strong>Hall Tachometer</strong>
-                        <span>{{ $diagnostic->rpm ? number_format($diagnostic->rpm) . ' RPM' : '750 RPM Idle' }}</span>
+                        <span>GPIO D23 · {{ $diagnostic->rpm ? number_format($diagnostic->rpm) . ' RPM' : '850 RPM Idle' }} (Non-ML)</span>
                     </div>
                 </div>
             </div>
@@ -430,12 +445,24 @@
                 {{-- Probe 4: Hall Tachometer RPM --}}
                 <div class="h-diag-probe-item">
                     <div class="h-diag-probe-pillar">
-                        <div class="h-diag-probe-bar green" style="height: {{ min(100, max(25, (($diagnostic->rpm ?? 750) / 4000) * 100)) }}%;"></div>
+                        <div class="h-diag-probe-bar green" style="height: {{ min(100, max(25, (($diagnostic->rpm ?? 850) / 4000) * 100)) }}%;"></div>
                         <div class="h-diag-probe-cap"></div>
                     </div>
-                    <div class="h-diag-probe-name">Tachometer</div>
+                    <div class="h-diag-probe-name">Tach</div>
                     <div class="h-diag-probe-status good">
-                        {{ $diagnostic->rpm ? number_format($diagnostic->rpm) . ' RPM' : '750 RPM' }}
+                        {{ $diagnostic->rpm ? number_format($diagnostic->rpm) . ' RPM' : '850 RPM' }}
+                    </div>
+                </div>
+
+                {{-- Probe 5: INA219 Bus Voltage --}}
+                <div class="h-diag-probe-item">
+                    <div class="h-diag-probe-pillar">
+                        <div class="h-diag-probe-bar blue" style="height: {{ min(100, max(25, (($diagnostic->voltage_v ?? 13.8) / 16) * 100)) }}%;"></div>
+                        <div class="h-diag-probe-cap"></div>
+                    </div>
+                    <div class="h-diag-probe-name">Voltage</div>
+                    <div class="h-diag-probe-status good">
+                        {{ $diagnostic->voltage_v ? number_format($diagnostic->voltage_v, 1) . ' V' : '13.8 V' }}
                     </div>
                 </div>
             </div>
@@ -502,19 +529,19 @@
             </div>
         </div>
 
-        {{-- CARD 3: CONTEXTUAL TELEMETRY GAUGES (Voltage + Tachometer) --}}
+        {{-- CARD 3: AUXILIARY HARDWARE TELEMETRY (DS18B20 · Hall RPM · INA219 — DB Recorded, Non-ML) --}}
         <div class="h-diag-card">
             <div class="h-diag-card-head">
-                <span class="h-diag-card-title">CONTEXTUAL GAUGES</span>
-                <span class="h-diag-card-status-badge ok">NON-ML SCOPE</span>
+                <span class="h-diag-card-title">AUXILIARY HARDWARE DAQ</span>
+                <span class="h-diag-card-status-badge ok" title="Recorded in database alongside ML prediction; excluded from ML feature vector">DB RECORDED · NON-ML</span>
             </div>
 
             <div class="h-diag-dual-gauges">
-                {{-- Voltage Arc Meter --}}
+                {{-- INA219 Voltage Arc Meter --}}
                 <div class="h-diag-gauge-cell">
                     <div class="h-gauge-label">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                        <span>VOLTAGE</span>
+                        <span>INA219 VOLTAGE</span>
                     </div>
                     <div class="h-gauge-arc-wrap">
                         <svg viewBox="0 0 100 55" class="h-gauge-svg">
@@ -528,11 +555,11 @@
                     </div>
                 </div>
 
-                {{-- RPM Wave Speed Gauge --}}
+                {{-- Hall-Effect RPM Wave Speed Gauge --}}
                 <div class="h-diag-gauge-cell">
                     <div class="h-gauge-label">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                        <span>TACHOMETER</span>
+                        <span>HALL TACH</span>
                     </div>
                     <div class="h-gauge-arc-wrap">
                         <svg viewBox="0 0 100 55" class="h-gauge-svg">
@@ -540,7 +567,7 @@
                             <circle cx="50" cy="35" r="4" fill="#0284c7"/>
                         </svg>
                         <div class="h-gauge-value-display">
-                            <span class="val">{{ $diagnostic->rpm ? number_format($diagnostic->rpm) : '750' }}</span>
+                            <span class="val">{{ $diagnostic->rpm ? number_format($diagnostic->rpm) : '850' }}</span>
                             <span class="unit">RPM</span>
                         </div>
                     </div>
@@ -549,16 +576,16 @@
 
             <div class="h-diag-card-footer-metrics">
                 <div class="metric">
-                    <span class="m-val">{{ $diagnostic->current_ma ? round($diagnostic->current_ma) . ' mA' : '380 mA' }}</span>
-                    <span class="m-lbl">Current Draw</span>
+                    <span class="m-val" style="color:#ea580c;">{{ $diagnostic->temperature_c ? number_format($diagnostic->temperature_c, 1) . '°C' : '88.5°C' }}</span>
+                    <span class="m-lbl">DS18B20 Temp</span>
+                </div>
+                <div class="metric">
+                    <span class="m-val">{{ $diagnostic->current_ma ? round($diagnostic->current_ma) . ' mA' : '420 mA' }}</span>
+                    <span class="m-lbl">INA219 Current</span>
                 </div>
                 <div class="metric">
                     <span class="m-val">{{ ($diagnostic->voltage_v ?? 13.8) >= 13.2 ? 'Charging' : 'Resting' }}</span>
                     <span class="m-lbl">Alternator</span>
-                </div>
-                <div class="metric">
-                    <span class="m-val">{{ $diagnostic->temperature_c ? number_format($diagnostic->temperature_c, 1) . '°C' : '88.5°C' }}</span>
-                    <span class="m-lbl">Block Temp</span>
                 </div>
             </div>
         </div>

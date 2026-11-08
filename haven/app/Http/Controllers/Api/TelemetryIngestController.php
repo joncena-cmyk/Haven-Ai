@@ -181,10 +181,10 @@ class TelemetryIngestController extends Controller
         $audioPeak = $request->input('sensor_data.inmp441.peak');
 
         $sensorData = $validated['sensor_data'] ?? [
-            'ds18b20' => ['pin' => 'D4', 'temp_c' => $tempC ? (float) $tempC : null],
-            'hall_rpm' => ['pin' => 'D23', 'rpm' => $rpm ? (int) $rpm : null],
+            'ds18b20' => ['pin' => 'D4', 'temp_c' => $tempC !== null ? (float) $tempC : null],
+            'hall_rpm' => ['pin' => 'D23', 'rpm' => $rpm !== null ? (int) $rpm : null],
             'mpu6050' => ['pins' => 'D21/D22', 'peak_g' => $peakG, 'rms_g' => $rmsG],
-            'ina219' => ['pins' => 'D21/D22', 'voltage_v' => $voltageV ? (float) $voltageV : null, 'current_ma' => $currentMa ? (float) $currentMa : null],
+            'ina219' => ['pins' => 'D21/D22', 'voltage_v' => $voltageV !== null ? (float) $voltageV : null, 'current_ma' => $currentMa !== null ? (float) $currentMa : null],
             'inmp441' => ['pins' => 'D18/D19/D5', 'has_audio' => ! empty($audioPath)],
         ];
 
@@ -203,7 +203,7 @@ class TelemetryIngestController extends Controller
                 'pin' => 'D4 (OneWire)',
                 'connected' => $ds18Ok,
                 'status' => $ds18Ok ? 'CONNECTED' : 'DISCONNECTED / PIN UNPLUGGED',
-                'value' => $ds18Ok ? (round($tempC, 1).' °C') : 'DISCONNECTED',
+                'value' => $ds18Ok ? (round((float) $tempC, 1).' °C') : 'DISCONNECTED',
                 'hint' => $ds18Ok ? 'Reading room/ambient temp' : 'Signal lost on D4. Check jumper wire & 4.7kΩ pull-up.',
             ],
             'mpu6050' => [
@@ -211,7 +211,7 @@ class TelemetryIngestController extends Controller
                 'pins' => 'D21 (SDA) / D22 (SCL)',
                 'connected' => $mpuOk,
                 'status' => $mpuOk ? 'CONNECTED' : 'DISCONNECTED / PIN UNPLUGGED',
-                'value' => $mpuOk ? (round($peakG, 3).' g') : 'DISCONNECTED',
+                'value' => $mpuOk ? (round((float) $peakG, 3).' g') : 'DISCONNECTED',
                 'hint' => $mpuOk ? 'Dynamic vibration (gravity removed). ~0 g when stationary.' : 'I2C line lost. Check D21 (SDA) / D22 (SCL) jumper wire.',
             ],
             'ina219' => [
@@ -219,7 +219,7 @@ class TelemetryIngestController extends Controller
                 'pins' => 'D21 (SDA) / D22 (SCL)',
                 'connected' => $inaReported,
                 'status' => ! $inaReported ? 'DISCONNECTED / PIN UNPLUGGED' : ($voltageV > 1.0 ? 'CONNECTED (VOLTAGE DETECTED)' : 'CONNECTED (NO BATTERY ON VIN)'),
-                'value' => $inaReported ? (round($voltageV, 2).' V · '.round($currentMa, 1).' mA') : 'DISCONNECTED',
+                'value' => $inaReported ? (round((float) $voltageV, 2).' V · '.round((float) ($currentMa ?? 0), 1).' mA') : 'DISCONNECTED',
                 'hint' => ! $inaReported ? 'I2C line lost. Check D21 (SDA) / D22 (SCL) jumper wire.' : ($voltageV > 1.0 ? 'Reading vehicle battery' : 'Module is active, but Vin+/- screw terminals have no battery connected'),
             ],
             'inmp441' => [
@@ -235,7 +235,7 @@ class TelemetryIngestController extends Controller
                 'pin' => 'D23 (Digital Interrupt)',
                 'connected' => true,
                 'status' => $rpm > 0 ? 'PULSES DETECTED' : 'IDLE / READY',
-                'value' => number_format((int) $rpm).' RPM',
+                'value' => number_format((int) ($rpm ?? 0)).' RPM',
                 'hint' => $rpm > 0 ? 'Pulses registering (if not on engine, consider 10kΩ pull-up to stop noise)' : 'Waiting for magnet pass',
             ],
         ];
@@ -248,17 +248,17 @@ class TelemetryIngestController extends Controller
             'device_id' => $validated['device_id'] ?? 'ESP32-5SENSOR-NODE',
             'vehicle_name' => $vehicle->display_name,
             'vehicle_id' => $vehicle->id,
-            'temperature_c' => $tempC ? (float) $tempC : null,
-            'rpm' => $rpm ? (int) $rpm : 0,
-            'voltage_v' => $voltageV ? (float) $voltageV : null,
-            'current_ma' => $currentMa ? (float) $currentMa : null,
-            'power_mw' => $powerMw ? (float) $powerMw : null,
+            'temperature_c' => $tempC !== null ? (float) $tempC : null,
+            'rpm' => $rpm !== null ? (int) $rpm : 0,
+            'voltage_v' => $voltageV !== null ? (float) $voltageV : null,
+            'current_ma' => $currentMa !== null ? (float) $currentMa : null,
+            'power_mw' => $powerMw !== null ? (float) $powerMw : null,
             'peak_g' => ! is_null($peakG) ? (float) $peakG : null,
             'accel_x' => $request->input('sensor_data.mpu6050.ax'),
             'accel_y' => $request->input('sensor_data.mpu6050.ay'),
             'accel_z' => $request->input('sensor_data.mpu6050.az'),
-            'audio_rms' => $audioRms ? (float) $audioRms : null,
-            'audio_peak' => $audioPeak ? (float) $audioPeak : null,
+            'audio_rms' => $audioRms !== null ? (float) $audioRms : null,
+            'audio_peak' => $audioPeak !== null ? (float) $audioPeak : null,
             'components_health' => $componentsHealth,
             'mode' => 'live_check',
             'timestamp' => now()->toIso8601String(),
@@ -274,8 +274,8 @@ class TelemetryIngestController extends Controller
         $history = Cache::get($historyKey, []);
         $history[] = [
             'time' => now()->format('H:i:s'),
-            'rpm' => $rpm ? (int) $rpm : 0,
-            'temp' => $tempC ? (float) $tempC : null,
+            'rpm' => $rpm !== null ? (int) $rpm : 0,
+            'temp' => $tempC !== null ? (float) $tempC : null,
             'peak' => ! is_null($peakG) ? (float) $peakG : null,
         ];
         if (count($history) > 30) {
@@ -283,6 +283,7 @@ class TelemetryIngestController extends Controller
         }
         Cache::put($historyKey, $history, 60);
         if ($vehicle->user_id) {
+            Cache::put($historyKey, $history, 60);
             Cache::put('telemetry:history:user:'.$vehicle->user_id, $history, 60);
         }
 
@@ -311,16 +312,16 @@ class TelemetryIngestController extends Controller
         $deviceId = $validated['device_id'] ?? 'ESP32-Automotive-DAQ';
 
         $notesList = ["ESP32 Wi-Fi DAQ Node [{$deviceId}]."];
-        if ($tempC) {
+        if ($tempC !== null) {
             $notesList[] = "Temp: {$tempC}°C (DS18B20/D4).";
         }
-        if ($rpm) {
+        if ($rpm !== null) {
             $notesList[] = "RPM: {$rpm} (Hall/D23).";
         }
-        if ($voltageV) {
+        if ($voltageV !== null) {
             $notesList[] = "Battery: {$voltageV}V (INA219/D21-D22).";
         }
-        if ($peakG) {
+        if ($peakG !== null) {
             $notesList[] = "Peak G: {$peakG}g (MPU6050/D21-D22).";
         }
 
@@ -337,10 +338,10 @@ class TelemetryIngestController extends Controller
             'sample_rate_hz' => isset($validated['sample_rate_hz'])
                 ? (int) $validated['sample_rate_hz']
                 : (! empty($vibrationPath) ? 100 : null),
-            'temperature_c' => $tempC ? (float) $tempC : null,
-            'rpm' => $rpm ? (int) $rpm : null,
-            'voltage_v' => $voltageV ? (float) $voltageV : null,
-            'current_ma' => $currentMa ? (float) $currentMa : null,
+            'temperature_c' => $tempC !== null ? (float) $tempC : null,
+            'rpm' => $rpm !== null ? (int) $rpm : null,
+            'voltage_v' => $voltageV !== null ? (float) $voltageV : null,
+            'current_ma' => $currentMa !== null ? (float) $currentMa : null,
             'sensor_data' => $sensorData,
             'notes' => implode(' ', $notesList),
         ]);

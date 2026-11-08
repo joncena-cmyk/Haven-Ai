@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\BrevoService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,7 +30,7 @@ class RegisteredUserController extends Controller
      *
      * @throws ValidationException
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, BrevoService $brevoService): RedirectResponse
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -45,13 +46,17 @@ class RegisteredUserController extends Controller
 
         event(new Registered($user));
 
-        Auth::login($user);
+        // Generate 6-digit verification code and dispatch via Brevo
+        $code = $user->generateTwoFactorCode();
+        $brevoService->sendEmailOtp($user->email, $user->name, $code, 'Registration Verification');
 
-        AuditLogger::log('auth.registered', [
+        $request->session()->put('auth.registration_user_id', $user->id);
+
+        AuditLogger::log('auth.registered_pending_otp', [
             'email' => $user->email,
             'role' => 'user',
         ], $user->id);
 
-        return redirect(route('dashboard', absolute: false));
+        return redirect()->route('register.verify-otp');
     }
 }
