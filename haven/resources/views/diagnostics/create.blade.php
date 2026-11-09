@@ -620,6 +620,11 @@
             </div>
 
             <div class="h-diag-workbench-timer-row">
+                {{-- Live Audio Signal Quality Badge --}}
+                <div class="h-diag-quality-pill" id="live-audio-quality-pill" style="display:none;" title="Real-time acoustic signal level & harmonic clarity">
+                    <span class="dot" id="live-quality-dot"></span>
+                    <span id="live-quality-txt">Checking Signal...</span>
+                </div>
                 <span class="h-diag-rec-dot" id="live-rec-dot"></span>
                 <span class="h-diag-rec-timer" id="live-rec-timer">00:00</span>
                 <span class="h-diag-rec-target">/ 00:15 target</span>
@@ -650,6 +655,11 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
                     Stop Audio
                 </button>
+                <button type="button" id="btn-upload-audio" class="h-diag-btn-secondary" onclick="triggerAudioUpload()" title="Upload pre-recorded engine audio file (.wav, .mp3, .webm, .m4a)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Upload Audio
+                </button>
+                <input type="file" id="workbench-audio-input" accept=".wav,.mp3,.webm,.ogg,.m4a" style="display:none;" onchange="handleWorkbenchAudioUpload(this)">
                 <button type="button" id="btn-start-vib" class="h-diag-btn-primary" style="display:none;background:#0284c7;" onclick="startVibrationRecording()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                     Start Vibration Capture
@@ -2170,6 +2180,50 @@
     gap: 0.5rem;
     font-family: 'JetBrains Mono', monospace;
 }
+.h-diag-quality-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.22rem 0.65rem;
+    border-radius: var(--ds-radius-pill);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    transition: all 0.25s ease;
+}
+.h-diag-quality-pill .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.h-diag-quality-pill.optimal {
+    background: rgba(16, 185, 129, 0.14);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+.h-diag-quality-pill.optimal .dot {
+    background: #10b981;
+    box-shadow: 0 0 6px #10b981;
+}
+.h-diag-quality-pill.low {
+    background: rgba(245, 158, 11, 0.14);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+}
+.h-diag-quality-pill.low .dot {
+    background: #f59e0b;
+    box-shadow: 0 0 6px #f59e0b;
+}
+.h-diag-quality-pill.clipping {
+    background: rgba(239, 68, 68, 0.14);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.h-diag-quality-pill.clipping .dot {
+    background: #ef4444;
+    box-shadow: 0 0 6px #ef4444;
+}
 .h-diag-rec-dot {
     width: 8px; height: 8px;
     border-radius: 50%;
@@ -3250,6 +3304,8 @@
 
             // UI adjustments
             document.getElementById('btn-start-rec').style.display = 'none';
+            const uploadBtn = document.getElementById('btn-upload-audio');
+            if (uploadBtn) uploadBtn.style.display = 'none';
             document.getElementById('btn-stop-rec').style.display = 'inline-flex';
             document.getElementById('btn-start-vib').style.display = 'none';
             document.getElementById('btn-stop-vib').style.display = 'none';
@@ -3257,6 +3313,13 @@
             document.getElementById('canvas-overlay-text').style.display = 'none';
             const channels = document.getElementById('canvas-channels-legend');
             if (channels) channels.style.display = 'none';
+            const qPill = document.getElementById('live-audio-quality-pill');
+            if (qPill) {
+                qPill.style.display = 'inline-flex';
+                qPill.className = 'h-diag-quality-pill optimal';
+                const qTxt = document.getElementById('live-quality-txt');
+                if (qTxt) qTxt.textContent = 'Listening to Harmonics...';
+            }
 
             document.getElementById('hud-progress-label').textContent = 'RECORDING AUDIO HARMONICS (INMP441)...';
             document.getElementById('hud-progress-pct').textContent = '25%';
@@ -3413,6 +3476,8 @@
 
         // Workbench controls
         document.getElementById('btn-start-rec').style.display = 'none';
+        const uploadBtn = document.getElementById('btn-upload-audio');
+        if (uploadBtn) uploadBtn.style.display = 'none';
         document.getElementById('btn-stop-rec').style.display = 'none';
         document.getElementById('btn-start-vib').style.display = 'inline-flex';
         document.getElementById('btn-stop-vib').style.display = 'none';
@@ -3448,15 +3513,87 @@
         document.getElementById('btn-submit-session').disabled = false;
     }
 
+    // ─────────────────────────────────────────────
+    // Acoustic Signal Quality Checker & Oscilloscope
+    // ─────────────────────────────────────────────
+    function updateSignalQualityBadge(rms, peak, isStatic = false) {
+        const pill = document.getElementById('live-audio-quality-pill');
+        const txt = document.getElementById('live-quality-txt');
+        if (!pill || !txt) return;
+
+        pill.style.display = 'inline-flex';
+
+        if (peak > 0.96) {
+            pill.className = 'h-diag-quality-pill clipping';
+            txt.textContent = isStatic ? 'Distortion Risk (Peak > 96%)' : 'Distortion / High Gain';
+            pill.title = 'Acoustic amplitude is clipping (>96% dynamic range). Reduce microphone gain or avoid direct wind buffeting.';
+        } else if (rms < 0.015) {
+            pill.className = 'h-diag-quality-pill low';
+            txt.textContent = isStatic ? 'Low Level (RMS < 1.5%)' : 'Low Level (Move Closer)';
+            pill.title = 'Acoustic energy is very quiet (<1.5% RMS). Place microphone closer to the valve cover / engine bay.';
+        } else {
+            pill.className = 'h-diag-quality-pill optimal';
+            txt.textContent = isStatic ? 'Optimal Harmonics (Clean SNR)' : 'Optimal Engine Harmonics';
+            pill.title = 'Clean signal-to-noise ratio and balanced periodic cylinder firing harmonics detected.';
+        }
+    }
+
+    function renderStaticWaveform(audioBuffer) {
+        if (!canvas || !canvasCtx) return;
+        const w = canvas.width;
+        const h = canvas.height;
+        canvasCtx.fillStyle = '#0f172a';
+        canvasCtx.fillRect(0, 0, w, h);
+
+        const data = audioBuffer.getChannelData(0);
+        const step = Math.ceil(data.length / w);
+        const amp = h / 2;
+
+        const grad = canvasCtx.createLinearGradient(0, h, 0, 0);
+        grad.addColorStop(0, '#0284c7');
+        grad.addColorStop(1, '#38bdf8');
+        canvasCtx.fillStyle = grad;
+
+        for (let i = 0; i < w; i++) {
+            let min = 1.0;
+            let max = -1.0;
+            const start = i * step;
+            for (let j = 0; j < step && (start + j) < data.length; j++) {
+                const val = data[start + j];
+                if (val < min) min = val;
+                if (val > max) max = val;
+            }
+            const barHeight = Math.max(3, (max - min) * amp * 0.95);
+            canvasCtx.fillRect(i, (h - barHeight) / 2, 1, barHeight);
+        }
+    }
+
     function drawOscilloscope() {
         if (!analyser || !canvasCtx) return;
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
+        const timeData = new Uint8Array(bufferLength);
+        let frameCount = 0;
 
         function render() {
             if (captureState !== 'RECORDING_AUDIO') return;
             animFrame = requestAnimationFrame(render);
             analyser.getByteFrequencyData(dataArray);
+            analyser.getByteTimeDomainData(timeData);
+
+            frameCount++;
+            if (frameCount % 10 === 0) {
+                let sumSq = 0;
+                let peak = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    const norm = (timeData[i] - 128) / 128;
+                    const absN = Math.abs(norm);
+                    if (absN > peak) peak = absN;
+                    sumSq += norm * norm;
+                }
+                const rms = Math.sqrt(sumSq / bufferLength);
+                updateSignalQualityBadge(rms, peak, false);
+            }
 
             canvasCtx.fillStyle = '#0f172a';
             canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
@@ -3477,6 +3614,121 @@
         }
         render();
     }
+
+    // ─────────────────────────────────────────────
+    // Pre-Recorded Engine Audio File Upload
+    // ─────────────────────────────────────────────
+    window.triggerAudioUpload = function() {
+        const inp = document.getElementById('workbench-audio-input');
+        if (inp) inp.click();
+    };
+
+    window.handleWorkbenchAudioUpload = async function(input) {
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
+
+        // Size check (max 50MB)
+        if (file.size > 52428800) {
+            alert('Audio file size exceeds the 50 MB limit.');
+            return;
+        }
+
+        // Snapshot live hardware DAQ telemetry (RPM, Temp, Voltage)
+        if (typeof window.captureLiveTelemetrySnapshot === 'function') {
+            window.captureLiveTelemetrySnapshot(false);
+        }
+
+        // Bind directly to hidden submission form
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        document.getElementById('form_audio_file').files = dt.files;
+        const blobInput = document.getElementById('form_audio_blob');
+        if (blobInput) blobInput.value = '';
+
+        try {
+            const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const arrayBuf = await file.arrayBuffer();
+            const decodedBuffer = await tempCtx.decodeAudioData(arrayBuf);
+            const durationSec = Math.max(1, Math.round(decodedBuffer.duration));
+            document.getElementById('form_audio_duration').value = durationSec;
+
+            // Signal quality evaluation (RMS & Peak)
+            const channelData = decodedBuffer.getChannelData(0);
+            let sumSq = 0;
+            let peak = 0;
+            const step = Math.max(1, Math.floor(channelData.length / 5000));
+            let samplesEvaluated = 0;
+            for (let i = 0; i < channelData.length; i += step) {
+                const val = Math.abs(channelData[i]);
+                if (val > peak) peak = val;
+                sumSq += val * val;
+                samplesEvaluated++;
+            }
+            const rms = Math.sqrt(sumSq / Math.max(1, samplesEvaluated));
+            updateSignalQualityBadge(rms, peak, true);
+
+            // Render static waveform onto oscilloscope canvas
+            renderStaticWaveform(decodedBuffer);
+
+            // Audio preview playback
+            const audioUrl = URL.createObjectURL(file);
+            const player = document.getElementById('workbench-audio-playback');
+            if (player) {
+                player.src = audioUrl;
+                document.getElementById('playback-strip').style.display = 'flex';
+                document.getElementById('playback-duration-meta').innerHTML = `<strong>${file.name}</strong> (${durationSec}s audio attached)`;
+            }
+
+            // Update UI State & Stepper
+            captureState = 'AUDIO_DONE';
+            document.getElementById('tick-audio').classList.add('active');
+            document.getElementById('tick-audio').classList.add('completed');
+            document.getElementById('tick-vib').classList.add('active');
+            document.getElementById('probe-audio-val').textContent = `${durationSec}s File`;
+
+            window.setDiagnosisFlowStep('vibration');
+            document.getElementById('hud-progress-pct').textContent = '50%';
+            document.getElementById('hud-progress-label').textContent = 'AUDIO FILE LOADED · PROCEED TO VIBRATION';
+
+            const condChip = document.getElementById('hud-condition-chip');
+            if (condChip) {
+                condChip.className = 'h-diag-status-chip normal';
+                const icon = document.getElementById('hud-condition-icon');
+                if (icon) icon.textContent = '✓';
+                const name = document.getElementById('hud-condition-name');
+                if (name) name.textContent = 'AUDIO FILE READY';
+            }
+
+            // Button visibility
+            document.getElementById('btn-start-rec').style.display = 'none';
+            const uploadBtn = document.getElementById('btn-upload-audio');
+            if (uploadBtn) uploadBtn.style.display = 'none';
+            document.getElementById('btn-start-vib').style.display = 'inline-flex';
+            const skipVibBtn = document.getElementById('btn-skip-vib');
+            if (skipVibBtn) skipVibBtn.style.display = 'inline-flex';
+
+            const masterBtn = document.getElementById('btn-master-action');
+            if (masterBtn) {
+                const txt = masterBtn.querySelector('#master-btn-text');
+                if (txt) txt.textContent = 'Run ML Diagnostics (Audio Attached)';
+                const icon = masterBtn.querySelector('#master-btn-icon');
+                if (icon) {
+                    icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+                }
+            }
+
+            document.getElementById('canvas-overlay-text').style.display = 'none';
+            document.getElementById('btn-submit-session').disabled = false;
+        } catch (decodeErr) {
+            console.warn('Audio decoding fallback:', decodeErr);
+            document.getElementById('playback-strip').style.display = 'flex';
+            document.getElementById('playback-duration-meta').textContent = `${file.name} (Attached)`;
+            captureState = 'AUDIO_DONE';
+            document.getElementById('btn-submit-session').disabled = false;
+            document.getElementById('btn-start-vib').style.display = 'inline-flex';
+            document.getElementById('btn-skip-vib').style.display = 'inline-flex';
+        }
+    };
 
     // ─────────────────────────────────────────────
     // Stage 2: Live Vibration Recording (ADXL345 / Device Sensor)
