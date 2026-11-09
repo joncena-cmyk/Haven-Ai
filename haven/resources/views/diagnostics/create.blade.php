@@ -182,7 +182,7 @@
                 <iframe
                     id="diagnostic-sketchfab-frame"
                     title="Interactive 3D vehicle viewer"
-                    src="{{ $diagnosticModelUid ? ('https://sketchfab.com/models/' . $diagnosticModelUid . '/embed?autostart=1&transparent=1&ui_controls=0&ui_infos=0&ui_watermark=0&ui_help=0&ui_settings=0&ui_annotations=0&ui_theme=dark') : '' }}"
+                    src="{{ $diagnosticModelUid ? ('https://sketchfab.com/models/' . $diagnosticModelUid . '/embed?autostart=1&transparent=1&ui_controls=0&ui_infos=0&ui_watermark=0&ui_help=0&ui_settings=0&ui_annotations=0&ui_theme=dark&ui_hint=0&ui_ar=0&ui_vr=0&dnt=1') : '' }}"
                     allow="autoplay; fullscreen; xr-spatial-tracking"
                     xr-spatial-tracking
                     execution-while-out-of-viewport
@@ -1730,13 +1730,19 @@
     min-width: 0;
     min-height: 380px;
     background: transparent;
+    overflow: hidden;
+    border-radius: var(--ds-radius-card, 16px);
 }
 #diagnostic-sketchfab-frame {
+    position: absolute;
+    top: -60px;
+    left: 0;
     width: 100%;
-    height: 100%;
-    min-height: 380px;
+    height: calc(100% + 118px);
+    min-height: calc(380px + 118px);
     border: 0;
     display: block;
+    pointer-events: auto;
 }
 .h-diag-car-svg {
     width: 100%;
@@ -2997,6 +3003,12 @@
     .h-diag-vehicle-canvas-area {
         min-height: 220px !important;
     }
+    #diagnostic-sketchfab-stage {
+        min-height: 220px !important;
+    }
+    #diagnostic-sketchfab-frame {
+        min-height: calc(220px + 118px) !important;
+    }
     .h-diag-car-svg {
         max-height: 200px !important;
     }
@@ -3197,7 +3209,10 @@
             ui_loading: '0',
             ui_annotations: '0',
             annotations_visible: '0',
-            ui_theme: 'dark'
+            ui_theme: 'dark',
+            ui_ar: '0',
+            ui_vr: '0',
+            dnt: '1'
         });
         iframe.src = `https://sketchfab.com/models/${diagnosticModelUid}/embed?${embedParams.toString()}`;
 
@@ -3237,7 +3252,7 @@
         if (diagnosticApiAttempts >= 40) {
             const iframe = document.getElementById('diagnostic-sketchfab-frame');
             if (iframe && diagnosticModelUid) {
-                iframe.src = `https://sketchfab.com/models/${diagnosticModelUid}/embed?autostart=1&transparent=1&ui_controls=0&ui_infos=0&ui_watermark=0&ui_help=0&ui_settings=0&ui_annotations=0`;
+                iframe.src = `https://sketchfab.com/models/${diagnosticModelUid}/embed?autostart=1&transparent=1&ui_controls=0&ui_infos=0&ui_watermark=0&ui_help=0&ui_settings=0&ui_annotations=0&ui_theme=dark&ui_hint=0&ui_ar=0&ui_vr=0&dnt=1`;
             }
             return;
         }

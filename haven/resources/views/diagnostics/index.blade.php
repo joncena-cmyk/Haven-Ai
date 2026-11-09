@@ -1733,9 +1733,10 @@ const char* token    = "YOUR_VEHICLE_TOKEN";</span>
 
 .h-diag-sketchfab-iframe {
     position: absolute;
-    inset: 0;
+    top: -60px;
+    left: 0;
     width: 100%;
-    height: 100%;
+    height: calc(100% + 118px);
     border: none;
     display: block;
     border-radius: 0 0 18px 18px;
@@ -3739,7 +3740,10 @@ function initSketchfab(modelKey, modelUid) {
         ui_annotations: '0',
         annotations_visible: '0',
         annotation_cycle: '0',
-        ui_theme: 'dark'
+        ui_theme: 'dark',
+        ui_ar: '0',
+        ui_vr: '0',
+        dnt: '1'
     });
     iframe.src = `https://sketchfab.com/models/${modelUid}/embed?${embedParams.toString()}`;
 

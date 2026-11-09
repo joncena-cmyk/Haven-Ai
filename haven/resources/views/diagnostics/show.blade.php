@@ -257,8 +257,8 @@
                     <iframe
                         id="diagnostic-sketchfab-frame"
                         title="Interactive 3D vehicle viewer"
-                        src="https://sketchfab.com/models/{{ $diagnosticModelUid }}/embed?autostart=1&transparent=1&ui_controls=0&ui_infos=0&ui_watermark=0&ui_help=0&ui_settings=0&ui_annotations=0&ui_theme=dark"
-                        style="width:100%;height:100%;border:0;display:block;"
+                        src="https://sketchfab.com/models/{{ $diagnosticModelUid }}/embed?autostart=1&transparent=1&ui_controls=0&ui_infos=0&ui_watermark=0&ui_help=0&ui_settings=0&ui_annotations=0&ui_theme=dark&ui_hint=0&ui_ar=0&ui_vr=0&dnt=1"
+                        style="position:absolute;top:-60px;left:0;width:100%;height:calc(100% + 118px);border:0;display:block;"
                         allow="autoplay; fullscreen; xr-spatial-tracking"
                         allowfullscreen>
                     </iframe>
@@ -1577,6 +1577,24 @@
     justify-content: center;
     min-height: 380px;
 }
+#diagnostic-sketchfab-stage {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    border-radius: 14px;
+    overflow: hidden;
+}
+#diagnostic-sketchfab-frame {
+    position: absolute;
+    top: -60px;
+    left: 0;
+    width: 100%;
+    height: calc(100% + 118px);
+    border: 0;
+    display: block;
+}
 .h-diag-car-wrap {
     position: relative;
     width: 90%;
@@ -2310,7 +2328,11 @@ function initDiagnosticSketchfab() {
         ui_help: '0',
         ui_settings: '0',
         ui_annotations: '0',
-        ui_theme: 'dark'
+        ui_theme: 'dark',
+        ui_hint: '0',
+        ui_ar: '0',
+        ui_vr: '0',
+        dnt: '1'
     });
     iframe.src = `https://sketchfab.com/models/${diagnosticModelUid}/embed?${embedParams.toString()}`;
 
