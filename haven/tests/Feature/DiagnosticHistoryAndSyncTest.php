@@ -207,9 +207,10 @@ class DiagnosticHistoryAndSyncTest extends TestCase
         $response->assertSee('id="daq-status-pill"', false);
         $response->assertSee('ESP32 OFFLINE', false);
         $response->assertSee('h-diag-btn-gated', false);
-        $response->assertSee('Connect ESP32 / Upload Audio', false);
+        $response->assertSee('Go to Diagnostic Workbench', false);
         $response->assertSee('id="btn-upload-audio"', false);
         $response->assertSee('id="workbench-audio-input"', false);
+        $response->assertSee('id="btn-manual-telemetry"', false);
         $response->assertSee('Import Vibration CSV', false);
     }
 }

@@ -186,27 +186,16 @@
                 </div>
             </div>
 
-            {{-- Master Trigger CTA (Reference Image: Blue Glowing Button) --}}
+            {{-- Master Trigger CTA (Navigates directly to the unified Workbench) --}}
             <div class="h-diag-hud-cta-wrap">
-                <button type="button" id="btn-master-action" class="h-diag-cta-btn" onclick="triggerPrimaryAction()" title="ESP32 DAQ Node is offline. Connect ESP32 for live capture, or click to upload engine audio.">
+                <button type="button" id="btn-master-action" class="h-diag-cta-btn" onclick="triggerPrimaryAction()" title="Scroll down to the Diagnostic Workbench to capture or upload engine signals">
                     <span class="h-diag-cta-glow"></span>
                     <span class="h-diag-cta-icon" id="master-btn-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14"/><polyline points="19 12 12 19 5 12"/></svg>
                     </span>
-                    <span id="master-btn-text">Connect ESP32 / Upload Audio</span>
+                    <span id="master-btn-text">Go to Diagnostic Workbench</span>
                     <span class="h-diag-cta-spinner" id="master-btn-spinner" style="display:none;"></span>
                 </button>
-
-                <div class="h-diag-sub-actions">
-                    <button type="button" class="h-diag-sub-btn" onclick="openSampleUploadModal()">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                        Import Vibration CSV
-                    </button>
-                    <button type="button" class="h-diag-sub-btn" onclick="openManualTelemetryDrawer()">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
-                        Manual DAQ
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -740,6 +729,10 @@
                 <button type="button" id="btn-sample-telemetry" class="h-diag-btn-secondary" onclick="captureLiveTelemetrySnapshot(true)" title="Snapshot real-time Coolant Temperature, Engine RPM, and Battery Voltage from vehicle" style="display:inline-flex;align-items:center;gap:0.35rem;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     <span>Capture Live DAQ</span>
+                </button>
+                <button type="button" id="btn-manual-telemetry" class="h-diag-btn-secondary" onclick="openManualTelemetryDrawer()" title="Manually enter contextual RPM, Coolant Temp, or Voltage" style="display:inline-flex;align-items:center;gap:0.35rem;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
+                    <span>Manual DAQ</span>
                 </button>
             </div>
 
@@ -1433,6 +1426,14 @@
 .h-diag-btn-gated:hover {
     transform: none !important;
     box-shadow: none !important;
+}
+@keyframes workbenchFocusPulse {
+    0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7), 0 0 28px rgba(2, 132, 199, 0.5); border-color: #38bdf8; }
+    50% { box-shadow: 0 0 0 8px rgba(56, 189, 248, 0), 0 0 36px rgba(56, 189, 248, 0.45); border-color: #38bdf8; }
+    100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+}
+.h-diag-workbench-focus-pulse {
+    animation: workbenchFocusPulse 1.8s ease-out;
 }
 .h-diag-live-dot {
     width: 7px;
@@ -3459,17 +3460,6 @@
             document.getElementById('hud-progress-pct').textContent = '25%';
             window.setDiagnosisFlowStep('capture');
 
-            // Master CTA update
-            const masterBtn = document.getElementById('btn-master-action');
-            if (masterBtn) {
-                const txt = masterBtn.querySelector('#master-btn-text');
-                if (txt) txt.textContent = 'Stop Audio Recording';
-                const icon = masterBtn.querySelector('#master-btn-icon');
-                if (icon) {
-                    icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
-                }
-            }
-
             // Start timer
             recSeconds = 0;
             document.getElementById('live-rec-timer').textContent = '00:00';
@@ -3635,26 +3625,12 @@
             }
         }
 
-        const masterBtn = document.getElementById('btn-master-action');
-        if (masterBtn) {
-            const txt = masterBtn.querySelector('#master-btn-text');
-            if (txt) {
-                txt.textContent = hasHardwareVib ? 'Start Vibration Capture' : 'Run ML Diagnostics (Audio Only)';
-            }
-            const icon = masterBtn.querySelector('#master-btn-icon');
-            if (icon) {
-                icon.innerHTML = hasHardwareVib
-                    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>'
-                    : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
-            }
-        }
-
         // Overlay Guide
         const overlay = document.getElementById('canvas-overlay-text');
         if (overlay) {
             overlay.innerHTML = hasHardwareVib
-                ? 'Phase 1 Complete. Click <strong>"Start Vibration Capture"</strong> for 3-axis accelerometer data, or <strong>"Skip Vibration"</strong> for audio-only.'
-                : 'Acoustic Capture Complete. Click <strong>"Run ML Diagnostics"</strong> for instant audio classification, or <strong>"Capture Vibration"</strong> to attach ESP32 sensor telemetry.';
+                ? 'Phase 1 Complete. Click <strong>"Start Vibration Capture"</strong> for 3-axis accelerometer data, or <strong>"Skip Vibration"</strong> / <strong>"Analyze Diagnostic"</strong>.'
+                : 'Acoustic Capture Complete. Click <strong>"Analyze Diagnostic"</strong> for instant classification, or <strong>"Import Vibration CSV"</strong> to attach vibration data.';
             overlay.style.display = 'block';
         }
 
@@ -3869,16 +3845,6 @@
             const skipVibBtn = document.getElementById('btn-skip-vib');
             if (skipVibBtn) skipVibBtn.style.display = 'inline-flex';
 
-            const masterBtn = document.getElementById('btn-master-action');
-            if (masterBtn) {
-                const txt = masterBtn.querySelector('#master-btn-text');
-                if (txt) txt.textContent = 'Run ML Diagnostics (Audio Attached)';
-                const icon = masterBtn.querySelector('#master-btn-icon');
-                if (icon) {
-                    icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
-                }
-            }
-
             document.getElementById('canvas-overlay-text').style.display = 'none';
             document.getElementById('btn-submit-session').disabled = false;
         } catch (decodeErr) {
@@ -3911,17 +3877,6 @@
         document.getElementById('hud-progress-pct').textContent = '65%';
         document.getElementById('hud-progress-label').textContent = latestDeviceAccel ? 'STREAMING HARDWARE ACCELEROMETER...' : 'STREAMING ESP32 ADXL345 ACCELEROMETER...';
         document.getElementById('tick-vib').classList.add('active');
-
-        // Master CTA
-        const masterBtn = document.getElementById('btn-master-action');
-        if (masterBtn) {
-            const txt = masterBtn.querySelector('#master-btn-text');
-            if (txt) txt.textContent = 'Stop Vibration Capture';
-            const icon = masterBtn.querySelector('#master-btn-icon');
-            if (icon) {
-                icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
-            }
-        }
 
         // Workbench UI
         document.getElementById('btn-start-vib').style.display = 'none';
@@ -4099,24 +4054,13 @@
             if (name) name.textContent = 'TELEMETRY SYNCED';
         }
 
-        // Master CTA updates to Run ML Diagnostics
-        const masterBtn = document.getElementById('btn-master-action');
-        if (masterBtn) {
-            const txt = masterBtn.querySelector('#master-btn-text');
-            if (txt) txt.textContent = 'Run ML Diagnostics';
-            const icon = masterBtn.querySelector('#master-btn-icon');
-            if (icon) {
-                icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
-            }
-        }
-
         // Enable workbench submit
         document.getElementById('btn-submit-session').disabled = false;
 
         // Overlay Message
         const overlay = document.getElementById('canvas-overlay-text');
         if (overlay) {
-            overlay.innerHTML = 'Acoustic and vibration telemetry captured. Click <strong>"Run ML Diagnostics"</strong> to perform inference.';
+            overlay.innerHTML = 'Acoustic and vibration telemetry captured. Click <strong>"Analyze Diagnostic"</strong> to perform inference.';
             overlay.style.display = 'block';
         }
     };
@@ -4161,24 +4105,13 @@
             }
         }
 
-        // Master CTA updates to Run ML Diagnostics
-        const masterBtn = document.getElementById('btn-master-action');
-        if (masterBtn) {
-            const txt = masterBtn.querySelector('#master-btn-text');
-            if (txt) txt.textContent = 'Run ML Diagnostics';
-            const icon = masterBtn.querySelector('#master-btn-icon');
-            if (icon) {
-                icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
-            }
-        }
-
         // Enable workbench submit
         document.getElementById('btn-submit-session').disabled = false;
 
         // Overlay Message
         const overlay = document.getElementById('canvas-overlay-text');
         if (overlay) {
-            overlay.innerHTML = 'Acoustic telemetry captured (Vibration skipped). Click <strong>"Run ML Diagnostics"</strong> to perform inference.';
+            overlay.innerHTML = 'Acoustic telemetry captured (Vibration skipped). Click <strong>"Analyze Diagnostic"</strong> to perform inference.';
             overlay.style.display = 'block';
         }
     };
@@ -4262,32 +4195,32 @@
     }
 
     // ─────────────────────────────────────────────
-    // 5. Trigger Primary Action CTA (HUD Main Button)
+    // 5. Trigger Primary Action CTA (HUD Main Button -> Scrolls to Unified Workbench)
     // ─────────────────────────────────────────────
     window.triggerPrimaryAction = function() {
-        if (captureState === 'IDLE') {
-            if (!window.isEsp32Online) {
-                if (confirm('⚠️ ESP32 DAQ Hardware Node is currently offline.\n\nLive engine bay hardware capture requires your ESP32 node to be powered on and streaming over Wi-Fi.\n\nWould you like to select and upload a pre-recorded engine audio file (.wav/.mp3) to diagnose offline?')) {
-                    triggerAudioUpload();
-                }
-                return;
-            }
-            startAudioRecording();
-        } else if (captureState === 'RECORDING_AUDIO') {
-            stopAudioRecording();
-        } else if (captureState === 'AUDIO_DONE') {
-            if (window.isEsp32Online || latestDeviceAccel) {
-                startVibrationRecording();
-            } else {
-                // No physical accelerometer streaming: skip vibration and submit audio diagnostic directly
-                skipVibrationCapture();
-                submitDiagnosticForm();
-            }
-        } else if (captureState === 'RECORDING_VIBRATION') {
-            stopVibrationRecording();
-        } else {
-            submitDiagnosticForm();
+        const workbench = document.getElementById('recording-workbench');
+        if (workbench) {
+            workbench.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            workbench.classList.remove('h-diag-workbench-focus-pulse');
+            void workbench.offsetWidth; // trigger reflow
+            workbench.classList.add('h-diag-workbench-focus-pulse');
+            setTimeout(() => {
+                workbench.classList.remove('h-diag-workbench-focus-pulse');
+            }, 1900);
         }
+
+        // Focus the primary active control inside the workbench
+        setTimeout(() => {
+            if (captureState === 'IDLE') {
+                const targetBtn = window.isEsp32Online
+                    ? document.getElementById('btn-start-rec')
+                    : document.getElementById('btn-upload-audio');
+                if (targetBtn) targetBtn.focus({ preventScroll: true });
+            } else {
+                const submitBtn = document.getElementById('btn-submit-session');
+                if (submitBtn && !submitBtn.disabled) submitBtn.focus({ preventScroll: true });
+            }
+        }, 450);
     };
 
     // 6. Recording Mode Selection (Idle vs Revving target regime)
@@ -4387,12 +4320,6 @@
                 document.getElementById('hud-progress-pct').textContent = '90%';
                 document.getElementById('hud-progress-label').textContent = 'ALL SIGNALS CAPTURED · READY TO ANALYZE';
                 window.setDiagnosisFlowStep('analyze');
-
-                const masterBtn = document.getElementById('btn-master-action');
-                if (masterBtn) {
-                    const txt = masterBtn.querySelector('#master-btn-text');
-                    if (txt) txt.textContent = 'Run ML Diagnostics';
-                }
             }
         }
         closeSampleUploadModal();
@@ -4507,16 +4434,11 @@
 
     function resetAnalyzeButtons() {
         captureState = 'READY_TO_SUBMIT';
-        const masterBtn = document.getElementById('btn-master-action');
-        if (masterBtn) {
-            masterBtn.disabled = false;
-            const spinner = document.getElementById('master-btn-spinner');
-            if (spinner) spinner.style.display = 'none';
-            const txt = masterBtn.querySelector('#master-btn-text');
-            if (txt) txt.textContent = 'Analyze Diagnostic';
-        }
         const submitBtn = document.getElementById('btn-submit-session');
-        if (submitBtn) submitBtn.disabled = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Analyze Diagnostic';
+        }
     }
 
     // 8. 6-Stage AI Stepper Animation & Form Submission
@@ -4528,16 +4450,11 @@
         document.getElementById('analysis-pipeline-card').scrollIntoView({ behavior: 'smooth' });
         window.setDiagnosisFlowStep('analyze');
 
-        const masterBtn = document.getElementById('btn-master-action');
-        if (masterBtn) {
-            masterBtn.disabled = true;
-            const spinner = document.getElementById('master-btn-spinner');
-            if (spinner) spinner.style.display = 'inline-block';
-            const txt = masterBtn.querySelector('#master-btn-text');
-            if (txt) txt.textContent = 'Running Inference...';
-        }
         const submitBtn = document.getElementById('btn-submit-session');
-        if (submitBtn) submitBtn.disabled = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Running Inference...';
+        }
 
         // Animate Pipeline Stages
         let step = 1;
@@ -4819,15 +4736,8 @@
                     btnStartRec.title = 'Start live acoustic capture via connected ESP32 / INMP441 node';
                     if (btnStartRecTxt) btnStartRecTxt.textContent = 'Start Audio Capture';
                 }
-                if (masterBtn && masterTxt) {
-                    masterTxt.textContent = 'Start Live Diagnostic';
-                    masterBtn.title = 'Start live engine bay diagnostic session';
-                    if (masterIcon) {
-                        masterIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>';
-                    }
-                }
                 if (overlay && !overlay.dataset.hasCustomContent) {
-                    overlay.innerHTML = 'ESP32 DAQ Node: <strong style="color:#34d399;">ONLINE (STREAMING)</strong> · Click <strong>"Start Live Diagnostic"</strong> to begin';
+                    overlay.innerHTML = 'ESP32 DAQ Node: <strong style="color:#34d399;">ONLINE (STREAMING)</strong> · Click <strong>"Start Audio Capture"</strong> to begin';
                 }
             } else if (captureState === 'AUDIO_DONE') {
                 if (btnStartVib) {
@@ -4859,13 +4769,6 @@
                     btnStartRec.classList.add('h-diag-btn-gated');
                     btnStartRec.title = 'ESP32 DAQ Node is offline. Connect ESP32 hardware to enable live capture, or click Upload Audio below.';
                     if (btnStartRecTxt) btnStartRecTxt.innerHTML = '<span style="font-size:0.8rem;margin-right:2px;">🔒</span> Live Capture (ESP32 Offline)';
-                }
-                if (masterBtn && masterTxt) {
-                    masterTxt.textContent = 'Connect ESP32 / Upload Audio';
-                    masterBtn.title = 'ESP32 DAQ Node is offline. Connect ESP32 for live capture, or click to upload engine audio.';
-                    if (masterIcon) {
-                        masterIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
-                    }
                 }
                 if (overlay && !overlay.dataset.hasCustomContent) {
                     overlay.innerHTML = 'ESP32 DAQ Node: <strong style="color:#f87171;">OFFLINE</strong> · Connect ESP32 for live capture, or click <strong>"Upload Audio"</strong> (.wav/.mp3)';
