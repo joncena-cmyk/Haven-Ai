@@ -216,17 +216,24 @@
             {{-- 3D Ground Plane Radial Grid --}}
             <div class="h-diag-grid-plane"></div>
 
-            <div id="diagnostic-sketchfab-stage" style="display:none;">
+            <div id="diagnostic-sketchfab-stage" style="{{ $diagnosticModelUid ? '' : 'display:none;' }}">
                 <iframe
                     id="diagnostic-sketchfab-frame"
                     title="Interactive 3D vehicle viewer"
+                    src="{{ $diagnosticModelUid ? ('https://sketchfab.com/models/' . $diagnosticModelUid . '/embed?autostart=1&transparent=1&ui_controls=0&ui_infos=0&ui_watermark=0&ui_help=0&ui_settings=0&ui_annotations=0&ui_theme=dark') : '' }}"
                     allow="autoplay; fullscreen; xr-spatial-tracking"
-                    allowfullscreen>
+                    xr-spatial-tracking
+                    execution-while-out-of-viewport
+                    execution-while-not-rendered
+                    web-share
+                    allowfullscreen
+                    mozallowfullscreen="true"
+                    webkitallowfullscreen="true">
                 </iframe>
             </div>
 
             {{-- High-Precision 3D Automotive Vector Render --}}
-            <div class="h-diag-car-stage" id="car-3d-model">
+            <div class="h-diag-car-stage" id="car-3d-model" style="{{ $diagnosticModelUid ? 'display:none;' : '' }}">
                 <svg viewBox="0 0 740 380" class="h-diag-car-svg" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                         {{-- Gradients for Sleek White/Silver Luxury Body --}}
@@ -428,8 +435,8 @@
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
                 </button>
                 <div class="h-diag-view-mode-rail" role="group" aria-label="Vehicle model view">
-                    <button type="button" class="h-diag-view-mode-btn" id="view-mode-3d" onclick="setDiagnosticViewMode('3d')">3D</button>
-                    <button type="button" class="h-diag-view-mode-btn is-active" id="view-mode-2d" onclick="setDiagnosticViewMode('2d')">2D</button>
+                    <button type="button" class="h-diag-view-mode-btn {{ $diagnosticModelUid ? 'is-active' : '' }}" id="view-mode-3d" onclick="setDiagnosticViewMode('3d')">3D</button>
+                    <button type="button" class="h-diag-view-mode-btn {{ $diagnosticModelUid ? '' : 'is-active' }}" id="view-mode-2d" onclick="setDiagnosticViewMode('2d')">2D</button>
                 </div>
             </div>
         </div>
@@ -3270,8 +3277,8 @@
         window.location.href = url.toString();
     };
 
-    // 2D / 3D vehicle presentation (Default to 2D vector for immediate rendering)
-    let diagnosticViewMode = '2d';
+    // 2D / 3D vehicle presentation
+    let diagnosticViewMode = diagnosticModelUid ? '3d' : '2d';
     window.setDiagnosticViewMode = function(mode) {
         const stage3d = document.getElementById('diagnostic-sketchfab-stage');
         const stage2d = document.getElementById('car-3d-model');

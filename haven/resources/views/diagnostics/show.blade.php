@@ -243,10 +243,11 @@
         {{-- Center/Right: 3D Vehicle Stage with Glowing Pinpoint Fault Location --}}
         <div class="h-diag-stage-viewport" id="stage-viewport" style="position:relative;">
             @if($diagnosticModelUid)
-                <div id="diagnostic-sketchfab-stage" style="position:absolute;inset:0;width:100%;height:100%;z-index:10;border-radius:14px;overflow:hidden;display:none;">
+                <div id="diagnostic-sketchfab-stage" style="position:absolute;inset:0;width:100%;height:100%;z-index:10;border-radius:14px;overflow:hidden;">
                     <iframe
                         id="diagnostic-sketchfab-frame"
                         title="Interactive 3D vehicle viewer"
+                        src="https://sketchfab.com/models/{{ $diagnosticModelUid }}/embed?autostart=1&transparent=1&ui_controls=0&ui_infos=0&ui_watermark=0&ui_help=0&ui_settings=0&ui_annotations=0&ui_theme=dark"
                         style="width:100%;height:100%;border:0;display:block;"
                         allow="autoplay; fullscreen; xr-spatial-tracking"
                         allowfullscreen>
@@ -254,7 +255,7 @@
                 </div>
             @endif
 
-            <div class="h-diag-car-wrap" id="car-stage-wrap">
+            <div class="h-diag-car-wrap" id="car-stage-wrap" style="{{ $diagnosticModelUid ? 'display:none;' : '' }}">
                 <svg class="h-diag-car-svg" viewBox="0 0 740 380" preserveAspectRatio="xMidYMid meet">
                     <defs>
                         <linearGradient id="bodySilverGrad" x1="0%" y1="0%" x2="100%" y2="80%">
@@ -2260,7 +2261,7 @@ function escapeHtml(t) {
 const diagnosticModelUid = @json($diagnosticModelUid);
 let diagnosticSketchfabApi = null;
 let diagnosticViewerReady = false;
-let diagnosticViewDimension = '2d';
+let diagnosticViewDimension = diagnosticModelUid ? '3d' : '2d';
 
 function initDiagnosticSketchfab() {
     const iframe = document.getElementById('diagnostic-sketchfab-frame');
