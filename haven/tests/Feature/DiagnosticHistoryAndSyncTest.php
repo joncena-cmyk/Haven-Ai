@@ -190,4 +190,26 @@ class DiagnosticHistoryAndSyncTest extends TestCase
         $this->assertEquals('application/zip', $responseZip->headers->get('content-type'));
         $this->assertStringContainsString('haven-session-'.$diag->id, $responseZip->headers->get('content-disposition'));
     }
+
+    public function test_diagnostics_create_renders_esp32_hardware_gate_and_offline_prompts(): void
+    {
+        $user = User::factory()->create();
+        $vehicle = Vehicle::create([
+            'user_id' => $user->id,
+            'make' => 'Toyota',
+            'model' => 'Corolla',
+            'year' => 2022,
+            'body_type' => 'sedan',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('diagnostics.create', ['vehicle_id' => $vehicle->id]));
+        $response->assertStatus(200);
+        $response->assertSee('id="daq-status-pill"', false);
+        $response->assertSee('ESP32 OFFLINE', false);
+        $response->assertSee('h-diag-btn-gated', false);
+        $response->assertSee('Connect ESP32 / Upload Audio', false);
+        $response->assertSee('id="btn-upload-audio"', false);
+        $response->assertSee('id="workbench-audio-input"', false);
+        $response->assertSee('Import Vibration CSV', false);
+    }
 }

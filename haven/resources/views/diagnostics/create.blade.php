@@ -82,9 +82,9 @@
             </button>
 
             {{-- Live Hardware DAQ Ping --}}
-            <div class="h-diag-daq-pill" id="daq-status-pill" title="ESP32 Ingestion Node Status">
-                <span class="h-diag-live-dot" id="daq-live-dot"></span>
-                <span id="daq-status-text">ESP32 STANDBY</span>
+            <div class="h-diag-daq-pill is-offline" id="daq-status-pill" title="ESP32 Ingestion Node Status">
+                <span class="h-diag-live-dot" id="daq-live-dot" style="background:#ef4444;box-shadow:none;animation:none;"></span>
+                <span id="daq-status-text">ESP32 OFFLINE</span>
             </div>
 
             {{-- User Profile Avatar --}}
@@ -188,12 +188,12 @@
 
             {{-- Master Trigger CTA (Reference Image: Blue Glowing Button) --}}
             <div class="h-diag-hud-cta-wrap">
-                <button type="button" id="btn-master-action" class="h-diag-cta-btn" onclick="triggerPrimaryAction()">
+                <button type="button" id="btn-master-action" class="h-diag-cta-btn" onclick="triggerPrimaryAction()" title="ESP32 DAQ Node is offline. Connect ESP32 for live capture, or click to upload engine audio.">
                     <span class="h-diag-cta-glow"></span>
                     <span class="h-diag-cta-icon" id="master-btn-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     </span>
-                    <span id="master-btn-text">Start Live Diagnostic</span>
+                    <span id="master-btn-text">Connect ESP32 / Upload Audio</span>
                     <span class="h-diag-cta-spinner" id="master-btn-spinner" style="display:none;"></span>
                 </button>
 
@@ -696,7 +696,7 @@
         <div class="h-diag-oscilloscope-wrap" style="position:relative;">
             <canvas id="live-oscilloscope" width="1000" height="90" class="h-diag-canvas"></canvas>
             <div class="h-diag-canvas-overlay" id="canvas-overlay-text">
-                Click <strong>"Start Live Diagnostic"</strong> or <strong>"Start Audio Capture"</strong> to stream microphone harmonics
+                ESP32 DAQ Node: <strong style="color:#f87171;">OFFLINE</strong> · Connect ESP32 for live capture, or click <strong>"Upload Audio"</strong> (.wav/.mp3)
             </div>
             <div class="h-diag-canvas-channels" id="canvas-channels-legend" style="display:none;position:absolute;top:8px;right:12px;gap:10px;font-size:0.7rem;font-weight:700;z-index:2;background:rgba(15,23,42,0.85);padding:2px 8px;border-radius:4px;border:1px solid rgba(51,65,85,0.6);">
                 <span style="color:#06b6d4;display:inline-flex;align-items:center;gap:4px;"><span style="width:8px;height:2px;background:#06b6d4;display:inline-block;"></span>X (Lateral)</span>
@@ -708,9 +708,9 @@
         {{-- Workbench Control Actions --}}
         <div class="h-diag-workbench-actions">
             <div class="h-diag-actions-left" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
-                <button type="button" id="btn-start-rec" class="h-diag-btn-primary" onclick="startAudioRecording()">
+                <button type="button" id="btn-start-rec" class="h-diag-btn-primary h-diag-btn-gated" onclick="startAudioRecording()" title="ESP32 DAQ Node is offline. Connect ESP32 hardware to enable live capture, or click Upload Audio below.">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
-                    Start Audio Capture
+                    <span id="btn-start-rec-text"><span style="font-size:0.8rem;margin-right:2px;">🔒</span> Live Capture (ESP32 Offline)</span>
                 </button>
                 <button type="button" id="btn-stop-rec" class="h-diag-btn-danger" style="display:none;" onclick="stopAudioRecording()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
@@ -1413,6 +1413,26 @@
     font-size: 0.7rem;
     font-weight: 700;
     color: #166534;
+}
+.h-diag-daq-pill.is-offline {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border-color: rgba(239, 68, 68, 0.25) !important;
+    color: #f87171 !important;
+}
+.h-diag-daq-pill.is-offline .h-diag-live-dot {
+    background: #ef4444 !important;
+    box-shadow: none !important;
+    animation: none !important;
+}
+.h-diag-btn-gated {
+    opacity: 0.65 !important;
+    cursor: not-allowed !important;
+    border-color: rgba(148, 163, 184, 0.3) !important;
+    filter: saturate(0.6);
+}
+.h-diag-btn-gated:hover {
+    transform: none !important;
+    box-shadow: none !important;
 }
 .h-diag-live-dot {
     width: 7px;
@@ -2854,6 +2874,11 @@
     color: #4ade80;
     border-color: rgba(34, 197, 94, 0.3);
 }
+[data-theme="dark"] .h-diag-daq-pill.is-offline {
+    background: rgba(239, 68, 68, 0.12) !important;
+    color: #f87171 !important;
+    border-color: rgba(239, 68, 68, 0.3) !important;
+}
 [data-theme="dark"] .badge-normal {
     background: rgba(34, 197, 94, 0.15);
     color: #4ade80;
@@ -3352,6 +3377,8 @@
     let mediaRecorder, audioChunks = [], audioBlob, analyser, animFrame, audioCtx, recordTimer, recSeconds = 0;
     let vibInterval = null, vibSeconds = 0, vibrationSamples = [], vibAnimFrame = null;
     let latestDeviceAccel = null;
+    window.isEsp32Online = false;
+    window.latestEsp32Accel = null;
 
     const canvas = document.getElementById('live-oscilloscope');
     const canvasCtx = canvas ? canvas.getContext('2d') : null;
@@ -3375,6 +3402,17 @@
     // Stage 1: Live Audio Recording (Acoustics)
     // ─────────────────────────────────────────────
     window.startAudioRecording = async function() {
+        if (!window.isEsp32Online) {
+            alert('⚠️ ESP32 DAQ Hardware Node Offline\n\nLive acoustic capture requires an active ESP32 sensor node streaming over Wi-Fi.\n\nTo diagnose without the physical ESP32 node, please use "Upload Audio" (.wav/.mp3) or "Import Vibration CSV".');
+            const uploadBtn = document.getElementById('btn-upload-audio');
+            if (uploadBtn) {
+                uploadBtn.focus();
+                uploadBtn.style.outline = '2px solid #38bdf8';
+                setTimeout(() => { uploadBtn.style.outline = ''; }, 2500);
+            }
+            return;
+        }
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -3583,7 +3621,20 @@
         if (skipVibBtn) skipVibBtn.style.display = 'inline-flex';
 
         // Master CTA update: If no physical sensor attached, offer Audio-Only ML inference directly
-        const hasHardwareVib = !!latestDeviceAccel;
+        const hasHardwareVib = !!latestDeviceAccel || window.isEsp32Online;
+        const btnStartVib = document.getElementById('btn-start-vib');
+        if (btnStartVib) {
+            if (!hasHardwareVib) {
+                btnStartVib.classList.add('h-diag-btn-gated');
+                btnStartVib.innerHTML = '<span style="font-size:0.8rem;margin-right:2px;">🔒</span> Live Vibration (ESP32 Offline)';
+                btnStartVib.title = 'ESP32 DAQ is offline. Import a vibration CSV or skip vibration for audio-only analysis.';
+            } else {
+                btnStartVib.classList.remove('h-diag-btn-gated');
+                btnStartVib.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Start Vibration Capture';
+                btnStartVib.title = 'Start live vibration capture from ESP32 ADXL345 node';
+            }
+        }
+
         const masterBtn = document.getElementById('btn-master-action');
         if (masterBtn) {
             const txt = masterBtn.querySelector('#master-btn-text');
@@ -3801,7 +3852,20 @@
             document.getElementById('btn-start-rec').style.display = 'none';
             const uploadBtn = document.getElementById('btn-upload-audio');
             if (uploadBtn) uploadBtn.style.display = 'none';
-            document.getElementById('btn-start-vib').style.display = 'inline-flex';
+            const hasHardwareVib = !!latestDeviceAccel || window.isEsp32Online;
+            const btnStartVib = document.getElementById('btn-start-vib');
+            if (btnStartVib) {
+                btnStartVib.style.display = 'inline-flex';
+                if (!hasHardwareVib) {
+                    btnStartVib.classList.add('h-diag-btn-gated');
+                    btnStartVib.innerHTML = '<span style="font-size:0.8rem;margin-right:2px;">🔒</span> Live Vibration (ESP32 Offline)';
+                    btnStartVib.title = 'ESP32 DAQ is offline. Import a vibration CSV or skip vibration for audio-only analysis.';
+                } else {
+                    btnStartVib.classList.remove('h-diag-btn-gated');
+                    btnStartVib.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Start Vibration Capture';
+                    btnStartVib.title = 'Start live vibration capture from ESP32 ADXL345 node';
+                }
+            }
             const skipVibBtn = document.getElementById('btn-skip-vib');
             if (skipVibBtn) skipVibBtn.style.display = 'inline-flex';
 
@@ -3832,6 +3896,11 @@
     // Stage 2: Live Vibration Recording (ADXL345 / Device Sensor)
     // ─────────────────────────────────────────────
     window.startVibrationRecording = function() {
+        if (!window.isEsp32Online && !latestDeviceAccel) {
+            alert('⚠️ ESP32 DAQ Hardware Node Offline\n\nLive vibration capture requires the physical ESP32 accelerometer node streaming over Wi-Fi.\n\nPlease import an ADXL345 vibration CSV file or click "Skip Vibration" for audio-only analysis.');
+            return;
+        }
+
         captureState = 'RECORDING_VIBRATION';
         const carModel = document.getElementById('car-3d-model');
         if (carModel) carModel.classList.add('recording-vib');
@@ -3840,7 +3909,7 @@
 
         window.setDiagnosisFlowStep('vibration');
         document.getElementById('hud-progress-pct').textContent = '65%';
-        document.getElementById('hud-progress-label').textContent = latestDeviceAccel ? 'STREAMING HARDWARE ACCELEROMETER...' : 'SIMULATING VIBRATION HARMONICS (DEMO)...';
+        document.getElementById('hud-progress-label').textContent = latestDeviceAccel ? 'STREAMING HARDWARE ACCELEROMETER...' : 'STREAMING ESP32 ADXL345 ACCELEROMETER...';
         document.getElementById('tick-vib').classList.add('active');
 
         // Master CTA
@@ -3900,8 +3969,6 @@
         }
 
         // 50Hz Sampling Loop (every 20ms)
-        const isRevving = (document.getElementById('form_recording_mode').value === 'revving');
-        const baseFreq = isRevving ? 36.67 : 14.17; // RPM / 60 fundamental
         const sampleStartTime = performance.now();
 
         clearInterval(vibInterval);
@@ -3914,21 +3981,18 @@
                 x = latestDeviceAccel.x;
                 y = latestDeviceAccel.y;
                 z = latestDeviceAccel.z;
+            } else if (window.latestEsp32Accel) {
+                // Record physical ESP32 ADXL345 / MPU6050 accelerometer readings (in Gs)
+                x = window.latestEsp32Accel.x;
+                y = window.latestEsp32Accel.y;
+                z = window.latestEsp32Accel.z;
             } else {
-                // Realistic calibrated ADXL345 3-axis accelerometer output (in Gs)
-                const noiseX = (Math.random() - 0.5) * 0.05;
-                const noiseY = (Math.random() - 0.5) * 0.05;
-                const noiseZ = (Math.random() - 0.5) * 0.07;
-
-                if (isRevving) {
-                    x = 0.22 * Math.sin(2 * Math.PI * baseFreq * elapsed) + 0.08 * Math.sin(4 * Math.PI * baseFreq * elapsed) + noiseX;
-                    y = 0.18 * Math.cos(2 * Math.PI * baseFreq * elapsed) + 0.07 * Math.sin(6 * Math.PI * baseFreq * elapsed) + noiseY;
-                    z = 1.0 + 0.35 * Math.sin(2 * Math.PI * baseFreq * elapsed) + 0.12 * Math.sin(4 * Math.PI * baseFreq * elapsed) + noiseZ;
-                } else {
-                    x = 0.09 * Math.sin(2 * Math.PI * baseFreq * elapsed) + 0.04 * Math.sin(4 * Math.PI * baseFreq * elapsed) + noiseX;
-                    y = 0.08 * Math.cos(2 * Math.PI * baseFreq * elapsed) + 0.03 * Math.sin(6 * Math.PI * baseFreq * elapsed) + noiseY;
-                    z = 1.0 + 0.15 * Math.sin(2 * Math.PI * baseFreq * elapsed) + 0.05 * Math.sin(4 * Math.PI * baseFreq * elapsed) + noiseZ;
-                }
+                // Hardware offline / no physical accelerometer active - abort fake vibration generation
+                clearInterval(vibInterval);
+                window.stopVibrationRecording();
+                alert('⚠️ No live accelerometer signal received from ESP32 node.\n\nSimulated vibration has been disabled to preserve hardware authenticity. Please import a vibration CSV file or skip vibration.');
+                skipVibrationCapture();
+                return;
             }
 
             vibrationSamples.push({ t: elapsed, x, y, z });
@@ -3953,23 +4017,13 @@
         cancelAnimationFrame(vibAnimFrame);
 
         document.getElementById('live-rec-dot').classList.remove('active');
-        const carModel = document.getElementById('car-3d-model');
-        if (carModel) carModel.classList.remove('recording-audio');
         document.getElementById('btn-stop-vib').style.display = 'none';
         const channels = document.getElementById('canvas-channels-legend');
         if (channels) channels.style.display = 'none';
 
         if (vibrationSamples.length === 0) {
-            // Safe fallback: at least 150 samples
-            for (let i = 0; i < 150; i++) {
-                const t = i * 0.02;
-                vibrationSamples.push({
-                    t,
-                    x: (Math.random() - 0.5) * 0.1,
-                    y: (Math.random() - 0.5) * 0.1,
-                    z: 1.0 + (Math.random() - 0.5) * 0.2
-                });
-            }
+            skipVibrationCapture();
+            return;
         }
 
         // Compute DC mean vector (x, y, z) to isolate AC dynamic mechanical vibration from 1.0G Earth gravity
@@ -4006,8 +4060,8 @@
         document.getElementById('form_vibration_file').files = dt.files;
 
         // Determine sensor source transparency
-        const isSimulated = !latestDeviceAccel;
-        const source = isSimulated ? 'simulated' : 'device_sensor';
+        const isDevice = !!latestDeviceAccel;
+        const source = isDevice ? 'device_sensor' : 'adxl345_live';
         document.getElementById('form_vibration_source').value = source;
 
         // UI indicators
@@ -4025,20 +4079,16 @@
             vibStrip.style.display = 'flex';
             const meta = document.getElementById('vibration-meta');
             if (meta) {
-                if (isSimulated) {
-                    meta.innerHTML = `<span style="color:#f59e0b;font-weight:700;">[DEMO SIMULATION]</span> Synthetic 3-Axis Data (${vibrationSamples.length} samples @ 50Hz) · <em style="color:#64748b;">Excluded from retraining</em>`;
-                } else {
-                    meta.innerHTML = `<span style="color:#10b981;font-weight:700;">[HARDWARE SENSOR]</span> ${vibrationSamples.length} Live 3-Axis Samples (${vibSeconds || Math.round(vibrationSamples.length * 0.02)}s @ 50Hz)`;
-                }
+                meta.innerHTML = isDevice
+                    ? `<span style="color:#10b981;font-weight:700;">[PHYSICAL SENSOR]</span> Mobile Device Accelerometer (${vibrationSamples.length} samples @ 50Hz)`
+                    : `<span style="color:#0284c7;font-weight:700;">[HARDWARE DAQ]</span> ESP32 ADXL345 Telemetry (${vibrationSamples.length} samples @ 50Hz)`;
             }
         }
 
         // Stepper: advance to Analyze
         window.setDiagnosisFlowStep('analyze');
         document.getElementById('hud-progress-pct').textContent = '90%';
-        document.getElementById('hud-progress-label').textContent = isSimulated
-            ? 'ACOUSTIC & DEMO VIBRATION CAPTURED · READY TO ANALYZE'
-            : 'ALL SIGNALS CAPTURED · READY TO ANALYZE';
+        document.getElementById('hud-progress-label').textContent = 'ALL SIGNALS CAPTURED · READY TO ANALYZE';
 
         const condChip = document.getElementById('hud-condition-chip');
         if (condChip) {
@@ -4216,14 +4266,20 @@
     // ─────────────────────────────────────────────
     window.triggerPrimaryAction = function() {
         if (captureState === 'IDLE') {
+            if (!window.isEsp32Online) {
+                if (confirm('⚠️ ESP32 DAQ Hardware Node is currently offline.\n\nLive engine bay hardware capture requires your ESP32 node to be powered on and streaming over Wi-Fi.\n\nWould you like to select and upload a pre-recorded engine audio file (.wav/.mp3) to diagnose offline?')) {
+                    triggerAudioUpload();
+                }
+                return;
+            }
             startAudioRecording();
         } else if (captureState === 'RECORDING_AUDIO') {
             stopAudioRecording();
         } else if (captureState === 'AUDIO_DONE') {
-            if (latestDeviceAccel) {
+            if (window.isEsp32Online || latestDeviceAccel) {
                 startVibrationRecording();
             } else {
-                // No physical accelerometer attached: skip vibration and submit audio diagnostic directly
+                // No physical accelerometer streaming: skip vibration and submit audio diagnostic directly
                 skipVibrationCapture();
                 submitDiagnosticForm();
             }
@@ -4718,6 +4774,112 @@
         if (tickAux) tickAux.classList.remove('completed');
     };
 
+    function updateEsp32ConnectionState(isOnline, data) {
+        window.isEsp32Online = !!isOnline;
+
+        const dot = document.getElementById('daq-live-dot');
+        const stTxt = document.getElementById('daq-status-text');
+        const stPill = document.getElementById('daq-status-pill');
+        const busBdg = document.getElementById('sensor-bus-badge');
+        const btnStartRec = document.getElementById('btn-start-rec');
+        const btnStartRecTxt = document.getElementById('btn-start-rec-text');
+        const masterBtn = document.getElementById('btn-master-action');
+        const masterTxt = masterBtn ? masterBtn.querySelector('#master-btn-text') : null;
+        const masterIcon = masterBtn ? masterBtn.querySelector('#master-btn-icon') : null;
+        const btnStartVib = document.getElementById('btn-start-vib');
+        const overlay = document.getElementById('canvas-overlay-text');
+
+        if (window.isEsp32Online) {
+            if (dot) {
+                dot.style.background = '#22c55e';
+                dot.style.boxShadow = '0 0 8px #22c55e';
+                dot.style.animation = 'pulseDot 2s infinite ease-in-out';
+            }
+            if (stTxt) stTxt.textContent = 'ESP32 STREAMING';
+            if (stPill) {
+                stPill.classList.remove('is-offline');
+                stPill.style.background = 'rgba(34,197,94,0.12)';
+                stPill.style.borderColor = 'rgba(34,197,94,0.3)';
+                stPill.style.color = '#34d399';
+            }
+            if (busBdg) busBdg.textContent = 'HARDWARE NODE CONNECTED';
+
+            if (data && data.accel_x !== undefined && data.accel_x !== null) {
+                window.latestEsp32Accel = {
+                    x: Number(data.accel_x),
+                    y: Number(data.accel_y),
+                    z: Number(data.accel_z)
+                };
+            }
+
+            // Unlock live capture buttons if still in IDLE state
+            if (captureState === 'IDLE') {
+                if (btnStartRec) {
+                    btnStartRec.classList.remove('h-diag-btn-gated');
+                    btnStartRec.title = 'Start live acoustic capture via connected ESP32 / INMP441 node';
+                    if (btnStartRecTxt) btnStartRecTxt.textContent = 'Start Audio Capture';
+                }
+                if (masterBtn && masterTxt) {
+                    masterTxt.textContent = 'Start Live Diagnostic';
+                    masterBtn.title = 'Start live engine bay diagnostic session';
+                    if (masterIcon) {
+                        masterIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>';
+                    }
+                }
+                if (overlay && !overlay.dataset.hasCustomContent) {
+                    overlay.innerHTML = 'ESP32 DAQ Node: <strong style="color:#34d399;">ONLINE (STREAMING)</strong> · Click <strong>"Start Live Diagnostic"</strong> to begin';
+                }
+            } else if (captureState === 'AUDIO_DONE') {
+                if (btnStartVib) {
+                    btnStartVib.classList.remove('h-diag-btn-gated');
+                    btnStartVib.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Start Vibration Capture';
+                    btnStartVib.title = 'Start live vibration capture from ESP32 ADXL345 node';
+                }
+            }
+        } else {
+            // ESP32 is OFFLINE
+            window.latestEsp32Accel = null;
+            if (dot) {
+                dot.style.background = '#ef4444';
+                dot.style.boxShadow = 'none';
+                dot.style.animation = 'none';
+            }
+            if (stTxt) stTxt.textContent = 'ESP32 OFFLINE';
+            if (stPill) {
+                stPill.classList.add('is-offline');
+                stPill.style.background = 'rgba(239,68,68,0.1)';
+                stPill.style.borderColor = 'rgba(239,68,68,0.25)';
+                stPill.style.color = '#f87171';
+            }
+            if (busBdg) busBdg.textContent = 'HARDWARE NODE OFFLINE';
+
+            // Gate live capture buttons if still in IDLE state
+            if (captureState === 'IDLE') {
+                if (btnStartRec) {
+                    btnStartRec.classList.add('h-diag-btn-gated');
+                    btnStartRec.title = 'ESP32 DAQ Node is offline. Connect ESP32 hardware to enable live capture, or click Upload Audio below.';
+                    if (btnStartRecTxt) btnStartRecTxt.innerHTML = '<span style="font-size:0.8rem;margin-right:2px;">🔒</span> Live Capture (ESP32 Offline)';
+                }
+                if (masterBtn && masterTxt) {
+                    masterTxt.textContent = 'Connect ESP32 / Upload Audio';
+                    masterBtn.title = 'ESP32 DAQ Node is offline. Connect ESP32 for live capture, or click to upload engine audio.';
+                    if (masterIcon) {
+                        masterIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+                    }
+                }
+                if (overlay && !overlay.dataset.hasCustomContent) {
+                    overlay.innerHTML = 'ESP32 DAQ Node: <strong style="color:#f87171;">OFFLINE</strong> · Connect ESP32 for live capture, or click <strong>"Upload Audio"</strong> (.wav/.mp3)';
+                }
+            } else if (captureState === 'AUDIO_DONE') {
+                if (btnStartVib && !latestDeviceAccel) {
+                    btnStartVib.classList.add('h-diag-btn-gated');
+                    btnStartVib.innerHTML = '<span style="font-size:0.8rem;margin-right:2px;">🔒</span> Live Vibration (ESP32 Offline)';
+                    btnStartVib.title = 'ESP32 DAQ is offline. Import a vibration CSV or skip vibration for audio-only analysis.';
+                }
+            }
+        }
+    }
+
     function checkLiveDaq() {
         const sel = document.getElementById('vehicle-switcher');
         const vid = (sel && sel.value) ? sel.value : '{{ $selectedVehicle?->id ?? '' }}';
@@ -4726,14 +4888,7 @@
             .then(res => res.json())
             .then(data => {
                 if (data.online) {
-                    const dot = document.getElementById('daq-live-dot');
-                    if (dot) dot.style.background = '#22c55e';
-                    const stTxt = document.getElementById('daq-status-text');
-                    if (stTxt) stTxt.textContent = 'ESP32 STREAMING';
-                    const stPill = document.getElementById('daq-status-pill');
-                    if (stPill) stPill.style.background = '#f0fdf4';
-                    const busBdg = document.getElementById('sensor-bus-badge');
-                    if (busBdg) busBdg.textContent = 'HARDWARE NODE CONNECTED';
+                    updateEsp32ConnectionState(true, data);
 
                     // Update gauges and workbench only if user hasn't chosen to skip
                     if (!window._userSkippedAuxHardware) {
@@ -4796,9 +4951,22 @@
                         const pVib = document.getElementById('probe-vib-val');
                         if (pVib) pVib.textContent = fmtG + ' g';
                     }
+                } else {
+                    updateEsp32ConnectionState(false, data);
+                    if (!window._userSkippedAuxHardware) {
+                        const tag = document.getElementById('wb-status-tag');
+                        if (tag) {
+                            tag.textContent = 'ESP32 OFFLINE (OPTIONAL)';
+                            tag.style.background = 'rgba(100,116,139,0.18)';
+                            tag.style.color = '#94a3b8';
+                            tag.style.borderColor = 'rgba(100,116,139,0.3)';
+                        }
+                    }
                 }
             })
-            .catch(() => {});
+            .catch(() => {
+                updateEsp32ConnectionState(false, null);
+            });
     }
 
     window.captureLiveTelemetrySnapshot = async function(interactive = false) {
