@@ -105,11 +105,13 @@ Route::middleware(['auth:web'])->group(function () {
         ->middleware(['throttle:ai-ask'])
         ->name('diagnostics.ai.ask');
 
-    // Owner-checked private media streaming routes
+    // Owner-checked private media streaming & dataset packaging routes
     Route::get('diagnostics/{diagnostic}/audio', [DiagnosticController::class, 'streamAudio'])
         ->name('diagnostics.audio');
     Route::get('diagnostics/{diagnostic}/vibration', [DiagnosticController::class, 'streamVibration'])
         ->name('diagnostics.vibration');
+    Route::get('diagnostics/{diagnostic}/export-bundle', [DiagnosticController::class, 'exportBundle'])
+        ->name('diagnostics.export-bundle');
 
     // Stage 6 — Report
     Route::get('diagnostics/{diagnostic}/report', [DiagnosticController::class, 'report'])

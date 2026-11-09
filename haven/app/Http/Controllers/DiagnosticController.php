@@ -14,8 +14,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use ZipArchive;
 
 class DiagnosticController extends Controller
 {
@@ -515,6 +518,127 @@ class DiagnosticController extends Controller
             $diagnostic->vibration_path,
             basename($diagnostic->vibration_path)
         );
+    }
+
+    /* ─────────────────────────────────────────────
+       EXPORT BUNDLE  GET /diagnostics/{diagnostic}/export-bundle
+       1-Click complete raw telemetry and metadata ZIP package.
+    ───────────────────────────────────────────── */
+    public function exportBundle(Diagnostic $diagnostic): BinaryFileResponse
+    {
+        $this->authorizeOwner($diagnostic);
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'haven_pkg_');
+        $zip = new ZipArchive();
+
+        if ($zip->open($tempFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            abort(500, 'Unable to create dataset ZIP archive.');
+        }
+
+        // 1. Audio recording file
+        if (! empty($diagnostic->audio_path)) {
+            $disk = $this->resolveFileDisk($diagnostic->audio_path);
+            if ($disk && Storage::disk($disk)->exists($diagnostic->audio_path)) {
+                $ext = pathinfo($diagnostic->audio_path, PATHINFO_EXTENSION) ?: 'wav';
+                $zip->addFromString("raw_audio.{$ext}", Storage::disk($disk)->get($diagnostic->audio_path));
+            }
+        }
+
+        // 2. Vibration recording file
+        if (! empty($diagnostic->vibration_path)) {
+            $disk = $this->resolveFileDisk($diagnostic->vibration_path);
+            if ($disk && Storage::disk($disk)->exists($diagnostic->vibration_path)) {
+                $ext = pathinfo($diagnostic->vibration_path, PATHINFO_EXTENSION) ?: 'csv';
+                $zip->addFromString("raw_vibration.{$ext}", Storage::disk($disk)->get($diagnostic->vibration_path));
+            }
+        }
+
+        // 3. Machine Learning Inference Report (JSON)
+        $reportPayload = [
+            'session_id' => $diagnostic->id,
+            'session_status' => $diagnostic->status,
+            'timestamp' => $diagnostic->created_at?->toIso8601String(),
+            'vehicle' => [
+                'make' => $diagnostic->vehicle?->make,
+                'model' => $diagnostic->vehicle?->model,
+                'year' => $diagnostic->vehicle?->year,
+                'body_type' => $diagnostic->vehicle?->body_type,
+                'plate_number' => $diagnostic->vehicle?->plate_number,
+                'engine_type' => $diagnostic->vehicle?->engine_type,
+            ],
+            'diagnosis' => [
+                'condition' => $diagnostic->ml_condition,
+                'condition_label' => $diagnostic->condition_label,
+                'confidence' => $diagnostic->ml_confidence,
+                'confidence_pct' => $diagnostic->confidence_percent,
+                'processed_at' => $diagnostic->ml_processed_at?->toIso8601String(),
+                'raw_inference' => $diagnostic->ml_result_raw,
+            ],
+            'telemetry' => [
+                'audio_duration_sec' => $diagnostic->audio_duration_sec,
+                'vibration_peak_g' => $diagnostic->vibration_peak_g,
+                'vibration_rms_g' => $diagnostic->vibration_rms_g,
+                'vibration_source' => $diagnostic->vibration_source,
+                'sample_rate_hz' => $diagnostic->sample_rate_hz,
+                'auxiliary_daq' => [
+                    'rpm' => $diagnostic->rpm,
+                    'temperature_c' => $diagnostic->temperature_c,
+                    'voltage_v' => $diagnostic->voltage_v,
+                    'current_ma' => $diagnostic->current_ma,
+                ],
+            ],
+            'system' => [
+                'app' => 'HAVEN AI Automotive Diagnostic System',
+                'version' => '2.0.0-cet-capstone',
+                'institution' => 'University of Makati - College of Technology',
+            ],
+        ];
+        $zip->addFromString('ml_classification_report.json', json_encode($reportPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        // 4. Formatted Plain Text Summary
+        $vName = $diagnostic->vehicle ? "{$diagnostic->vehicle->year} {$diagnostic->vehicle->make} {$diagnostic->vehicle->model}" : 'Vehicle';
+        $summaryTxt = "================================================================================\n" .
+                      "HAVEN AI — VEHICLE TELEMETRY & ML INGESTION DATASET\n" .
+                      "================================================================================\n" .
+                      "Diagnostic Session ID : #{$diagnostic->id}\n" .
+                      "Created Timestamp     : {$diagnostic->created_at}\n" .
+                      "Target Vehicle        : {$vName}\n" .
+                      "Classification Status : " . strtoupper($diagnostic->status) . "\n" .
+                      "Predicted Condition   : " . strtoupper($diagnostic->condition_label ?? 'Unclassified') . "\n" .
+                      "ML Model Confidence   : " . ($diagnostic->confidence_percent ?? 'N/A') . "\n\n" .
+                      "--------------------------------------------------------------------------------\n" .
+                      "TELEMETRY ACQUISITION DATA:\n" .
+                      "- Audio Duration      : " . ($diagnostic->audio_duration_sec ? ($diagnostic->audio_duration_sec . ' seconds') : 'None') . "\n" .
+                      "- Vibration Peak Accel: " . ($diagnostic->vibration_peak_g ? ($diagnostic->vibration_peak_g . ' g') : 'None') . "\n" .
+                      "- Vibration RMS Accel : " . ($diagnostic->vibration_rms_g ? ($diagnostic->vibration_rms_g . ' g') : 'None') . "\n" .
+                      "- Accelerometer Source: " . ($diagnostic->vibration_source ?? 'N/A') . "\n" .
+                      "- Engine Speed (RPM)  : " . ($diagnostic->rpm !== null ? ($diagnostic->rpm . ' RPM') : 'Unrecorded') . "\n" .
+                      "- Coolant Temp        : " . ($diagnostic->temperature_c !== null ? ($diagnostic->temperature_c . ' °C') : 'Unrecorded') . "\n" .
+                      "- DC Bus Voltage      : " . ($diagnostic->voltage_v !== null ? ($diagnostic->voltage_v . ' V') : 'Unrecorded') . "\n" .
+                      "- Bus Current Draw    : " . ($diagnostic->current_ma !== null ? ($diagnostic->current_ma . ' mA') : 'Unrecorded') . "\n" .
+                      "--------------------------------------------------------------------------------\n" .
+                      "FILES INCLUDED IN THIS ARCHIVE:\n" .
+                      "1. raw_audio.*               : Original acoustic recording captured via INMP441 MEMS microphone\n" .
+                      "2. raw_vibration.*           : 3-Axis accelerometer timeseries data (timestamp,x,y,z in Gs)\n" .
+                      "3. ml_classification_report.json : Full inference probabilities, feature vectors, and metadata\n" .
+                      "4. session_metadata.txt      : This human-readable diagnostic session sheet\n\n" .
+                      "Generated by HAVEN AI Engine Diagnostic Suite (University of Makati)\n" .
+                      "================================================================================\n";
+        $zip->addFromString('session_metadata.txt', $summaryTxt);
+
+        $zip->close();
+
+        $vehicleSlug = Str::slug($diagnostic->vehicle ? "{$diagnostic->vehicle->make}-{$diagnostic->vehicle->model}" : 'vehicle');
+        $downloadName = "haven-session-{$diagnostic->id}-{$vehicleSlug}-dataset.zip";
+
+        AuditLogger::log('diagnostic.exported_bundle', [
+            'diagnostic_id' => $diagnostic->id,
+            'vehicle_id' => $diagnostic->vehicle_id,
+        ]);
+
+        return response()->download($tempFile, $downloadName, [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
     }
 
     private function resolveFileDisk(string $relativePath): ?string

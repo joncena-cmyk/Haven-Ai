@@ -151,4 +151,43 @@ class DiagnosticHistoryAndSyncTest extends TestCase
         $responseNormal->assertSee('normal-active');
         $responseNormal->assertSee('ALL POWERTRAIN SUB-ASSEMBLIES IN-SPEC');
     }
+
+    public function test_diagnostic_export_bundle_downloads_zip_dataset_and_renders_spectrogram_on_show(): void
+    {
+        $user = User::factory()->create();
+        $vehicle = Vehicle::create([
+            'user_id' => $user->id,
+            'make' => 'Toyota',
+            'model' => 'Corolla',
+            'year' => 2022,
+            'body_type' => 'sedan',
+        ]);
+
+        $diag = Diagnostic::create([
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'completed',
+            'ml_condition' => 'valve_clearance',
+            'ml_confidence' => 0.945,
+            'audio_duration_sec' => 15,
+            'audio_path' => 'diagnostics/test_audio.wav',
+            'vibration_peak_g' => 1.25,
+            'rpm' => 850,
+            'temperature_c' => 88.5,
+            'voltage_v' => 13.8,
+        ]);
+
+        // 1. Verify show page renders Export Dataset (ZIP) CTA and Spectrogram canvas
+        $responseShow = $this->actingAs($user)->get(route('diagnostics.show', $diag));
+        $responseShow->assertStatus(200);
+        $responseShow->assertSee('Export Dataset (ZIP)');
+        $responseShow->assertSee('audio-spectrogram-canvas');
+        $responseShow->assertSee('Acoustic Frequency Spectrum (FFT)');
+
+        // 2. Verify export-bundle route streams a valid ZIP archive
+        $responseZip = $this->actingAs($user)->get(route('diagnostics.export-bundle', $diag));
+        $responseZip->assertStatus(200);
+        $this->assertEquals('application/zip', $responseZip->headers->get('content-type'));
+        $this->assertStringContainsString('haven-session-'.$diag->id, $responseZip->headers->get('content-disposition'));
+    }
 }

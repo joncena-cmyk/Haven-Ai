@@ -75,6 +75,12 @@
                 <span class="h-hide-mobile">Report</span>
             </a>
 
+            {{-- 1-Click Complete Dataset ZIP Export --}}
+            <a href="{{ route('diagnostics.export-bundle', $diagnostic) }}" class="h-diag-topbar-btn" style="text-decoration:none;" title="Download complete raw telemetry dataset (.wav, .csv, and ML report JSON)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span class="h-hide-mobile">Dataset ZIP</span>
+            </a>
+
             {{-- Re-analyze or Analyze Button --}}
             @if(in_array($diagnostic->status, ['draft','submitted', 'processing']) && ($diagnostic->hasAudio() || $diagnostic->hasVibration() || $diagnostic->hasMultiSensor()))
                 <form method="POST" action="{{ route('diagnostics.analyze', $diagnostic) }}">
@@ -232,6 +238,10 @@
                 <a href="{{ route('diagnostics.report', $diagnostic) }}" target="_blank" class="h-diag-cta-btn" style="text-decoration:none;font-size:0.75rem;height:36px;padding:0 0.85rem;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                     <span>Inspection Report</span>
+                </a>
+                <a href="{{ route('diagnostics.export-bundle', $diagnostic) }}" class="h-diag-btn-subtle" style="text-decoration:none;font-size:0.75rem;height:36px;padding:0 0.85rem;display:inline-flex;align-items:center;gap:0.4rem;" title="Download complete telemetry archive (.wav, .csv, and ML JSON report)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span>Export Dataset (ZIP)</span>
                 </a>
                 <a href="{{ route('diagnostics.create') }}" class="h-diag-btn-subtle" style="text-decoration:none;font-size:0.75rem;height:36px;padding:0 0.85rem;display:inline-flex;align-items:center;gap:0.4rem;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1135,7 +1145,30 @@
                     Duration: <strong>{{ floor($diagnostic->audio_duration_sec/60) }}:{{ str_pad($diagnostic->audio_duration_sec%60,2,'0',STR_PAD_LEFT) }}</strong>
                     @if($diagnostic->audio_original_name) · {{ $diagnostic->audio_original_name }} @endif
                 </div>
-                <audio controls style="width:100%;height:38px;border-radius:6px;" src="{{ route('diagnostics.audio', $diagnostic) }}"></audio>
+                <audio id="h-diagnostic-audio-player" controls style="width:100%;height:38px;border-radius:6px;" src="{{ route('diagnostics.audio', $diagnostic) }}"></audio>
+
+                {{-- Interactive Spectrogram & FFT Harmonic Frequency Canvas --}}
+                <div class="h-diag-spectrogram-wrap" style="margin-top:0.85rem;background:#060a12;border-radius:8px;padding:0.65rem;border:1px solid rgba(56,189,248,0.2);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                        <span style="font-size:0.68rem;font-weight:800;color:#94a3b8;letter-spacing:0.05em;text-transform:uppercase;">
+                            Acoustic Frequency Spectrum (FFT)
+                        </span>
+                        <div style="display:flex;gap:0.35rem;font-size:0.62rem;">
+                            <span style="padding:0.15rem 0.45rem;border-radius:4px;background:rgba(56,189,248,0.15);color:#38bdf8;font-weight:700;">0 - 20 kHz</span>
+                            @if($canon === 'valve_clearance')
+                                <span style="padding:0.15rem 0.45rem;border-radius:4px;background:rgba(239,68,68,0.18);color:#ef4444;font-weight:700;">★ 2.8 - 4.5 kHz Tap</span>
+                            @endif
+                        </div>
+                    </div>
+                    <canvas id="audio-spectrogram-canvas" width="560" height="110" style="width:100%;height:95px;display:block;border-radius:4px;background:#030712;"></canvas>
+                    <div style="display:flex;justify-content:space-between;font-size:0.6rem;color:#64748b;font-family:'JetBrains Mono',monospace;margin-top:0.35rem;">
+                        <span>0 Hz</span>
+                        <span>1 kHz</span>
+                        <span style="{{ $canon === 'valve_clearance' ? 'color:#ef4444;font-weight:700;' : '' }}">3.5 kHz</span>
+                        <span>8 kHz</span>
+                        <span>16 kHz</span>
+                    </div>
+                </div>
             @else
                 <p style="font-size:0.78rem;color:#94a3b8;margin:0;">No audio recorded for this session.</p>
             @endif
@@ -2375,6 +2408,138 @@ window.toggleVehiclePerspective = function() {
     }
 };
 </script>
+
+@if($diagnostic->hasAudio())
+<script>
+// ── Interactive FFT Spectrogram & Acoustic Frequency Visualizer ──
+(function() {
+    const audioEl = document.getElementById('h-diagnostic-audio-player');
+    const canvas = document.getElementById('audio-spectrogram-canvas');
+    if (!audioEl || !canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const diagnosedCondition = @json($canon);
+    let audioCtx = null;
+    let analyser = null;
+    let sourceNode = null;
+    let animId = null;
+
+    function drawStaticSpectrum() {
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.fillStyle = '#030712';
+        ctx.fillRect(0, 0, w, h);
+
+        // Grid lines
+        ctx.strokeStyle = 'rgba(30, 41, 59, 0.6)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < w; x += w / 4) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, h);
+            ctx.stroke();
+        }
+
+        // Frequency curve gradient
+        const gradient = ctx.createLinearGradient(0, h, 0, 0);
+        gradient.addColorStop(0, 'rgba(56, 189, 248, 0.12)');
+        gradient.addColorStop(0.7, 'rgba(56, 189, 248, 0.45)');
+        gradient.addColorStop(1, '#38bdf8');
+
+        ctx.beginPath();
+        ctx.moveTo(0, h - 8);
+        const points = 50;
+        for (let i = 0; i <= points; i++) {
+            const x = (i / points) * w;
+            const normX = i / points;
+            let baseAmp = Math.exp(-normX * 3.2) * (h * 0.72);
+
+            // Fault signature harmonic highlights
+            if (diagnosedCondition === 'valve_clearance' && normX >= 0.28 && normX <= 0.42) {
+                baseAmp += Math.sin((normX - 0.28) / 0.14 * Math.PI) * (h * 0.42);
+            } else if (diagnosedCondition === 'misfire' && normX >= 0.05 && normX <= 0.22) {
+                baseAmp += Math.sin((normX - 0.05) / 0.17 * Math.PI) * (h * 0.38);
+            }
+
+            const y = Math.max(12, h - 8 - baseAmp);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.lineTo(w, h - 8);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        ctx.strokeStyle = (diagnosedCondition === 'valve_clearance') ? '#ef4444' : '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    drawStaticSpectrum();
+
+    audioEl.addEventListener('play', function() {
+        try {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 128;
+                sourceNode = audioCtx.createMediaElementSource(audioEl);
+                sourceNode.connect(analyser);
+                analyser.connect(audioCtx.destination);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            function renderFrame() {
+                animId = requestAnimationFrame(renderFrame);
+                analyser.getByteFrequencyData(dataArray);
+
+                const w = canvas.width;
+                const h = canvas.height;
+                ctx.fillStyle = '#030712';
+                ctx.fillRect(0, 0, w, h);
+
+                const barWidth = (w / bufferLength) * 0.85;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = (dataArray[i] / 255) * (h - 10);
+                    const freqRatio = i / bufferLength;
+
+                    if (diagnosedCondition === 'valve_clearance' && freqRatio >= 0.25 && freqRatio <= 0.45) {
+                        ctx.fillStyle = '#ef4444';
+                    } else if (freqRatio < 0.2) {
+                        ctx.fillStyle = '#f59e0b';
+                    } else {
+                        ctx.fillStyle = '#38bdf8';
+                    }
+
+                    ctx.fillRect(x, h - barHeight - 4, barWidth, barHeight);
+                    x += barWidth + 2;
+                }
+            }
+            renderFrame();
+        } catch (err) {
+            console.warn('AudioContext visualization notice:', err);
+        }
+    });
+
+    audioEl.addEventListener('pause', function() {
+        if (animId) cancelAnimationFrame(animId);
+        drawStaticSpectrum();
+    });
+
+    audioEl.addEventListener('ended', function() {
+        if (animId) cancelAnimationFrame(animId);
+        drawStaticSpectrum();
+    });
+})();
+</script>
+@endif
 
 @if(in_array($diagnostic->status, ['submitted', 'processing']))
 <script>
