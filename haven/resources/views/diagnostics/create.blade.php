@@ -65,33 +65,6 @@
             </div>
         </div>
 
-        <div class="h-diag-topbar-right">
-            {{-- Quick Search & Symptoms --}}
-            <div class="h-diag-search-wrap">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" id="diag-quick-search" placeholder="Search DTC or symptom..." oninput="handleQuickSearch(this.value)">
-            </div>
-
-            {{-- Vehicle History Slideout Trigger --}}
-            <button type="button" class="h-diag-topbar-btn" onclick="toggleHistoryDrawer()" title="View Diagnostic History">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span class="h-hide-mobile">History</span>
-                @if(isset($recentDiagnostics) && $recentDiagnostics->count() > 0)
-                    <span class="h-diag-counter-pill">{{ $recentDiagnostics->count() }}</span>
-                @endif
-            </button>
-
-            {{-- Live Hardware DAQ Ping --}}
-            <div class="h-diag-daq-pill is-offline" id="daq-status-pill" title="ESP32 Ingestion Node Status">
-                <span class="h-diag-live-dot" id="daq-live-dot" style="background:#ef4444;box-shadow:none;animation:none;"></span>
-                <span id="daq-status-text">ESP32 OFFLINE</span>
-            </div>
-
-            {{-- User Profile Avatar --}}
-            <div class="h-diag-avatar-wrap">
-                <div class="h-diag-avatar">{{ auth()->user()?->name ? strtoupper(substr(auth()->user()->name, 0, 1)) : 'U' }}</div>
-            </div>
-        </div>
     </header>
 
     @if($vehicles->isEmpty())

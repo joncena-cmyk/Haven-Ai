@@ -204,7 +204,6 @@ class DiagnosticHistoryAndSyncTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('diagnostics.create', ['vehicle_id' => $vehicle->id]));
         $response->assertStatus(200);
-        $response->assertSee('id="daq-status-pill"', false);
         $response->assertSee('ESP32 OFFLINE', false);
         $response->assertSee('h-diag-btn-gated', false);
         $response->assertSee('Go to Diagnostic Workbench', false);
