@@ -178,6 +178,46 @@ def parse_firmware_range_g(headers: List[str]) -> Optional[float]:
     return None
 
 
+def parse_firmware_aux_telemetry(headers: List[str]) -> Dict[str, Optional[float]]:
+    """
+    Extract auxiliary 3-component telemetry snapshot from:
+    '# HAVEN_AUX_TELEMETRY TEMP_C=87.5 RPM=850 VOLTAGE_V=14.12 CURRENT_MA=450.0'
+    """
+    telemetry: Dict[str, Optional[float]] = {
+        "temperature_c": None,
+        "rpm_measured": None,
+        "voltage_v": None,
+        "current_ma": None,
+    }
+    for hdr in reversed(headers):
+        line = str(hdr).strip()
+        if not line.startswith("# HAVEN_AUX_TELEMETRY"):
+            continue
+        m_temp = re.search(r"\bTEMP_C\s*=\s*([^\s]+)", line)
+        m_rpm = re.search(r"\bRPM\s*=\s*([^\s]+)", line)
+        m_volt = re.search(r"\bVOLTAGE_V\s*=\s*([^\s]+)", line)
+        m_curr = re.search(r"\bCURRENT_MA\s*=\s*([^\s]+)", line)
+
+        def _val(m: Optional[re.Match]) -> Optional[float]:
+            if not m:
+                return None
+            s = m.group(1).upper()
+            if s in ("NULL", "DISCONNECTED", "NONE", "-999", "-999.0"):
+                return None
+            try:
+                f = float(s)
+                return f if math.isfinite(f) else None
+            except ValueError:
+                return None
+
+        telemetry["temperature_c"] = _val(m_temp)
+        telemetry["rpm_measured"] = _val(m_rpm)
+        telemetry["voltage_v"] = _val(m_volt)
+        telemetry["current_ma"] = _val(m_curr)
+        break
+    return telemetry
+
+
 def build_output_dir(
     output_root: pathlib.Path,
     session_id: str,
@@ -656,12 +696,29 @@ def record_synchronized_session(
 
     tap_info = detect_tap_marker(audio_float, audio_sr, vib_t_us, vib_xyz)
 
+    # Extract auxiliary 3-component telemetry snapshot (DS18B20 Temp, Hall RPM, INA219 Voltage/Current)
+    aux_telemetry = parse_firmware_aux_telemetry(firmware_headers)
+    temp_c = getattr(args, "temp_c", None) if getattr(args, "temp_c", None) is not None else aux_telemetry.get("temperature_c")
+    rpm_measured = getattr(args, "rpm_measured", None) if getattr(args, "rpm_measured", None) is not None else aux_telemetry.get("rpm_measured")
+    voltage_v = getattr(args, "voltage_v", None) if getattr(args, "voltage_v", None) is not None else aux_telemetry.get("voltage_v")
+    current_ma = getattr(args, "current_ma", None) if getattr(args, "current_ma", None) is not None else aux_telemetry.get("current_ma")
+
     metadata: Dict[str, Any] = {
         "session_id": args.session_id,
         "vehicle_id": str(args.vehicle_id),
         "condition": args.condition,
         "rpm_target": int(args.rpm_target),
         "duration_target_sec": duration_s,
+        "temperature_c": temp_c,
+        "rpm_measured": rpm_measured,
+        "voltage_v": voltage_v,
+        "current_ma": current_ma,
+        "telemetry": {
+            "temperature_c": temp_c,
+            "rpm_measured": rpm_measured,
+            "voltage_v": voltage_v,
+            "current_ma": current_ma,
+        },
         "operator": args.operator,
         "verified_by": args.verified_by or "",
         "sensor_position": args.sensor_position,
@@ -744,12 +801,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--baud", type=int, default=921600, help="Serial baud rate (default: 921600)")
     parser.add_argument("--device", type=str, default=None, help="Audio input device index or name (sounddevice)")
     parser.add_argument("--audio-rate", type=int, default=44100, help="Audio sample rate in Hz (default: 44100)")
-    parser.add_argument(
-        "--sensor-range-g",
+    parser.add_argument("--sensor-range-g",
         type=float,
         default=0.0,
         help="Accelerometer full-scale range in g (0 = auto-detect RANGE_G from firmware header, fallback 16g)",
     )
+    parser.add_argument("--temp-c", type=float, default=None, help="Engine coolant/block temperature in °C (DS18B20)")
+    parser.add_argument("--rpm-measured", type=int, default=None, help="Actual measured crankshaft RPM from Hall sensor (D23)")
+    parser.add_argument("--voltage-v", type=float, default=None, help="Alternator / battery DC voltage in V (INA219)")
+    parser.add_argument("--current-ma", type=float, default=None, help="Electrical current draw in mA (INA219)")
     parser.add_argument("--output-root", type=str, default="recordings", help="Root output directory")
     return parser
 

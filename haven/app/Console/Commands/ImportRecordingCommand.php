@@ -109,6 +109,11 @@ class ImportRecordingCommand extends Command
             ? $achievedRateHz
             : (isset($meta['vibration_achieved_rate_hz']) ? (int) round((float) $meta['vibration_achieved_rate_hz']) : null);
 
+        $tempC = isset($meta['temperature_c']) ? (float) $meta['temperature_c'] : (isset($meta['telemetry']['temperature_c']) ? (float) $meta['telemetry']['temperature_c'] : null);
+        $rpmVal = isset($meta['rpm_measured']) ? (int) $meta['rpm_measured'] : (isset($meta['telemetry']['rpm_measured']) ? (int) $meta['telemetry']['rpm_measured'] : ($targetRpm ?: null));
+        $voltageV = isset($meta['voltage_v']) ? (float) $meta['voltage_v'] : (isset($meta['telemetry']['voltage_v']) ? (float) $meta['telemetry']['voltage_v'] : null);
+        $currentMa = isset($meta['current_ma']) ? (float) $meta['current_ma'] : (isset($meta['telemetry']['current_ma']) ? (float) $meta['telemetry']['current_ma'] : null);
+
         $diagnostic = Diagnostic::create([
             'user_id' => $userId,
             'vehicle_id' => $vehicle->id,
@@ -120,6 +125,15 @@ class ImportRecordingCommand extends Command
             'vibration_sample_count' => $sampleCount,
             'vibration_peak_g' => $peakG,
             'vibration_rms_g' => $rmsG,
+            'temperature_c' => $tempC,
+            'rpm' => $rpmVal,
+            'voltage_v' => $voltageV,
+            'current_ma' => $currentMa,
+            'sensor_data' => [
+                'ds18b20' => ['temp_c' => $tempC, 'pin' => 'D4'],
+                'hall_rpm' => ['rpm' => $rpmVal, 'pin' => 'D23'],
+                'ina219' => ['voltage_v' => $voltageV, 'current_ma' => $currentMa, 'pins' => 'D21/D22'],
+            ],
             'recording_mode' => $recordingMode,
             'notes' => $meta['notes'] ?? 'Imported via haven:import-recording',
             'status' => 'completed',

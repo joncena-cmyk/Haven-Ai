@@ -138,32 +138,24 @@ class DiagnosticController extends Controller
             'is_training_sample' => $request->boolean('is_training_sample') && ! empty($trueCondition),
         ];
 
-        $liveCache = \Illuminate\Support\Facades\Cache::get('telemetry:live:'.$vehicle->id)
-            ?? \Illuminate\Support\Facades\Cache::get('telemetry:live:user:'.Auth::id());
+        // Auxiliary hardware metadata (DS18B20 Temp, Hall RPM, INA219 Voltage/Current):
+        // Per thesis scope, strictly optional contextual metadata. Excluded from core ML feature vector.
+        // If not explicitly captured from live ESP32 or provided by user, leave as null (no auto-generated fallbacks).
+        $data['temperature_c'] = ($request->filled('temperature_c') && is_numeric($request->temperature_c))
+            ? (float) $request->temperature_c
+            : null;
 
-        if ($request->filled('temperature_c')) {
-            $data['temperature_c'] = (float) $request->temperature_c;
-        } elseif (is_array($liveCache) && isset($liveCache['temperature_c']) && $liveCache['temperature_c'] !== null) {
-            $data['temperature_c'] = (float) $liveCache['temperature_c'];
-        }
+        $data['rpm'] = ($request->filled('rpm') && is_numeric($request->rpm))
+            ? (int) $request->rpm
+            : null;
 
-        if ($request->filled('rpm')) {
-            $data['rpm'] = (int) $request->rpm;
-        } elseif (is_array($liveCache) && isset($liveCache['rpm']) && $liveCache['rpm'] !== null) {
-            $data['rpm'] = (int) $liveCache['rpm'];
-        }
+        $data['voltage_v'] = ($request->filled('voltage_v') && is_numeric($request->voltage_v))
+            ? (float) $request->voltage_v
+            : null;
 
-        if ($request->filled('voltage_v')) {
-            $data['voltage_v'] = (float) $request->voltage_v;
-        } elseif (is_array($liveCache) && isset($liveCache['voltage_v']) && $liveCache['voltage_v'] !== null) {
-            $data['voltage_v'] = (float) $liveCache['voltage_v'];
-        }
-
-        if ($request->filled('current_ma')) {
-            $data['current_ma'] = (float) $request->current_ma;
-        } elseif (is_array($liveCache) && isset($liveCache['current_ma']) && $liveCache['current_ma'] !== null) {
-            $data['current_ma'] = (float) $liveCache['current_ma'];
-        }
+        $data['current_ma'] = ($request->filled('current_ma') && is_numeric($request->current_ma))
+            ? (float) $request->current_ma
+            : null;
 
         // ── Audio file: prefer blob (recorded) over uploaded file ──
         $audioFile = $request->file('audio_blob') ?? $request->file('audio_file');

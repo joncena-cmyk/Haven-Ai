@@ -418,31 +418,31 @@
                 {{-- Probe 3: Temperature DS18B20 (Contextual) --}}
                 <div class="h-diag-probe-item">
                     <div class="h-diag-probe-pillar">
-                        <div class="h-diag-probe-bar orange" style="height: 78%;"></div>
+                        <div class="h-diag-probe-bar orange" style="height: 0%;"></div>
                         <div class="h-diag-probe-cap orange"></div>
                     </div>
                     <div class="h-diag-probe-name" style="color:#ea580c;">Coolant</div>
-                    <div class="h-diag-probe-val" id="probe-temp-val">88.5°C</div>
+                    <div class="h-diag-probe-val" id="probe-temp-val">--</div>
                 </div>
 
                 {{-- Probe 4: Hall Tachometer (Contextual) --}}
                 <div class="h-diag-probe-item">
                     <div class="h-diag-probe-pillar">
-                        <div class="h-diag-probe-bar blue" style="height: 48%;"></div>
+                        <div class="h-diag-probe-bar blue" style="height: 0%;"></div>
                         <div class="h-diag-probe-cap"></div>
                     </div>
                     <div class="h-diag-probe-name">Tach</div>
-                    <div class="h-diag-probe-val" id="probe-rpm-val">850 RPM</div>
+                    <div class="h-diag-probe-val" id="probe-rpm-val">--</div>
                 </div>
 
                 {{-- Probe 5: Bus Voltage INA219 --}}
                 <div class="h-diag-probe-item">
                     <div class="h-diag-probe-pillar">
-                        <div class="h-diag-probe-bar blue" style="height: 60%;"></div>
+                        <div class="h-diag-probe-bar blue" style="height: 0%;"></div>
                         <div class="h-diag-probe-cap"></div>
                     </div>
                     <div class="h-diag-probe-name">Voltage</div>
-                    <div class="h-diag-probe-val" id="probe-volt-val">13.8 V</div>
+                    <div class="h-diag-probe-val" id="probe-volt-val">--</div>
                 </div>
             </div>
 
@@ -515,9 +515,9 @@
                     <div class="h-diag-arc-wrap">
                         <svg width="110" height="60" viewBox="0 0 110 60">
                             <path d="M 15 50 A 40 40 0 0 1 95 50" fill="none" stroke="#e2e8f0" stroke-width="8" stroke-linecap="round"/>
-                            <path id="voltage-arc-path" d="M 15 50 A 40 40 0 0 1 95 50" fill="none" stroke="#0284c7" stroke-width="8" stroke-linecap="round" stroke-dasharray="125" stroke-dashoffset="35"/>
+                            <path id="voltage-arc-path" d="M 15 50 A 40 40 0 0 1 95 50" fill="none" stroke="#0284c7" stroke-width="8" stroke-linecap="round" stroke-dasharray="125" stroke-dashoffset="125"/>
                         </svg>
-                        <div class="h-diag-arc-val" id="gauge-voltage-num">13.8</div>
+                        <div class="h-diag-arc-val" id="gauge-voltage-num">--</div>
                     </div>
                     <div class="h-diag-gauge-lbl">I2C 0x40 · DC Bus (V)</div>
                 </div>
@@ -529,13 +529,13 @@
                         <span class="unit">RPM</span>
                     </div>
                     <div class="h-diag-rpm-wave-wrap">
-                        <div class="h-diag-rpm-display" id="gauge-rpm-num">850</div>
+                        <div class="h-diag-rpm-display" id="gauge-rpm-num">--</div>
                         <svg width="100" height="34" viewBox="0 0 100 34" fill="none" class="h-diag-sine-svg">
                             <path d="M 0 17 Q 15 0, 30 17 T 60 17 T 90 17 T 120 17" fill="none" stroke="#0ea5e9" stroke-width="2.5"/>
                             <circle cx="60" cy="17" r="4" fill="#0284c7"/>
                         </svg>
                     </div>
-                    <div class="h-diag-gauge-lbl" id="gauge-rpm-mode">GPIO D23 · Idling</div>
+                    <div class="h-diag-gauge-lbl" id="gauge-rpm-mode">GPIO D23 · Standby</div>
                 </div>
             </div>
 
@@ -543,11 +543,11 @@
             <div class="h-diag-card-footer-metrics" style="margin-top:0.35rem;margin-bottom:0.45rem;">
                 <div class="h-diag-footer-metric">
                     <span class="lbl">DS18B20 Temp (D4)</span>
-                    <span class="val" style="color:#ea580c;" id="gauge-temp-num">88.5°C</span>
+                    <span class="val" style="color:#ea580c;" id="gauge-temp-num">--</span>
                 </div>
                 <div class="h-diag-footer-metric">
                     <span class="lbl">INA219 Current</span>
-                    <span class="val" id="gauge-curr-num">420 mA</span>
+                    <span class="val" id="gauge-curr-num">--</span>
                 </div>
                 <div class="h-diag-footer-metric">
                     <button type="button" onclick="openManualTelemetryDrawer()" style="background:rgba(2,132,199,0.1);color:#0284c7;border:1px solid rgba(2,132,199,0.28);border-radius:6px;padding:0.22rem 0.5rem;font-size:0.68rem;font-weight:700;cursor:pointer;">
@@ -559,10 +559,10 @@
             {{-- Mode Switcher Pill inside Card --}}
             <div class="h-diag-mode-selector-strip">
                 <button type="button" class="h-mode-btn active" id="btn-mode-idle" onclick="setRecordingMode('idle')">
-                    Baseline Idle (850 RPM)
+                    Baseline Idle (850 RPM target)
                 </button>
                 <button type="button" class="h-mode-btn" id="btn-mode-revving" onclick="setRecordingMode('revving')">
-                    Baseline Revving (2,200 RPM)
+                    Baseline Revving (2,200 RPM target)
                 </button>
             </div>
         </div>
@@ -666,6 +666,10 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                     Import Vibration CSV
                 </button>
+                <button type="button" id="btn-sample-telemetry" class="h-diag-btn-secondary" onclick="captureLiveTelemetrySnapshot(true)" title="Snapshot real-time Coolant Temperature, Engine RPM, and Battery Voltage from vehicle" style="display:inline-flex;align-items:center;gap:0.35rem;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span>Capture Live DAQ</span>
+                </button>
             </div>
 
             {{-- Audio Playback Strip (Visible after recording) --}}
@@ -678,6 +682,29 @@
             <div class="h-diag-playback-strip" id="vibration-strip" style="display:none;border-color:rgba(6,182,212,0.4);background:rgba(6,182,212,0.08);">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                 <span class="h-diag-playback-meta" id="vibration-meta" style="color:var(--ds-text);">ADXL345 3-Axis Data Ingested</span>
+            </div>
+
+            {{-- 3-Component Auxiliary Telemetry Metadata Strip (RPM, Temp, Voltage) --}}
+            <div class="h-diag-playback-strip" id="workbench-telemetry-strip" style="display:inline-flex;align-items:center;gap:0.6rem;padding:0.4rem 0.75rem;background:rgba(15,23,42,0.85);border:1px solid rgba(51,65,85,0.7);border-radius:8px;font-size:0.78rem;">
+                <span style="font-size:0.65rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Aux Hardware (Optional):</span>
+                <div style="display:flex;align-items:center;gap:0.3rem;" title="Engine RPM (Hall Tachometer / D23)">
+                    <span style="color:#38bdf8;font-weight:700;">RPM:</span>
+                    <span id="wb-val-rpm" style="font-family:monospace;font-weight:700;color:#f8fafc;">--</span>
+                </div>
+                <span style="color:#475569;">·</span>
+                <div style="display:flex;align-items:center;gap:0.3rem;" title="Coolant Temperature (DS18B20 / D4)">
+                    <span style="color:#fb923c;font-weight:700;">Temp:</span>
+                    <span id="wb-val-temp" style="font-family:monospace;font-weight:700;color:#f8fafc;">--</span>
+                </div>
+                <span style="color:#475569;">·</span>
+                <div style="display:flex;align-items:center;gap:0.3rem;" title="Battery / Alternator Voltage (INA219 / D21-D22)">
+                    <span style="color:#4ade80;font-weight:700;">Volt:</span>
+                    <span id="wb-val-volt" style="font-family:monospace;font-weight:700;color:#f8fafc;">--</span>
+                </div>
+                <span id="wb-status-tag" style="font-size:0.62rem;padding:0.12rem 0.35rem;border-radius:4px;background:rgba(100,116,139,0.18);color:#94a3b8;border:1px solid rgba(100,116,139,0.3);font-weight:700;">NOT CAPTURED (OPTIONAL)</span>
+                <button type="button" id="btn-clear-hardware" onclick="clearAuxiliaryTelemetry()" style="margin-left:0.25rem;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.35);border-radius:4px;padding:0.18rem 0.45rem;font-size:0.68rem;cursor:pointer;font-weight:700;display:none;" title="Do not record auxiliary hardware metadata for this session">
+                    ✕ Skip
+                </button>
             </div>
 
             <div class="h-diag-actions-right">
@@ -913,19 +940,19 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;">
                 <div>
                     <label style="font-size:0.75rem;font-weight:600;color:#334155;">Coolant Temp (°C · DS18B20)</label>
-                    <input type="number" step="0.5" id="man_temp" value="88.5" class="h-diag-file-input">
+                    <input type="number" step="0.5" id="man_temp" value="" placeholder="e.g. 88.5" class="h-diag-file-input">
                 </div>
                 <div>
                     <label style="font-size:0.75rem;font-weight:600;color:#334155;">Tachometer RPM (Hall)</label>
-                    <input type="number" id="man_rpm" value="850" class="h-diag-file-input">
+                    <input type="number" id="man_rpm" value="" placeholder="e.g. 850" class="h-diag-file-input">
                 </div>
                 <div>
                     <label style="font-size:0.75rem;font-weight:600;color:#334155;">DC Bus Voltage (V · INA219)</label>
-                    <input type="number" step="0.1" id="man_volt" value="13.8" class="h-diag-file-input">
+                    <input type="number" step="0.1" id="man_volt" value="" placeholder="e.g. 13.8" class="h-diag-file-input">
                 </div>
                 <div>
                     <label style="font-size:0.75rem;font-weight:600;color:#334155;">Current Draw (mA)</label>
-                    <input type="number" step="10" id="man_curr" value="420" class="h-diag-file-input">
+                    <input type="number" step="10" id="man_curr" value="" placeholder="e.g. 420" class="h-diag-file-input">
                 </div>
             </div>
 
@@ -3216,6 +3243,11 @@
 
             captureState = 'RECORDING_AUDIO';
 
+            // Snapshot live hardware DAQ telemetry (RPM, Temp, Voltage) at recording start
+            if (typeof window.captureLiveTelemetrySnapshot === 'function') {
+                window.captureLiveTelemetrySnapshot(false);
+            }
+
             // UI adjustments
             document.getElementById('btn-start-rec').style.display = 'none';
             document.getElementById('btn-stop-rec').style.display = 'inline-flex';
@@ -3846,16 +3878,16 @@
         }
     };
 
-    // 6. Recording Mode Selection (Idle vs Revving)
+    // 6. Recording Mode Selection (Idle vs Revving target regime)
     window.setRecordingMode = function(mode) {
         document.getElementById('form_recording_mode').value = mode;
         const isIdle = (mode === 'idle');
         const targetRpm = isIdle ? 850 : 2200;
         document.getElementById('btn-mode-idle').classList.toggle('active', isIdle);
         document.getElementById('btn-mode-revving').classList.toggle('active', !isIdle);
-        document.getElementById('gauge-rpm-num').textContent = isIdle ? '850' : '2,200';
-        document.getElementById('gauge-rpm-mode').textContent = isIdle ? 'GPIO D23 · Idling' : 'GPIO D23 · Revving';
-        document.getElementById('probe-rpm-val').textContent = targetRpm + ' RPM';
+        document.getElementById('gauge-rpm-mode').textContent = isIdle ? 'Target: 850 RPM (Idle)' : 'Target: 2,200 RPM (Revving)';
+        const formTargetRpm = document.getElementById('form_target_rpm');
+        if (formTargetRpm) formTargetRpm.value = targetRpm;
     };
 
     // 7. Modals & Sample Uploads
@@ -3955,10 +3987,10 @@
     };
 
     window.saveManualTelemetry = function() {
-        const temp = document.getElementById('man_temp').value;
-        const rpm = document.getElementById('man_rpm').value;
-        const volt = document.getElementById('man_volt').value;
-        const curr = document.getElementById('man_curr').value;
+        const temp = document.getElementById('man_temp')?.value?.trim() || '';
+        const rpm = document.getElementById('man_rpm')?.value?.trim() || '';
+        const volt = document.getElementById('man_volt')?.value?.trim() || '';
+        const curr = document.getElementById('man_curr')?.value?.trim() || '';
 
         document.getElementById('form_temperature_c').value = temp;
         document.getElementById('form_rpm').value = rpm;
@@ -3977,26 +4009,73 @@
         document.getElementById('form_sample_rate_hz').value = document.getElementById('man_sample_rate_hz')?.value || '';
         document.getElementById('form_is_training_sample').value = document.getElementById('man_is_training_sample')?.checked ? '1' : '0';
 
-        document.getElementById('probe-temp-val').textContent = temp + '°C';
-        document.getElementById('probe-rpm-val').textContent = rpm + ' RPM';
-        document.getElementById('probe-volt-val').textContent = volt + ' V';
-        document.getElementById('gauge-voltage-num').textContent = volt;
-        document.getElementById('gauge-rpm-num').textContent = rpm;
-        const gTemp = document.getElementById('gauge-temp-num');
-        if (gTemp) gTemp.textContent = temp + '°C';
-        const gCurr = document.getElementById('gauge-curr-num');
-        if (gCurr) gCurr.textContent = curr + ' mA';
+        if (temp) {
+            document.getElementById('probe-temp-val').textContent = temp + '°C';
+            const gTemp = document.getElementById('gauge-temp-num');
+            if (gTemp) gTemp.textContent = temp + '°C';
+            const wbTemp = document.getElementById('wb-val-temp');
+            if (wbTemp) wbTemp.textContent = temp + '°C';
+        } else {
+            document.getElementById('probe-temp-val').textContent = '--';
+            const wbTemp = document.getElementById('wb-val-temp');
+            if (wbTemp) wbTemp.textContent = '--';
+        }
+
+        if (rpm) {
+            document.getElementById('probe-rpm-val').textContent = rpm + ' RPM';
+            document.getElementById('gauge-rpm-num').textContent = rpm;
+            const wbRpm = document.getElementById('wb-val-rpm');
+            if (wbRpm) wbRpm.textContent = rpm;
+        } else {
+            document.getElementById('probe-rpm-val').textContent = '--';
+            const wbRpm = document.getElementById('wb-val-rpm');
+            if (wbRpm) wbRpm.textContent = '--';
+        }
+
+        if (volt) {
+            document.getElementById('probe-volt-val').textContent = volt + ' V';
+            document.getElementById('gauge-voltage-num').textContent = volt;
+            const wbVolt = document.getElementById('wb-val-volt');
+            if (wbVolt) wbVolt.textContent = volt + 'V';
+        } else {
+            document.getElementById('probe-volt-val').textContent = '--';
+            const wbVolt = document.getElementById('wb-val-volt');
+            if (wbVolt) wbVolt.textContent = '--';
+        }
+
+        if (curr) {
+            const gCurr = document.getElementById('gauge-curr-num');
+            if (gCurr) gCurr.textContent = curr + ' mA';
+        }
+
+        const tag = document.getElementById('wb-status-tag');
+        const btnClear = document.getElementById('btn-clear-hardware');
+        if (temp || rpm || volt) {
+            if (tag) {
+                tag.textContent = 'MANUAL SET';
+                tag.style.background = 'rgba(56,189,248,0.15)';
+                tag.style.color = '#38bdf8';
+            }
+            if (btnClear) btnClear.style.display = 'inline-flex';
+        } else {
+            if (tag) {
+                tag.textContent = 'NOT CAPTURED (OPTIONAL)';
+                tag.style.background = 'rgba(100,116,139,0.18)';
+                tag.style.color = '#94a3b8';
+            }
+            if (btnClear) btnClear.style.display = 'none';
+        }
+
         const tickAux = document.getElementById('tick-aux');
         if (tickAux) {
-            tickAux.classList.add('active');
-            tickAux.classList.add('completed');
+            if (temp || rpm || volt) {
+                tickAux.classList.add('completed');
+            } else {
+                tickAux.classList.remove('completed');
+            }
         }
 
         closeManualTelemetryDrawer();
-        window.setDiagnosisFlowStep('capture');
-        document.getElementById('hud-progress-label').textContent = 'MANUAL TELEMETRY ATTACHED · READY TO ANALYZE';
-        document.getElementById('hud-progress-pct').textContent = '90%';
-        document.getElementById('btn-submit-session').disabled = false;
     };
 
     // Keep-alive heartbeat to prevent session expiration while in the studio
@@ -4081,10 +4160,41 @@
         }
         advanceStepper();
 
-        // Auxiliary values (DS18B20, Hall RPM, INA219) are only submitted when they come from the
-        // live ESP32 stream or the Manual DAQ drawer; never fabricate defaults (they would defeat the ambient-noise gate).
-        // Perform asynchronous submission with CSRF auto-recovery
+        // Auxiliary hardware metadata (DS18B20 Temp, Hall RPM, INA219 Voltage/Current):
+        // Only attach if genuinely captured from live ESP32 hardware or entered by user.
+        // If not captured, delete them so database stores NULL (no auto-generated fake numbers).
         const formData = new FormData(form);
+        const inpRpm = document.getElementById('form_rpm');
+        const inpTemp = document.getElementById('form_temperature_c');
+        const inpVolt = document.getElementById('form_voltage_v');
+        const inpCurr = document.getElementById('form_current_ma');
+
+        const isValidVal = v => (v !== null && v !== undefined && v !== '' && v !== '--' && !isNaN(parseFloat(v)));
+
+        if (isValidVal(inpRpm?.value)) {
+            formData.set('rpm', inpRpm.value);
+        } else {
+            formData.delete('rpm');
+        }
+
+        if (isValidVal(inpTemp?.value)) {
+            formData.set('temperature_c', inpTemp.value);
+        } else {
+            formData.delete('temperature_c');
+        }
+
+        if (isValidVal(inpVolt?.value)) {
+            formData.set('voltage_v', inpVolt.value);
+        } else {
+            formData.delete('voltage_v');
+        }
+
+        if (isValidVal(inpCurr?.value)) {
+            formData.set('current_ma', inpCurr.value);
+        } else {
+            formData.delete('current_ma');
+        }
+
         const metaCsrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         if (metaCsrf) {
             formData.set('_token', metaCsrf);
@@ -4218,6 +4328,40 @@
     window.resetStudio = function() { window.location.reload(); };
 
     // 10. Live Polling for ESP32 Hardware Status
+    window.clearAuxiliaryTelemetry = function() {
+        window._userSkippedAuxHardware = true;
+        const formTemp = document.getElementById('form_temperature_c');
+        const formRpm = document.getElementById('form_rpm');
+        const formVolt = document.getElementById('form_voltage_v');
+        const formCurr = document.getElementById('form_current_ma');
+
+        if (formTemp) formTemp.value = '';
+        if (formRpm) { formRpm.value = ''; delete formRpm.dataset.liveLocked; }
+        if (formVolt) formVolt.value = '';
+        if (formCurr) formCurr.value = '';
+
+        const wbRpm = document.getElementById('wb-val-rpm');
+        if (wbRpm) wbRpm.textContent = '--';
+        const wbTemp = document.getElementById('wb-val-temp');
+        if (wbTemp) wbTemp.textContent = '--';
+        const wbVolt = document.getElementById('wb-val-volt');
+        if (wbVolt) wbVolt.textContent = '--';
+
+        const tag = document.getElementById('wb-status-tag');
+        if (tag) {
+            tag.textContent = 'NOT CAPTURED (OPTIONAL)';
+            tag.style.background = 'rgba(100,116,139,0.18)';
+            tag.style.color = '#94a3b8';
+            tag.style.borderColor = 'rgba(100,116,139,0.3)';
+        }
+
+        const btnClear = document.getElementById('btn-clear-hardware');
+        if (btnClear) btnClear.style.display = 'none';
+
+        const tickAux = document.getElementById('tick-aux');
+        if (tickAux) tickAux.classList.remove('completed');
+    };
+
     function checkLiveDaq() {
         const sel = document.getElementById('vehicle-switcher');
         const vid = (sel && sel.value) ? sel.value : '{{ $selectedVehicle?->id ?? '' }}';
@@ -4226,34 +4370,73 @@
             .then(res => res.json())
             .then(data => {
                 if (data.online) {
-                    document.getElementById('daq-live-dot').style.background = '#22c55e';
-                    document.getElementById('daq-status-text').textContent = 'ESP32 STREAMING';
-                    document.getElementById('daq-status-pill').style.background = '#f0fdf4';
-                    document.getElementById('sensor-bus-badge').textContent = 'HARDWARE NODE CONNECTED';
-                    if (data.temperature_c !== null && data.temperature_c !== undefined) {
-                        document.getElementById('probe-temp-val').textContent = data.temperature_c + '°C';
-                        const gTemp = document.getElementById('gauge-temp-num');
-                        if (gTemp) gTemp.textContent = data.temperature_c + '°C';
-                        document.getElementById('form_temperature_c').value = data.temperature_c;
+                    const dot = document.getElementById('daq-live-dot');
+                    if (dot) dot.style.background = '#22c55e';
+                    const stTxt = document.getElementById('daq-status-text');
+                    if (stTxt) stTxt.textContent = 'ESP32 STREAMING';
+                    const stPill = document.getElementById('daq-status-pill');
+                    if (stPill) stPill.style.background = '#f0fdf4';
+                    const busBdg = document.getElementById('sensor-bus-badge');
+                    if (busBdg) busBdg.textContent = 'HARDWARE NODE CONNECTED';
+
+                    // Update gauges and workbench only if user hasn't chosen to skip
+                    if (!window._userSkippedAuxHardware) {
+                        if (data.temperature_c !== null && data.temperature_c !== undefined) {
+                            const tempStr = Number(data.temperature_c).toFixed(1) + '°C';
+                            const pT = document.getElementById('probe-temp-val');
+                            if (pT) pT.textContent = tempStr;
+                            const gTemp = document.getElementById('gauge-temp-num');
+                            if (gTemp) gTemp.textContent = tempStr;
+                            const wbTemp = document.getElementById('wb-val-temp');
+                            if (wbTemp) wbTemp.textContent = tempStr;
+                            document.getElementById('form_temperature_c').value = data.temperature_c;
+                        }
+                        if (data.rpm !== null && data.rpm !== undefined) {
+                            const pR = document.getElementById('probe-rpm-val');
+                            if (pR) pR.textContent = data.rpm + ' RPM';
+                            const gR = document.getElementById('gauge-rpm-num');
+                            if (gR) gR.textContent = data.rpm;
+                            const wbRpm = document.getElementById('wb-val-rpm');
+                            if (wbRpm) wbRpm.textContent = data.rpm;
+                            const formRpm = document.getElementById('form_rpm');
+                            if (formRpm) {
+                                formRpm.value = data.rpm;
+                                formRpm.dataset.liveLocked = 'true';
+                            }
+                        }
+                        if (data.voltage_v !== null && data.voltage_v !== undefined) {
+                            const voltStr = Number(data.voltage_v).toFixed(2) + 'V';
+                            const pV = document.getElementById('probe-volt-val');
+                            if (pV) pV.textContent = voltStr;
+                            const gV = document.getElementById('gauge-voltage-num');
+                            if (gV) gV.textContent = Number(data.voltage_v).toFixed(2);
+                            const wbVolt = document.getElementById('wb-val-volt');
+                            if (wbVolt) wbVolt.textContent = voltStr;
+                            document.getElementById('form_voltage_v').value = data.voltage_v;
+                        }
+                        if (data.current_ma !== null && data.current_ma !== undefined) {
+                            const gCurr = document.getElementById('gauge-curr-num');
+                            if (gCurr) gCurr.textContent = Math.round(data.current_ma) + ' mA';
+                            document.getElementById('form_current_ma').value = data.current_ma;
+                        }
+
+                        const tag = document.getElementById('wb-status-tag');
+                        if (tag && (data.temperature_c !== null || data.rpm > 0 || data.voltage_v !== null)) {
+                            tag.textContent = '🟢 ESP32 LIVE';
+                            tag.style.background = 'rgba(16,185,129,0.15)';
+                            tag.style.color = '#34d399';
+                            tag.style.borderColor = 'rgba(16,185,129,0.3)';
+                            const btnClear = document.getElementById('btn-clear-hardware');
+                            if (btnClear) btnClear.style.display = 'inline-flex';
+                            const tickAux = document.getElementById('tick-aux');
+                            if (tickAux) tickAux.classList.add('completed');
+                        }
                     }
-                    if (data.rpm !== null && data.rpm !== undefined) {
-                        document.getElementById('probe-rpm-val').textContent = data.rpm + ' RPM';
-                        document.getElementById('gauge-rpm-num').textContent = data.rpm;
-                        document.getElementById('form_rpm').value = data.rpm;
-                    }
-                    if (data.voltage_v !== null && data.voltage_v !== undefined) {
-                        document.getElementById('probe-volt-val').textContent = data.voltage_v + ' V';
-                        document.getElementById('gauge-voltage-num').textContent = data.voltage_v;
-                        document.getElementById('form_voltage_v').value = data.voltage_v;
-                    }
-                    if (data.current_ma !== null && data.current_ma !== undefined) {
-                        const gCurr = document.getElementById('gauge-curr-num');
-                        if (gCurr) gCurr.textContent = data.current_ma + ' mA';
-                        document.getElementById('form_current_ma').value = data.current_ma;
-                    }
+
                     if (data.peak_g !== null && data.peak_g !== undefined) {
                         const fmtG = Number(data.peak_g).toFixed(3);
-                        document.getElementById('dark-peak-val').innerHTML = `${fmtG} <span style="font-size:1rem;color:#94a3b8;">g</span>`;
+                        const darkPeak = document.getElementById('dark-peak-val');
+                        if (darkPeak) darkPeak.innerHTML = `${fmtG} <span style="font-size:1rem;color:#94a3b8;">g</span>`;
                         const pVib = document.getElementById('probe-vib-val');
                         if (pVib) pVib.textContent = fmtG + ' g';
                     }
@@ -4261,6 +4444,71 @@
             })
             .catch(() => {});
     }
+
+    window.captureLiveTelemetrySnapshot = async function(interactive = false) {
+        const sel = document.getElementById('vehicle-switcher');
+        const vid = (sel && sel.value) ? sel.value : '{{ $selectedVehicle?->id ?? '' }}';
+        if (!vid) return false;
+
+        window._userSkippedAuxHardware = false;
+
+        try {
+            const res = await fetch('/api/v1/telemetry/latest?vehicle_id=' + encodeURIComponent(vid), { cache: 'no-store' });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.online) {
+                    let capturedCount = 0;
+                    if (data.temperature_c !== null && data.temperature_c !== undefined) {
+                        const tempStr = Number(data.temperature_c).toFixed(1) + '°C';
+                        document.getElementById('wb-val-temp').textContent = tempStr;
+                        document.getElementById('probe-temp-val').textContent = tempStr;
+                        document.getElementById('form_temperature_c').value = data.temperature_c;
+                        capturedCount++;
+                    }
+                    if (data.rpm !== null && data.rpm !== undefined) {
+                        document.getElementById('wb-val-rpm').textContent = data.rpm;
+                        document.getElementById('probe-rpm-val').textContent = data.rpm + ' RPM';
+                        document.getElementById('form_rpm').value = data.rpm;
+                        capturedCount++;
+                    }
+                    if (data.voltage_v !== null && data.voltage_v !== undefined) {
+                        const voltStr = Number(data.voltage_v).toFixed(2) + 'V';
+                        document.getElementById('wb-val-volt').textContent = voltStr;
+                        document.getElementById('probe-volt-val').textContent = voltStr;
+                        document.getElementById('form_voltage_v').value = data.voltage_v;
+                        capturedCount++;
+                    }
+                    if (data.current_ma !== null && data.current_ma !== undefined) {
+                        document.getElementById('form_current_ma').value = data.current_ma;
+                    }
+
+                    const tag = document.getElementById('wb-status-tag');
+                    if (tag) {
+                        tag.textContent = '🟢 ESP32 LIVE';
+                        tag.style.background = 'rgba(16,185,129,0.15)';
+                        tag.style.color = '#34d399';
+                        tag.style.borderColor = 'rgba(16,185,129,0.3)';
+                    }
+
+                    const btnClear = document.getElementById('btn-clear-hardware');
+                    if (btnClear) btnClear.style.display = 'inline-flex';
+
+                    const tickAux = document.getElementById('tick-aux');
+                    if (tickAux) tickAux.classList.add('completed');
+
+                    if (interactive) {
+                        alert('✓ Captured Live Hardware DAQ from ESP32:\n• Engine Speed: ' + (data.rpm ?? '--') + ' RPM\n• Coolant Temp: ' + (data.temperature_c !== null ? (data.temperature_c + '°C') : 'Unplugged') + '\n• DC Bus Voltage: ' + (data.voltage_v !== null ? (data.voltage_v + 'V') : 'Unplugged') + '\n\n(Contextual metadata captured with diagnosis; excluded from ML feature vector).');
+                    }
+                    return true;
+                }
+            }
+        } catch (_) {}
+
+        if (interactive) {
+            alert('ℹ️ ESP32 Hardware DAQ is currently offline or in standby.\n\nAuxiliary sensors (RPM, Coolant Temp, Voltage) remain uncaptured (null).\n\nYou can proceed with your acoustic/vibration diagnosis without them (they are optional), or connect your ESP32 node.');
+        }
+        return false;
+    };
     setInterval(checkLiveDaq, 3000);
     checkLiveDaq();
 

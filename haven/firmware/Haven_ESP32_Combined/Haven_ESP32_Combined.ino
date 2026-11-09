@@ -655,6 +655,25 @@ void enterLoggerMode() {
     validReads,
     kCalibSamples
   );
+
+  // Auxiliary 3-component telemetry snapshot (DS18B20 Temp, Hall RPM, INA219 Voltage/Current)
+  float auxTemp = NAN;
+  if (tempSensor.getDeviceCount() > 0) {
+    tempSensor.requestTemperatures();
+    auxTemp = tempSensor.getTempCByIndex(0);
+  }
+  float auxVolt = inaReady ? ina219.getBusVoltage_V() : NAN;
+  float auxMA   = inaReady ? ina219.getCurrent_mA() : NAN;
+  float auxRpm  = rpm;
+
+  Serial.printf(
+    "# HAVEN_AUX_TELEMETRY TEMP_C=%s RPM=%.0f VOLTAGE_V=%s CURRENT_MA=%s\n",
+    (!isnan(auxTemp) && auxTemp > -50 && auxTemp < 130) ? String(auxTemp, 1).c_str() : "NULL",
+    auxRpm,
+    (!isnan(auxVolt) && auxVolt >= 0) ? String(auxVolt, 2).c_str() : "NULL",
+    (!isnan(auxMA)) ? String(auxMA, 1).c_str() : "NULL"
+  );
+
   Serial.println("t_us,ax,ay,az");
 
   nextLoggerSampleUs = esp_timer_get_time();

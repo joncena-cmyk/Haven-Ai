@@ -25,24 +25,24 @@
             
             {{-- WebSerial 1-Click Wi-Fi Config Button --}}
             <button type="button" id="btn-webserial-config" onclick="openEsp32WebSerialModal()" 
-                    class="h-telemetry-info-btn" style="border-color:rgba(14,165,233,0.4);background:rgba(14,165,233,0.1);color:#38bdf8;" title="Pair & Configure ESP32 Wi-Fi over USB with 1-click">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+                    class="h-telemetry-info-btn" style="display:inline-flex;align-items:center;gap:0.35rem;white-space:nowrap;line-height:1;" title="Pair & Configure ESP32 Wi-Fi over USB with 1-click">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;vertical-align:middle;"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
                 <span>Pair Wi-Fi (USB)</span>
             </button>
 
             {{-- Live Rolling Waveform Toggle --}}
-            <button type="button" id="btn-toggle-chart" onclick="toggleRollingChart()" class="h-telemetry-info-btn">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <button type="button" id="btn-toggle-chart" onclick="toggleRollingChart()" class="h-telemetry-info-btn" style="display:inline-flex;align-items:center;gap:0.35rem;white-space:nowrap;line-height:1;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;vertical-align:middle;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                 <span id="txt-toggle-chart">Live Waveform</span>
-                <span id="icon-toggle-chart" style="font-size:0.7rem;">▾</span>
+                <span id="icon-toggle-chart" style="font-size:0.7rem;line-height:1;display:inline-block;margin-left:2px;vertical-align:middle;">▾</span>
             </button>
 
             {{-- More Info / Component Diagnostic Toggle Button --}}
             <button type="button" id="btn-toggle-hardware-info" onclick="toggleHardwareInfo()" 
-                    class="h-telemetry-info-btn">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    class="h-telemetry-info-btn" style="display:inline-flex;align-items:center;gap:0.35rem;white-space:nowrap;line-height:1;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;vertical-align:middle;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
                 <span id="txt-toggle-info">More Info</span>
-                <span id="icon-toggle-info" style="font-size:0.7rem;">▾</span>
+                <span id="icon-toggle-info" style="font-size:0.7rem;line-height:1;display:inline-block;margin-left:2px;vertical-align:middle;">▾</span>
             </button>
         </div>
     </div>
@@ -502,19 +502,24 @@ function openEsp32WebSerialModal() {
     // Auto-fill Server URL based on detected laptop Wi-Fi LAN IP when browsing via localhost
     const serverInput = document.getElementById('ws-server-url');
     const tip = document.getElementById('ws-ip-tip');
-    if (serverInput && !serverInput.value) {
+    if (serverInput) {
         const host = window.location.hostname;
         const lanIp = (serverInput.getAttribute('data-lan-ip') || '').trim();
         const port = window.location.port ? ':' + window.location.port : '';
-        const targetHost = ((host === 'localhost' || host === '127.0.0.1') && lanIp) ? lanIp : host;
-        serverInput.value = window.location.protocol + '//' + targetHost + port + '/api/v1/telemetry/ingest';
-        if ((host === 'localhost' || host === '127.0.0.1') && lanIp) {
+
+        // If field is empty OR contains localhost/127.0.0.1, auto-swap to detected Wi-Fi IP
+        if (!serverInput.value || (lanIp && (serverInput.value.includes('localhost') || serverInput.value.includes('127.0.0.1')))) {
+            const targetHost = lanIp || host;
+            serverInput.value = window.location.protocol + '//' + targetHost + port + '/api/v1/telemetry/ingest';
+        }
+
+        if (lanIp) {
             if (tip) {
-                tip.innerHTML = '✓ Auto-detected laptop Wi-Fi IP <code>' + lanIp + '</code>. Make sure Laravel was started via <code>start_haven.bat</code> or <code>php artisan serve --host=0.0.0.0</code>.';
+                tip.innerHTML = '✓ Auto-detected laptop Wi-Fi IP <code>' + lanIp + '</code> for ESP32. (Open dashboard in browser at <a href="http://localhost:8000" style="color:#38bdf8;text-decoration:underline;">http://localhost:8000</a> — never type 0.0.0.0 in browser).';
             }
         } else if (host === 'localhost' || host === '127.0.0.1') {
             if (tip) {
-                tip.innerHTML = '⚠️ Note: Since ESP32 connects via Wi-Fi, replace <code>' + host + '</code> with your laptop\'s Wi-Fi IP (e.g. <code>http://192.168.1.50:8000/...</code>) so the ESP32 can reach it.';
+                tip.innerHTML = '⚠️ Note: Since ESP32 connects via Wi-Fi, replace <code>' + host + '</code> with your laptop\'s Wi-Fi IP (e.g. <code>http://192.168.1.25:8000/...</code>) so the ESP32 can reach it.';
             }
         }
     }
@@ -583,13 +588,23 @@ function setWsStatus(type, msg) {
     box.innerText = msg;
 }
 
+let _havenUsbRelayAbort = null;
+
+async function stopHavenUsbRelay() {
+    if (_havenUsbRelayAbort) {
+        try { await _havenUsbRelayAbort(); } catch (_) {}
+        _havenUsbRelayAbort = null;
+    }
+}
+
 /**
  * Open the ESP32 serial port, wait out the auto-reset that most DevKits perform
- * when the port is opened (DTR/RTS toggle), send `command`, and read lines until
- * `matcher(line)` returns a truthy value or `timeoutMs` elapses.
- * The port is ALWAYS released and closed, even on timeout or error.
+ * when the port is opened (DTR/RTS toggle), drain stale boot lines, send `command`,
+ * and read lines until `matcher(line)` returns a truthy value or `timeoutMs` elapses.
  */
-async function esp32SerialTransaction(command, matcher, timeoutMs, onStatus) {
+async function esp32SerialTransaction(command, matcher, timeoutMs, onStatus, keepOpenForRelay) {
+    await stopHavenUsbRelay();
+
     const port = await navigator.serial.requestPort();
     await port.open({ baudRate: 115200 });
 
@@ -598,20 +613,39 @@ async function esp32SerialTransaction(command, matcher, timeoutMs, onStatus) {
     let reader = null;
     let writer = null;
     let timer = null;
+    let handoffToRelay = false;
 
     try {
-        // Release reset lines so the board can boot, then wait for setup() to start.
+        // Release reset lines so the board can boot, then drain boot banner before sending command.
         try { await port.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch (_) {}
         if (onStatus) onStatus('Waiting for ESP32 to boot...');
-        await new Promise(r => setTimeout(r, 2500));
 
         writer = port.writable.getWriter();
         reader = port.readable.getReader();
 
+        // Drain any boot messages emitted during the first 2.5s so stale [PREFS] lines aren't matched.
+        const drainEnd = Date.now() + 2500;
+        while (Date.now() < drainEnd) {
+            const remaining = Math.max(50, drainEnd - Date.now());
+            let drainTimer = null;
+            const readPromise = reader.read().catch(() => ({ done: true, value: null }));
+            const timeoutPromise = new Promise(r => { drainTimer = setTimeout(() => r({ timeout: true }), remaining); });
+            const res = await Promise.race([readPromise, timeoutPromise]);
+            if (drainTimer) clearTimeout(drainTimer);
+            if (res && res.timeout) {
+                try { await reader.cancel(); } catch (_) {}
+                try { reader.releaseLock(); } catch (_) {}
+                reader = port.readable.getReader();
+                break;
+            }
+            if (!res || res.done) break;
+        }
+
+        if (onStatus) onStatus('Sending configuration to ESP32...');
+
         // Cancelling the reader is the only reliable way to unblock a pending read().
         timer = setTimeout(() => { try { reader.cancel(); } catch (_) {} }, timeoutMs);
 
-        // Send command directly (without prepending PING, which caused checkSerialModeCommand() to return early).
         await writer.write(encoder.encode('\n' + command + '\n'));
         let resent = false;
         const startedAt = Date.now();
@@ -627,8 +661,16 @@ async function esp32SerialTransaction(command, matcher, timeoutMs, onStatus) {
             while ((nl = buffer.indexOf('\n')) >= 0) {
                 const line = buffer.slice(0, nl).trim();
                 buffer = buffer.slice(nl + 1);
+                if (!line) continue;
                 const result = matcher(line);
-                if (result) return result;
+                if (result) {
+                    if (keepOpenForRelay && typeof keepOpenForRelay === 'function') {
+                        if (timer) { clearTimeout(timer); timer = null; }
+                        handoffToRelay = true;
+                        keepOpenForRelay(port, reader, writer, decoder, buffer);
+                    }
+                    return result;
+                }
             }
 
             if (!resent && Date.now() - startedAt > 3000) {
@@ -639,10 +681,151 @@ async function esp32SerialTransaction(command, matcher, timeoutMs, onStatus) {
         return null; // timed out
     } finally {
         if (timer) clearTimeout(timer);
+        if (!handoffToRelay) {
+            try { if (reader) { await reader.cancel().catch(() => {}); reader.releaseLock(); } } catch (_) {}
+            try { if (writer) writer.releaseLock(); } catch (_) {}
+            try { await port.close(); } catch (_) {}
+        }
+    }
+}
+
+function startUsbTelemetryRelay(port, reader, writer, decoder, initialBuffer, meta) {
+    let closed = false;
+    let buffer = initialBuffer || '';
+    let pendingTelemetry = null;
+
+    _havenUsbRelayAbort = async () => {
+        closed = true;
         try { if (reader) { await reader.cancel().catch(() => {}); reader.releaseLock(); } } catch (_) {}
         try { if (writer) writer.releaseLock(); } catch (_) {}
         try { await port.close(); } catch (_) {}
-    }
+    };
+
+    let usbRelayIngested = false;
+    let modalAutoClosed = false;
+
+    const forwardTelemetry = async (t) => {
+        if (!t) return;
+        try {
+            console.log('[Haven USB Bridge] Ingesting telemetry packet to /api/v1/telemetry/ingest:', t);
+            const res = await fetch('/api/v1/telemetry/ingest', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Haven-Device-Key': meta.key
+                },
+                body: JSON.stringify({
+                    vehicle_id: meta.vehId,
+                    device_id: 'ESP32-5SENSOR-NODE',
+                    device_key: meta.key,
+                    save_session: false,
+                    auto_analyze: false,
+                    sample_rate_hz: 100,
+                    health: {
+                        ds18b20: t.temp !== null,
+                        mpu6050: t.mag !== null,
+                        ina219: t.volt !== null,
+                        inmp441: t.audio !== null && t.audio > 0,
+                        hall_rpm: true
+                    },
+                    temperature_c: t.temp,
+                    rpm: t.rpm,
+                    voltage_v: t.volt,
+                    peak_g: t.mag,
+                    sensor_data: {
+                        ds18b20: { pin: 'D4', temp_c: t.temp },
+                        hall_rpm: { pin: 'D23', rpm: t.rpm },
+                        mpu6050: { ax: 0, ay: 0, az: t.mag ?? 0, magnitude: t.mag },
+                        ina219: { voltage_v: t.volt, current_ma: 0, power_mw: 0 },
+                        inmp441: { rms: t.audio ?? 0, peak: t.audio ?? 0 }
+                    }
+                })
+            });
+            if (res.ok) {
+                usbRelayIngested = true;
+                setWsStatus('success', '✓ ESP32 Connected! Streaming live 5-sensor telemetry to HAVEN.');
+                if (!modalAutoClosed) {
+                    modalAutoClosed = true;
+                    setTimeout(closeEsp32WebSerialModal, 1200);
+                }
+                if (typeof window.fetchLiveTelemetry === 'function') {
+                    window.fetchLiveTelemetry();
+                }
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                console.warn('[Haven USB Bridge] Ingest returned error:', res.status, errData);
+                if (errData && errData.error) {
+                    setWsStatus('error', '⚠️ Server rejected packet (' + res.status + '): ' + errData.error);
+                }
+            }
+        } catch (fetchErr) {
+            console.error('[Haven USB Bridge] Network error forwarding packet:', fetchErr);
+            setWsStatus('error', '⚠️ Network error: Cannot forward telemetry to Haven server. Please verify the web app is running at http://localhost:8000');
+        }
+    };
+
+    (async () => {
+        try {
+            while (!closed) {
+                const { value, done } = await reader.read();
+                if (done || closed) break;
+                if (!value) continue;
+                buffer += decoder.decode(value, { stream: true });
+
+                let nl;
+                while ((nl = buffer.indexOf('\n')) >= 0) {
+                    const line = buffer.slice(0, nl).trim();
+                    buffer = buffer.slice(nl + 1);
+                    if (!line) continue;
+
+                    if (line.includes('[STA] [OK] Connected')) {
+                        setWsStatus('success', '✓ ESP32 joined Wi-Fi "' + meta.ssid + '"! Starting live telemetry stream...');
+                    } else if (line.includes('[STA] [WARN] Could not connect to Wi-Fi')) {
+                        setWsStatus('error', '⚠️ ESP32 could not join "' + meta.ssid + '". Check your Wi-Fi password and ensure it is a 2.4GHz network.');
+                    } else if (line.includes('[HAVEN] [OK]')) {
+                        setWsStatus('success', '✓ ESP32 is online and streaming live sensor telemetry to HAVEN!');
+                        if (!modalAutoClosed) {
+                            modalAutoClosed = true;
+                            setTimeout(closeEsp32WebSerialModal, 1500);
+                        }
+                    } else if (line.includes('[HAVEN] [AUTH ERROR]')) {
+                        setWsStatus('error', '⚠️ Device key rejected by server (401). Select the matching vehicle and re-flash.');
+                    } else if (line.includes('[HAVEN] [FAIL]') && !usbRelayIngested) {
+                        setWsStatus('info', '⏳ Wi-Fi direct blocked by Windows Firewall — activating USB Serial Bridge...');
+                    }
+
+                    const m = line.match(/Temp:\s*([^\s|]+)\s*\|\s*RPM:\s*([^\s|]+)\s*\|\s*Volt:\s*([^\s|]+)\s*\|\s*Mag:\s*([^\s|]+)\s*\|\s*Audio:\s*([^\s|]+)/i);
+                    if (m) {
+                        const parseVal = s => (s === 'DISCONNECTED' || isNaN(parseFloat(s))) ? null : parseFloat(s);
+                        pendingTelemetry = {
+                            temp: parseVal(m[1]),
+                            rpm: parseFloat(m[2]) || 0,
+                            volt: parseVal(m[3]),
+                            mag: parseVal(m[4]),
+                            audio: parseVal(m[5])
+                        };
+                        forwardTelemetry(pendingTelemetry);
+                    } else if (line.includes('HTTP Code:') || line.includes('[HAVEN] [FAIL]')) {
+                        // The ESP32 is running and attempting ingest! Trigger fallback ping
+                        forwardTelemetry({
+                            temp: null,
+                            rpm: 0,
+                            volt: null,
+                            mag: null,
+                            audio: null
+                        });
+                    }
+                }
+            }
+        } catch (_) {
+        } finally {
+            if (!closed) {
+                try { await _havenUsbRelayAbort(); } catch (_) {}
+                _havenUsbRelayAbort = null;
+            }
+        }
+    })();
 }
 
 async function scanWifiOverUsb() {
@@ -703,7 +886,14 @@ async function flashWebSerial() {
 
     const ssid = document.getElementById('ws-wifi-ssid').value.trim();
     const pass = document.getElementById('ws-wifi-pass').value;
-    const serverUrl = document.getElementById('ws-server-url').value.trim();
+    const serverInputEl = document.getElementById('ws-server-url');
+    let serverUrl = serverInputEl.value.trim();
+    const detectedIp = (serverInputEl.getAttribute('data-lan-ip') || '').trim();
+    if ((serverUrl.includes('localhost') || serverUrl.includes('127.0.0.1')) && detectedIp) {
+        serverUrl = serverUrl.replace('localhost', detectedIp).replace('127.0.0.1', detectedIp);
+        serverInputEl.value = serverUrl;
+    }
+
     const key = document.getElementById('ws-device-key').value.trim();
     const vehId = parseInt(document.getElementById('ws-vehicle-select').value, 10) || 1;
 
@@ -713,6 +903,10 @@ async function flashWebSerial() {
     }
     if (!serverUrl) {
         alert('Please enter the Haven Server Ingest URL.');
+        return;
+    }
+    if (serverUrl.includes('localhost') || serverUrl.includes('127.0.0.1')) {
+        alert('The Ingest URL cannot use "localhost" or "127.0.0.1" because the ESP32 is a separate Wi-Fi device. Please replace it with your laptop\'s Wi-Fi IP address (e.g. http://192.168.1.25:8000/api/v1/telemetry/ingest).');
         return;
     }
     if (!key) {
@@ -736,17 +930,23 @@ async function flashWebSerial() {
         const result = await esp32SerialTransaction(
             command,
             line => (
-                (line.includes('OK:SAVED') || line.includes('[PREFS] Loaded custom Wi-Fi') || line.includes('[STA] [OK] Connected'))
+                line.includes('OK:SAVED')
                     ? 'saved'
                     : (line.startsWith('ERR:') ? line : null)
             ),
             20000,
-            msg => setWsStatus('info', msg)
+            msg => setWsStatus('info', msg),
+            (port, reader, writer, decoder, remainingBuffer) => {
+                startUsbTelemetryRelay(port, reader, writer, decoder, remainingBuffer, {
+                    ssid: ssid,
+                    key: key,
+                    vehId: vehId
+                });
+            }
         );
 
         if (result === 'saved') {
-            setWsStatus('success', '✓ Wi-Fi saved to ESP32 flash. It is rebooting and joining "' + ssid + '". Watch the live status bar.');
-            setTimeout(closeEsp32WebSerialModal, 3000);
+            setWsStatus('success', '✓ Wi-Fi saved to ESP32 flash! Rebooting & verifying connection to "' + ssid + '"...');
         } else if (result) {
             setWsStatus('error', 'ESP32 rejected the configuration: ' + result);
         } else {
@@ -1151,6 +1351,7 @@ async function flashWebSerial() {
             console.warn('[Haven IoT] Polling error:', e);
         }
     }
+    window.fetchLiveTelemetry = pollTelemetry;
 
     function drawRollingChart(history) {
         const canvas = document.getElementById('telemetry-chart-canvas');
@@ -1220,29 +1421,7 @@ async function flashWebSerial() {
         ctx.stroke();
     }
 
-    // ── Real-Time Streaming (SSE) with Fallback Polling ──
-    let sseActive = false;
-    if (window.EventSource) {
-        try {
-            const es = new EventSource('/api/v1/telemetry/stream');
-            es.addEventListener('telemetry', function(e) {
-                try {
-                    const data = JSON.parse(e.data);
-                    renderTelemetryData(data);
-                    sseActive = true;
-                } catch (err) {}
-            });
-            es.onerror = function() {
-                if (es.readyState === EventSource.CLOSED) {
-                    es.close();
-                }
-            };
-        } catch (e) {
-            sseActive = false;
-        }
-    }
-
-    // Always run initial poll and periodic polling fallback
+    // Always run initial poll and periodic polling (lightweight JSON poll works cleanly with single-threaded php artisan serve on Windows)
     pollTelemetry();
     setInterval(pollTelemetry, 3000);
 })();

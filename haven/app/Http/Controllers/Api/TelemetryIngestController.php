@@ -264,9 +264,9 @@ class TelemetryIngestController extends Controller
             'timestamp' => now()->toIso8601String(),
         ];
 
-        Cache::put('telemetry:live:'.$vehicle->id, $livePayload, 15);
+        Cache::put('telemetry:live:'.$vehicle->id, $livePayload, 30);
         if ($vehicle->user_id) {
-            Cache::put('telemetry:live:user:'.$vehicle->user_id, $livePayload, 15);
+            Cache::put('telemetry:live:user:'.$vehicle->user_id, $livePayload, 30);
         }
 
         // Rolling 30-packet history buffer for live oscilloscope chart
@@ -437,10 +437,10 @@ class TelemetryIngestController extends Controller
         }
 
         if ($cached) {
-            // Revalidate freshness from stored timestamp: ESP32 sends every 5s; 10s = timeout
+            // Revalidate freshness from stored timestamp: ESP32 sends every 5s (plus up to 5s HTTP timeout); 20s = timeout
             $ts = $cached['timestamp'] ?? null;
             $diffSec = $ts ? abs(now()->diffInSeconds(Carbon::parse($ts))) : 999;
-            $isLive = ($diffSec <= 10);
+            $isLive = ($diffSec <= 20);
 
             $cached['diff_seconds'] = $diffSec;
             $cached['online'] = $isLive;
@@ -515,7 +515,7 @@ class TelemetryIngestController extends Controller
             session()->save();
         }
 
-        return response()->stream(function () use ($user, $vehicle) {
+        return response()->stream(function () use ($user, $vehicle, $vehicleId) {
             // Send initial ping event
             echo ": connected\n\n";
             if (ob_get_level() > 0) {

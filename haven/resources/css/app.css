@@ -155,7 +155,6 @@ body,
 
 /* Light mode card shadow elevations */
 [data-theme="light"] .h-card,
-[data-theme="light"] .h-stat-row,
 [data-theme="light"] .h-action-panel,
 [data-theme="light"] .h-list-card,
 [data-theme="light"] .h-vehicle-card,
@@ -712,6 +711,7 @@ body {
 }
 
 /* New Session CTA button: Integrated Cyan / Blue Tactile Button */
+.haven-nav-cta,
 .haven-navbar .haven-nav-cta {
     display: inline-flex;
     align-items: center;
@@ -728,15 +728,18 @@ body {
     transition: all 0.15s ease;
     white-space: nowrap;
 }
+.haven-nav-cta svg,
 .haven-navbar .haven-nav-cta svg {
     stroke: #ffffff !important;
     stroke-width: 2.4 !important;
     flex-shrink: 0;
 }
+.haven-nav-cta:hover,
 .haven-navbar .haven-nav-cta:hover {
     filter: brightness(1.12);
     box-shadow: 0 4px 12px rgba(2, 132, 199, 0.45) !important;
     transform: translateY(-1px);
+    color: #ffffff !important;
 }
 
 /* Theme toggle */
@@ -1232,13 +1235,24 @@ body {
 /* Stats row */
 .h-stat-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 1rem;
-    background: transparent;
-    border: none;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
     border-radius: 0;
     overflow: visible;
     margin-bottom: 1.5rem;
+}
+@media (max-width: 1023px) {
+    .h-stat-row {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+@media (max-width: 639px) {
+    .h-stat-row {
+        grid-template-columns: 1fr !important;
+    }
 }
 .h-stat-cell {
     background: linear-gradient(180deg, var(--h-surface) 0%, var(--h-surface2) 100%);
@@ -1505,10 +1519,13 @@ body {
 
 .h-telemetry-info-btn {
     font-size: 0.72rem;
-    padding: 0.3rem 0.65rem;
+    font-weight: 600;
+    padding: 0.32rem 0.65rem;
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
+    white-space: nowrap;
+    line-height: 1;
     cursor: pointer;
     background: rgba(56, 189, 248, 0.1) !important;
     border: 1px solid rgba(56, 189, 248, 0.25) !important;
@@ -1517,6 +1534,11 @@ body {
     font-family: inherit;
     transition: all 0.15s ease;
 }
+.h-telemetry-info-btn svg {
+    display: inline-block;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
 .h-telemetry-info-btn:hover {
     background: rgba(56, 189, 248, 0.2) !important;
     border-color: rgba(56, 189, 248, 0.45) !important;
@@ -1524,11 +1546,12 @@ body {
 }
 [data-theme="light"] .h-telemetry-info-btn {
     background: #ffffff !important;
-    border: 1px solid rgba(2, 132, 199, 0.25) !important;
+    border: 1px solid rgba(2, 132, 199, 0.32) !important;
     color: #0284c7 !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 [data-theme="light"] .h-telemetry-info-btn:hover {
-    background: #f0f7ff !important;
+    background: #f0f9ff !important;
     border-color: #0284c7 !important;
     color: #0369a1 !important;
 }
@@ -3953,7 +3976,6 @@ html, body {
     .h-list-card,
     .h-form-card,
     .h-detail-card,
-    .h-stat-row,
     .h-action-panel,
     .h-vehicle-card,
     .haven-vehicle-card,
@@ -4022,7 +4044,6 @@ html, body {
         .h-list-card,
         .h-form-card,
         .h-detail-card,
-        .h-stat-row,
         .h-action-panel,
         .h-vehicle-card,
         .haven-vehicle-card,

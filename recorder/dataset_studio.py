@@ -97,6 +97,9 @@ class RecordingEntry:
     timestamp_label: str
     valid: bool
     errors: List[str]
+    temperature_c: Optional[float] = None
+    voltage_v: Optional[float] = None
+    rpm_measured: Optional[int] = None
 
 
 class DatasetStudioController:
@@ -203,6 +206,11 @@ class DatasetStudioController:
                 tap_ok = bool(tap_info.get("tap_detected", False))
                 ts_label = folder.name
 
+                telem = meta.get("telemetry") if isinstance(meta.get("telemetry"), dict) else {}
+                temp_c = meta.get("temperature_c") if meta.get("temperature_c") is not None else telem.get("temperature_c")
+                volt_v = meta.get("voltage_v") if meta.get("voltage_v") is not None else telem.get("voltage_v")
+                rpm_meas = meta.get("rpm_measured") if meta.get("rpm_measured") is not None else telem.get("rpm_measured")
+
                 if vres.valid and cond in class_counts:
                     class_counts[cond] += 1
                     if veh:
@@ -225,6 +233,9 @@ class DatasetStudioController:
                         timestamp_label=ts_label,
                         valid=vres.valid,
                         errors=list(vres.errors),
+                        temperature_c=float(temp_c) if temp_c is not None else None,
+                        voltage_v=float(volt_v) if volt_v is not None else None,
+                        rpm_measured=int(rpm_meas) if rpm_meas is not None else None,
                     )
                 )
 

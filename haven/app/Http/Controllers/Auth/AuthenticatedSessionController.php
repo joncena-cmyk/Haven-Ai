@@ -44,14 +44,19 @@ class AuthenticatedSessionController extends Controller
 
         AuditLogger::log('auth.login', ['email' => $request->email]);
 
+        $intendedUrl = session()->pull('url.intended', route('dashboard', absolute: false));
+        if (str_contains($intendedUrl, '/api/')) {
+            $intendedUrl = route('dashboard', absolute: false);
+        }
+
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'redirect' => session()->pull('url.intended', route('dashboard', absolute: false)),
+                'redirect' => $intendedUrl,
             ]);
         }
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->to($intendedUrl);
     }
 
     /**

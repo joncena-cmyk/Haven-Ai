@@ -219,7 +219,7 @@
                 </div>
                 <div class="h-ticker-item active">
                     <span class="h-ticker-bullet"></span>
-                    <span class="h-ticker-txt">AUX DAQ: {{ $diagnostic->temperature_c !== null ? number_format($diagnostic->temperature_c, 1) . '°C' : '88.5°C' }} · {{ $diagnostic->rpm !== null ? number_format($diagnostic->rpm) . ' RPM' : '850 RPM' }} · {{ $diagnostic->voltage_v !== null ? number_format($diagnostic->voltage_v, 1) . 'V' : '13.8V' }}</span>
+                    <span class="h-ticker-txt">AUX DAQ: {{ $diagnostic->temperature_c !== null ? number_format($diagnostic->temperature_c, 1) . '°C' : '--' }} · {{ $diagnostic->rpm !== null ? number_format($diagnostic->rpm) . ' RPM' : '--' }} · {{ $diagnostic->voltage_v !== null ? number_format($diagnostic->voltage_v, 1) . 'V' : '--' }}</span>
                 </div>
                 <div class="h-ticker-item {{ $diagnostic->status === 'completed' ? 'active' : '' }}">
                     <span class="h-ticker-bullet"></span>
@@ -357,7 +357,7 @@
                     </div>
                     <div class="h-diag-pin-tooltip">
                         <strong>DS18B20 Thermal Probe</strong>
-                        <span>OneWire D4 · {{ $diagnostic->temperature_c !== null ? number_format($diagnostic->temperature_c, 1) . '°C' : '88.5°C' }} (Non-ML)</span>
+                        <span>OneWire D4 · {{ $diagnostic->temperature_c !== null ? number_format($diagnostic->temperature_c, 1) . '°C' : 'Unrecorded (Optional)' }} (Non-ML)</span>
                     </div>
                 </div>
 
@@ -368,7 +368,7 @@
                     </div>
                     <div class="h-diag-pin-tooltip">
                         <strong>INA219 Power Monitor</strong>
-                        <span>{{ $diagnostic->voltage_v ? number_format($diagnostic->voltage_v, 2) . 'V DC' : '13.8V Nominal' }} · {{ $diagnostic->current_ma ? round($diagnostic->current_ma) . ' mA' : '420 mA' }} (Non-ML)</span>
+                        <span>{{ $diagnostic->voltage_v ? number_format($diagnostic->voltage_v, 2) . 'V DC' : 'Unrecorded (Optional)' }} · {{ $diagnostic->current_ma ? round($diagnostic->current_ma) . ' mA' : '--' }} (Non-ML)</span>
                     </div>
                 </div>
 
@@ -379,7 +379,7 @@
                     </div>
                     <div class="h-diag-pin-tooltip">
                         <strong>Hall Tachometer</strong>
-                        <span>GPIO D23 · {{ $diagnostic->rpm ? number_format($diagnostic->rpm) . ' RPM' : '850 RPM Idle' }} (Non-ML)</span>
+                        <span>GPIO D23 · {{ $diagnostic->rpm ? number_format($diagnostic->rpm) . ' RPM' : 'Unrecorded (Optional)' }} (Non-ML)</span>
                     </div>
                 </div>
             </div>
@@ -433,36 +433,36 @@
                 {{-- Probe 3: Engine Temperature DS18B20 --}}
                 <div class="h-diag-probe-item">
                     <div class="h-diag-probe-pillar">
-                        <div class="h-diag-probe-bar orange" style="height: {{ min(100, max(20, ($diagnostic->temperature_c ?? 88) * 0.9)) }}%;"></div>
+                        <div class="h-diag-probe-bar orange" style="height: {{ $diagnostic->temperature_c !== null ? min(100, max(20, $diagnostic->temperature_c * 0.9)) : 0 }}%;"></div>
                         <div class="h-diag-probe-cap"></div>
                     </div>
                     <div class="h-diag-probe-name">Temp</div>
                     <div class="h-diag-probe-status {{ ($diagnostic->temperature_c ?? 0) >= 105 ? 'warn' : 'good' }}">
-                        {{ $diagnostic->temperature_c ? number_format($diagnostic->temperature_c, 1) . '°C' : '88.5°C' }}
+                        {{ $diagnostic->temperature_c !== null ? number_format($diagnostic->temperature_c, 1) . '°C' : '--' }}
                     </div>
                 </div>
 
                 {{-- Probe 4: Hall Tachometer RPM --}}
                 <div class="h-diag-probe-item">
                     <div class="h-diag-probe-pillar">
-                        <div class="h-diag-probe-bar green" style="height: {{ min(100, max(25, (($diagnostic->rpm ?? 850) / 4000) * 100)) }}%;"></div>
+                        <div class="h-diag-probe-bar green" style="height: {{ $diagnostic->rpm !== null ? min(100, max(25, ($diagnostic->rpm / 4000) * 100)) : 0 }}%;"></div>
                         <div class="h-diag-probe-cap"></div>
                     </div>
                     <div class="h-diag-probe-name">Tach</div>
                     <div class="h-diag-probe-status good">
-                        {{ $diagnostic->rpm ? number_format($diagnostic->rpm) . ' RPM' : '850 RPM' }}
+                        {{ $diagnostic->rpm !== null ? number_format($diagnostic->rpm) . ' RPM' : '--' }}
                     </div>
                 </div>
 
                 {{-- Probe 5: INA219 Bus Voltage --}}
                 <div class="h-diag-probe-item">
                     <div class="h-diag-probe-pillar">
-                        <div class="h-diag-probe-bar blue" style="height: {{ min(100, max(25, (($diagnostic->voltage_v ?? 13.8) / 16) * 100)) }}%;"></div>
+                        <div class="h-diag-probe-bar blue" style="height: {{ $diagnostic->voltage_v !== null ? min(100, max(25, ($diagnostic->voltage_v / 16) * 100)) : 0 }}%;"></div>
                         <div class="h-diag-probe-cap"></div>
                     </div>
                     <div class="h-diag-probe-name">Voltage</div>
                     <div class="h-diag-probe-status good">
-                        {{ $diagnostic->voltage_v ? number_format($diagnostic->voltage_v, 1) . ' V' : '13.8 V' }}
+                        {{ $diagnostic->voltage_v !== null ? number_format($diagnostic->voltage_v, 1) . ' V' : '--' }}
                     </div>
                 </div>
             </div>
@@ -546,11 +546,11 @@
                     <div class="h-gauge-arc-wrap">
                         <svg viewBox="0 0 100 55" class="h-gauge-svg">
                             <path d="M 15 50 A 35 35 0 0 1 85 50" fill="none" stroke="#e2e8f0" stroke-width="6" stroke-linecap="round"/>
-                            <path d="M 15 50 A 35 35 0 0 1 85 50" fill="none" stroke="#0284c7" stroke-width="6" stroke-linecap="round" stroke-dasharray="110" stroke-dashoffset="{{ max(10, 110 - (($diagnostic->voltage_v ?? 13.8) / 15) * 110) }}"/>
+                            <path d="M 15 50 A 35 35 0 0 1 85 50" fill="none" stroke="#0284c7" stroke-width="6" stroke-linecap="round" stroke-dasharray="110" stroke-dashoffset="{{ $diagnostic->voltage_v !== null ? max(10, 110 - ($diagnostic->voltage_v / 15) * 110) : 110 }}"/>
                         </svg>
                         <div class="h-gauge-value-display">
-                            <span class="val">{{ $diagnostic->voltage_v ? number_format($diagnostic->voltage_v, 1) : '13.8' }}</span>
-                            <span class="unit">Volts</span>
+                            <span class="val">{{ $diagnostic->voltage_v !== null ? number_format($diagnostic->voltage_v, 1) : '--' }}</span>
+                            <span class="unit">{{ $diagnostic->voltage_v !== null ? 'Volts' : 'Not Recorded' }}</span>
                         </div>
                     </div>
                 </div>
@@ -567,8 +567,8 @@
                             <circle cx="50" cy="35" r="4" fill="#0284c7"/>
                         </svg>
                         <div class="h-gauge-value-display">
-                            <span class="val">{{ $diagnostic->rpm ? number_format($diagnostic->rpm) : '850' }}</span>
-                            <span class="unit">RPM</span>
+                            <span class="val">{{ $diagnostic->rpm !== null ? number_format($diagnostic->rpm) : '--' }}</span>
+                            <span class="unit">{{ $diagnostic->rpm !== null ? 'RPM' : 'Not Recorded' }}</span>
                         </div>
                     </div>
                 </div>
@@ -576,15 +576,15 @@
 
             <div class="h-diag-card-footer-metrics">
                 <div class="metric">
-                    <span class="m-val" style="color:#ea580c;">{{ $diagnostic->temperature_c ? number_format($diagnostic->temperature_c, 1) . '°C' : '88.5°C' }}</span>
+                    <span class="m-val" style="color:#ea580c;">{{ $diagnostic->temperature_c !== null ? number_format($diagnostic->temperature_c, 1) . '°C' : '--' }}</span>
                     <span class="m-lbl">DS18B20 Temp</span>
                 </div>
                 <div class="metric">
-                    <span class="m-val">{{ $diagnostic->current_ma ? round($diagnostic->current_ma) . ' mA' : '420 mA' }}</span>
+                    <span class="m-val">{{ $diagnostic->current_ma !== null ? round($diagnostic->current_ma) . ' mA' : '--' }}</span>
                     <span class="m-lbl">INA219 Current</span>
                 </div>
                 <div class="metric">
-                    <span class="m-val">{{ ($diagnostic->voltage_v ?? 13.8) >= 13.2 ? 'Charging' : 'Resting' }}</span>
+                    <span class="m-val">{{ $diagnostic->voltage_v !== null ? ($diagnostic->voltage_v >= 13.2 ? 'Charging' : 'Resting') : '--' }}</span>
                     <span class="m-lbl">Alternator</span>
                 </div>
             </div>
