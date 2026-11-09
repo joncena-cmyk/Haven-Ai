@@ -254,6 +254,31 @@
                         <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
                             <feDropShadow dx="0" dy="28" stdDeviation="22" flood-color="#0f172a" flood-opacity="0.14"/>
                         </filter>
+                        {{-- Component-Specific Glow Filters --}}
+                        <filter id="valvetrainTapFilter" x="-30%" y="-30%" width="160%" height="160%">
+                            <feGaussianBlur stdDeviation="3.5" result="blur"/>
+                            <feComponentTransfer in="blur" result="glow">
+                                <feFuncA type="linear" slope="2"/>
+                            </feComponentTransfer>
+                            <feMerge>
+                                <feMergeNode in="glow"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                        <filter id="misfireFlameFilter" x="-30%" y="-30%" width="160%" height="160%">
+                            <feGaussianBlur stdDeviation="4" result="blur"/>
+                            <feMerge>
+                                <feMergeNode in="blur"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                        <filter id="mountOscillationFilter" x="-30%" y="-30%" width="160%" height="160%">
+                            <feGaussianBlur stdDeviation="3" result="blur"/>
+                            <feMerge>
+                                <feMergeNode in="blur"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
                     </defs>
 
                     {{-- Ground Shadow --}}
@@ -269,6 +294,35 @@
                         <path id="hood-holo-zone" class="h-diag-holo-hood"
                               d="M 95 165 C 120 135, 170 110, 230 95 C 270 125, 290 170, 270 215 C 200 230, 130 220, 95 165 Z"
                               fill="url(#hoodGlowGrad)" stroke="#0284c7" stroke-dasharray="3 3" stroke-width="1.5"/>
+
+                        {{-- ── 3D Vehicle Component Overlays (Workbench Diagnostic Inspection) ── --}}
+                        {{-- 1. Valvetrain & Camshaft Zone --}}
+                        <g id="wb-component-valvetrain" class="h-diag-fault-component" onclick="focusPin('audio')" style="cursor:pointer;" title="Valvetrain Camshaft & Lash Tappet Inspection Zone">
+                            <path class="h-diag-component-path"
+                                  d="M 148 132 C 172 118, 208 110, 238 114 L 244 134 C 212 130, 175 138, 146 146 Z"
+                                  fill="rgba(56, 189, 248, 0.18)"
+                                  stroke="#38bdf8"
+                                  stroke-width="1.5"/>
+                            <circle cx="168" cy="132" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap"/>
+                            <circle cx="188" cy="129" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap delay-1"/>
+                            <circle cx="208" cy="126" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap delay-2"/>
+                            <circle cx="228" cy="124" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap delay-3"/>
+                        </g>
+
+                        {{-- 2. Combustion Chamber & Cylinders Zone --}}
+                        <g id="wb-component-combustion" class="h-diag-fault-component" style="cursor:pointer;" title="Engine Block & Cylinder Combustion Chambers">
+                            <rect x="156" y="148" width="16" height="34" rx="2" fill="rgba(148, 163, 184, 0.14)" stroke="#64748b" stroke-width="1"/>
+                            <rect x="178" y="146" width="16" height="34" rx="2" fill="rgba(148, 163, 184, 0.14)" stroke="#64748b" stroke-width="1"/>
+                            <rect x="200" y="144" width="16" height="34" rx="2" fill="rgba(148, 163, 184, 0.14)" stroke="#64748b" stroke-width="1"/>
+                            <rect x="222" y="142" width="16" height="34" rx="2" fill="rgba(148, 163, 184, 0.14)" stroke="#64748b" stroke-width="1"/>
+                        </g>
+
+                        {{-- 3. Powertrain Mounts & Subframe Bushing Zone --}}
+                        <g id="wb-component-mounts" class="h-diag-fault-component" onclick="focusPin('vibration')" style="cursor:pointer;" title="Subframe Engine Mounts & Chassis Dampener Zone">
+                            <path d="M 134 208 Q 192 222 254 204" fill="none" stroke="#64748b" stroke-width="1.5"/>
+                            <ellipse cx="140" cy="208" rx="10" ry="7" fill="rgba(249, 115, 22, 0.2)" stroke="#f97316" stroke-width="1.8"/>
+                            <ellipse cx="250" cy="204" rx="10" ry="7" fill="rgba(249, 115, 22, 0.2)" stroke="#f97316" stroke-width="1.8"/>
+                        </g>
 
                         {{-- Aerodynamic Windshield & Greenhouse Glass --}}
                         <path d="M 235 90 C 310 75, 395 76, 465 102 C 430 140, 390 155, 275 145 C 255 125, 245 105, 235 90 Z"
@@ -1774,6 +1828,35 @@
 .h-diag-pin:hover .h-diag-pin-tooltip {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+}
+
+/* ── 3D Vehicle Component Overlays (Workbench Inspection) ── */
+.h-diag-fault-component {
+    transition: all 0.3s ease;
+}
+.h-diag-fault-component:hover .h-diag-component-path {
+    stroke-width: 2.5px;
+    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
+}
+.h-diag-valvetrain-tap {
+    transition: all 0.2s ease;
+}
+.recording-audio #wb-component-valvetrain .h-diag-valvetrain-tap {
+    animation: liveValvePulse 0.45s infinite alternate ease-in-out;
+}
+.recording-audio #wb-component-valvetrain .h-diag-valvetrain-tap.delay-1 { animation-delay: 0.11s; }
+.recording-audio #wb-component-valvetrain .h-diag-valvetrain-tap.delay-2 { animation-delay: 0.22s; }
+.recording-audio #wb-component-valvetrain .h-diag-valvetrain-tap.delay-3 { animation-delay: 0.33s; }
+@keyframes liveValvePulse {
+    0% { transform: scale(1); opacity: 0.7; }
+    100% { transform: scale(1.6); opacity: 1; fill: #38bdf8; }
+}
+.recording-vib #wb-component-mounts {
+    animation: liveMountVib 0.4s infinite alternate ease-in-out;
+}
+@keyframes liveMountVib {
+    0% { transform: translateX(-2px); }
+    100% { transform: translateX(2px); }
 }
 
 /* ── 3. Sensor Monitoring Panels (The 4 Bottom Cards) ── */
@@ -3296,6 +3379,8 @@
             mediaRecorder.start(100);
 
             captureState = 'RECORDING_AUDIO';
+            const carModel = document.getElementById('car-3d-model');
+            if (carModel) carModel.classList.add('recording-audio');
 
             // Snapshot live hardware DAQ telemetry (RPM, Temp, Voltage) at recording start
             if (typeof window.captureLiveTelemetrySnapshot === 'function') {
@@ -3366,6 +3451,8 @@
         document.getElementById('btn-start-rec').style.display = 'none';
         document.getElementById('btn-stop-rec').style.display = 'none';
         document.getElementById('live-rec-dot').classList.remove('active');
+        const carModel = document.getElementById('car-3d-model');
+        if (carModel) carModel.classList.remove('recording-audio');
     };
 
     function encodeAudioBufferToMonoWav16(audioBuffer) {
@@ -3735,6 +3822,8 @@
     // ─────────────────────────────────────────────
     window.startVibrationRecording = function() {
         captureState = 'RECORDING_VIBRATION';
+        const carModel = document.getElementById('car-3d-model');
+        if (carModel) carModel.classList.add('recording-vib');
         vibrationSamples = [];
         vibSeconds = 0;
 
@@ -3846,11 +3935,15 @@
 
     window.stopVibrationRecording = function() {
         captureState = 'VIBRATION_DONE';
+        const carModel = document.getElementById('car-3d-model');
+        if (carModel) carModel.classList.remove('recording-vib');
         clearInterval(vibInterval);
         clearInterval(recordTimer);
         cancelAnimationFrame(vibAnimFrame);
 
         document.getElementById('live-rec-dot').classList.remove('active');
+        const carModel = document.getElementById('car-3d-model');
+        if (carModel) carModel.classList.remove('recording-audio');
         document.getElementById('btn-stop-vib').style.display = 'none';
         const channels = document.getElementById('canvas-channels-legend');
         if (channels) channels.style.display = 'none';

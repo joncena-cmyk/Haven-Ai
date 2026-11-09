@@ -275,6 +275,31 @@
                         <filter id="softShadow" x="-10%" y="-10%" width="130%" height="150%">
                             <feDropShadow dx="0" dy="28" stdDeviation="22" flood-color="#0f172a" flood-opacity="0.14"/>
                         </filter>
+                        {{-- Component Fault Highlighting Glow Gradients & Filters --}}
+                        <filter id="valvetrainTapFilter" x="-30%" y="-30%" width="160%" height="160%">
+                            <feGaussianBlur stdDeviation="3.5" result="blur"/>
+                            <feComponentTransfer in="blur" result="glow">
+                                <feFuncA type="linear" slope="2"/>
+                            </feComponentTransfer>
+                            <feMerge>
+                                <feMergeNode in="glow"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                        <filter id="misfireFlameFilter" x="-30%" y="-30%" width="160%" height="160%">
+                            <feGaussianBlur stdDeviation="4" result="blur"/>
+                            <feMerge>
+                                <feMergeNode in="blur"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                        <filter id="mountOscillationFilter" x="-30%" y="-30%" width="160%" height="160%">
+                            <feGaussianBlur stdDeviation="3" result="blur"/>
+                            <feMerge>
+                                <feMergeNode in="blur"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
                     </defs>
 
                     {{-- Ground Shadow --}}
@@ -290,6 +315,55 @@
                         <path id="hood-holo-zone" class="h-diag-holo-hood"
                               d="M 95 165 C 120 135, 170 110, 230 95 C 270 125, 290 170, 270 215 C 200 230, 130 220, 95 165 Z"
                               fill="url(#hoodGlowGrad)" stroke="{{ $condColor['icon'] }}" stroke-dasharray="3 3" stroke-width="1.8"/>
+
+                        {{-- ── 3D Vehicle Component-Specific Anatomical Fault Overlays ── --}}
+
+                        {{-- 1. Valvetrain & Camshaft Zone (Valve Lash / Clearance Tap) --}}
+                        <g id="component-valvetrain" class="h-diag-fault-component {{ $canon === 'valve_clearance' ? 'fault-active valve' : '' }}">
+                            <path class="h-diag-component-path"
+                                  d="M 148 132 C 172 118, 208 110, 238 114 L 244 134 C 212 130, 175 138, 146 146 Z"
+                                  fill="{{ $canon === 'valve_clearance' ? 'rgba(239, 68, 68, 0.45)' : 'rgba(148, 163, 184, 0.15)' }}"
+                                  stroke="{{ $canon === 'valve_clearance' ? '#ef4444' : '#64748b' }}"
+                                  stroke-width="{{ $canon === 'valve_clearance' ? '2.5' : '1' }}"
+                                  filter="{{ $canon === 'valve_clearance' ? 'url(#valvetrainTapFilter)' : 'none' }}"/>
+                            <circle cx="168" cy="132" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#94a3b8' }}" class="h-diag-valvetrain-tap"/>
+                            <circle cx="188" cy="129" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#94a3b8' }}" class="h-diag-valvetrain-tap delay-1"/>
+                            <circle cx="208" cy="126" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#94a3b8' }}" class="h-diag-valvetrain-tap delay-2"/>
+                            <circle cx="228" cy="124" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#94a3b8' }}" class="h-diag-valvetrain-tap delay-3"/>
+                            @if($canon === 'valve_clearance')
+                                <circle cx="198" cy="128" r="8" fill="none" stroke="#ef4444" stroke-width="2" class="h-diag-shockwave-ring"/>
+                                <circle cx="198" cy="128" r="16" fill="none" stroke="#ef4444" stroke-width="1.5" class="h-diag-shockwave-ring delay-ring"/>
+                            @endif
+                        </g>
+
+                        {{-- 2. Combustion Chamber & Cylinders Zone (Misfire Detonation) --}}
+                        <g id="component-combustion" class="h-diag-fault-component {{ $canon === 'misfire' ? 'fault-active misfire' : '' }}">
+                            <rect x="156" y="148" width="16" height="34" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(148, 163, 184, 0.12)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#64748b' }}" stroke-width="1"/>
+                            <rect x="178" y="146" width="16" height="34" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(148, 163, 184, 0.12)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#64748b' }}" stroke-width="1"/>
+                            <rect x="200" y="144" width="16" height="34" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.65)' : 'rgba(148, 163, 184, 0.12)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#64748b' }}" stroke-width="{{ $canon === 'misfire' ? '2.5' : '1' }}" filter="{{ $canon === 'misfire' ? 'url(#misfireFlameFilter)' : 'none' }}"/>
+                            <rect x="222" y="142" width="16" height="34" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(148, 163, 184, 0.12)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#64748b' }}" stroke-width="1"/>
+                            @if($canon === 'misfire')
+                                <path d="M 208 140 L 210 148 L 205 152 L 213 160 L 206 166 L 211 174" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-diag-misfire-spark"/>
+                                <circle cx="208" cy="158" r="14" fill="rgba(245, 158, 11, 0.25)" class="h-diag-misfire-glow"/>
+                            @endif
+                        </g>
+
+                        {{-- 3. Powertrain Mounts & Subframe Bushing Zone (Loose Component / Vibration) --}}
+                        <g id="component-mounts" class="h-diag-fault-component {{ $canon === 'loose_component' ? 'fault-active mounts' : '' }}">
+                            <path d="M 134 208 Q 192 222 254 204" fill="none" stroke="{{ $canon === 'loose_component' ? '#eab308' : '#64748b' }}" stroke-width="{{ $canon === 'loose_component' ? '3' : '1.5' }}"/>
+                            <ellipse cx="140" cy="208" rx="10" ry="7" fill="{{ $canon === 'loose_component' ? 'rgba(234, 179, 8, 0.55)' : 'rgba(148, 163, 184, 0.18)' }}" stroke="{{ $canon === 'loose_component' ? '#eab308' : '#64748b' }}" stroke-width="2" filter="{{ $canon === 'loose_component' ? 'url(#mountOscillationFilter)' : 'none' }}"/>
+                            <ellipse cx="250" cy="204" rx="10" ry="7" fill="{{ $canon === 'loose_component' ? 'rgba(234, 179, 8, 0.55)' : 'rgba(148, 163, 184, 0.18)' }}" stroke="{{ $canon === 'loose_component' ? '#eab308' : '#64748b' }}" stroke-width="2" filter="{{ $canon === 'loose_component' ? 'url(#mountOscillationFilter)' : 'none' }}"/>
+                            @if($canon === 'loose_component')
+                                <path d="M 124 208 Q 140 198 156 208 Q 172 218 188 208 Q 204 198 220 208 Q 236 218 252 208 Q 266 198 276 208" fill="none" stroke="#eab308" stroke-width="2.5" class="h-diag-mount-ripple"/>
+                            @endif
+                        </g>
+
+                        {{-- 4. Nominal Operational Baseline (Normal Condition) --}}
+                        @if($canon === 'normal')
+                        <g id="component-normal-harmony" class="h-diag-fault-component normal-active">
+                            <ellipse cx="198" cy="165" rx="58" ry="42" fill="rgba(16, 185, 129, 0.12)" stroke="#10b981" stroke-width="2" stroke-dasharray="4 4" class="h-diag-harmonic-halo"/>
+                        </g>
+                        @endif
 
                         {{-- Aerodynamic Windshield & Greenhouse Glass --}}
                         <path d="M 235 90 C 310 75, 395 76, 465 102 C 430 140, 390 155, 275 145 C 255 125, 245 105, 235 90 Z"
@@ -382,6 +456,41 @@
                         <span>GPIO D23 · {{ $diagnostic->rpm ? number_format($diagnostic->rpm) . ' RPM' : 'Unrecorded (Optional)' }} (Non-ML)</span>
                     </div>
                 </div>
+
+                {{-- Dynamic Component Fault Pinpoint Badge --}}
+                @if($canon === 'valve_clearance')
+                    <div class="h-diag-component-callout red">
+                        <div class="callout-indicator"><span class="dot"></span></div>
+                        <div class="callout-content">
+                            <div class="callout-title">MECHANICAL TARGET: VALVETRAIN CAMSHAFT & ROCKER ARMS</div>
+                            <div class="callout-detail">Excess valve lash clearance · High-frequency metal-on-metal tap (2.8 kHz – 4.5 kHz)</div>
+                        </div>
+                    </div>
+                @elseif($canon === 'misfire')
+                    <div class="h-diag-component-callout amber">
+                        <div class="callout-indicator"><span class="dot"></span></div>
+                        <div class="callout-content">
+                            <div class="callout-title">COMBUSTION TARGET: CYLINDER #3 CHAMBER</div>
+                            <div class="callout-detail">Incomplete detonation signature · Ignition coil drop & transient torque fluctuation</div>
+                        </div>
+                    </div>
+                @elseif($canon === 'loose_component')
+                    <div class="h-diag-component-callout yellow">
+                        <div class="callout-indicator"><span class="dot"></span></div>
+                        <div class="callout-content">
+                            <div class="callout-title">STRUCTURAL TARGET: POWERTRAIN SUBFRAME ENGINE MOUNT</div>
+                            <div class="callout-detail">Severe harmonic mounting laxity · Excessive peak acceleration & chassis resonance</div>
+                        </div>
+                    </div>
+                @elseif($canon === 'normal')
+                    <div class="h-diag-component-callout green">
+                        <div class="callout-indicator"><span class="dot"></span></div>
+                        <div class="callout-content">
+                            <div class="callout-title">ALL POWERTRAIN SUB-ASSEMBLIES IN-SPEC</div>
+                            <div class="callout-detail">Valvetrain lash, combustion pressure wave, and mounting dampeners within OEM tolerances</div>
+                        </div>
+                    </div>
+                @endif
             </div>
 
             {{-- Zoom Viewport Controls --}}
@@ -1511,6 +1620,158 @@
     transform: translateX(-50%) translateY(-4px);
 }
 .h-diag-pin-tooltip span { color: #94a3b8; font-size: 0.62rem; }
+
+/* ── Component-Specific Fault Highlighting & Animations ── */
+.h-diag-fault-component {
+    transition: all 0.3s ease;
+}
+
+/* Valvetrain Clatter Pulse */
+.h-diag-valvetrain-tap {
+    transition: all 0.2s ease;
+}
+.fault-active.valve .h-diag-valvetrain-tap {
+    animation: valveTapPulse 0.45s infinite alternate ease-in-out;
+}
+.fault-active.valve .h-diag-valvetrain-tap.delay-1 { animation-delay: 0.11s; }
+.fault-active.valve .h-diag-valvetrain-tap.delay-2 { animation-delay: 0.22s; }
+.fault-active.valve .h-diag-valvetrain-tap.delay-3 { animation-delay: 0.33s; }
+@keyframes valveTapPulse {
+    0% { transform: scale(1); opacity: 0.7; }
+    100% { transform: scale(1.6); opacity: 1; fill: #f87171; }
+}
+.h-diag-shockwave-ring {
+    animation: shockwavePulse 1.2s infinite ease-out;
+    transform-origin: 198px 128px;
+}
+.h-diag-shockwave-ring.delay-ring {
+    animation-delay: 0.6s;
+}
+@keyframes shockwavePulse {
+    0% { transform: scale(0.6); opacity: 1; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* Combustion Misfire Spark & Flare */
+.fault-active.misfire .h-diag-misfire-spark {
+    animation: misfireSparkFlash 0.6s infinite steps(2, start);
+}
+@keyframes misfireSparkFlash {
+    0%, 100% { opacity: 0.2; stroke: #f59e0b; }
+    50% { opacity: 1; stroke: #ef4444; stroke-width: 3.5px; }
+}
+.fault-active.misfire .h-diag-misfire-glow {
+    animation: misfireGlowPulse 0.8s infinite ease-in-out alternate;
+}
+@keyframes misfireGlowPulse {
+    0% { transform: scale(0.85); opacity: 0.3; }
+    100% { transform: scale(1.4); opacity: 0.85; }
+}
+
+/* Engine Mount Oscillation Ripple */
+.fault-active.mounts .h-diag-mount-ripple {
+    animation: mountRippleWave 0.7s infinite linear;
+}
+@keyframes mountRippleWave {
+    0% { stroke-dashoffset: 0; opacity: 0.9; transform: translateX(-4px); }
+    50% { transform: translateX(4px); }
+    100% { stroke-dashoffset: 24; opacity: 0.9; transform: translateX(-4px); }
+}
+
+/* Normal Equilibrium Halo */
+.normal-active .h-diag-harmonic-halo {
+    animation: harmonicEquilibrium 3s infinite ease-in-out alternate;
+    transform-origin: 198px 165px;
+}
+@keyframes harmonicEquilibrium {
+    0% { transform: scale(0.96); opacity: 0.6; }
+    100% { transform: scale(1.05); opacity: 1; stroke-width: 3px; }
+}
+
+/* Floating Component Callout Badge */
+.h-diag-component-callout {
+    position: absolute;
+    bottom: 1.25rem;
+    left: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1rem;
+    border-radius: var(--ds-radius-card);
+    backdrop-filter: blur(12px);
+    z-index: 25;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    animation: fadeInCallout 0.4s ease-out;
+}
+@keyframes fadeInCallout {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.h-diag-component-callout .callout-indicator .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    animation: calloutDotPulse 1.4s infinite ease-in-out;
+}
+@keyframes calloutDotPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.6; }
+}
+.h-diag-component-callout .callout-title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.h-diag-component-callout .callout-detail {
+    font-size: 0.7rem;
+    opacity: 0.85;
+    margin-top: 0.15rem;
+}
+.h-diag-component-callout.red {
+    background: rgba(239, 68, 68, 0.14);
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    color: #fca5a5;
+}
+.h-diag-component-callout.red .callout-indicator .dot {
+    background: #ef4444;
+    box-shadow: 0 0 10px #ef4444;
+}
+.h-diag-component-callout.red .callout-title { color: #f87171; }
+
+.h-diag-component-callout.amber {
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid rgba(245, 158, 11, 0.45);
+    color: #fde68a;
+}
+.h-diag-component-callout.amber .callout-indicator .dot {
+    background: #f59e0b;
+    box-shadow: 0 0 10px #f59e0b;
+}
+.h-diag-component-callout.amber .callout-title { color: #fbbf24; }
+
+.h-diag-component-callout.yellow {
+    background: rgba(234, 179, 8, 0.14);
+    border: 1px solid rgba(234, 179, 8, 0.45);
+    color: #fef08a;
+}
+.h-diag-component-callout.yellow .callout-indicator .dot {
+    background: #eab308;
+    box-shadow: 0 0 10px #eab308;
+}
+.h-diag-component-callout.yellow .callout-title { color: #facc15; }
+
+.h-diag-component-callout.green {
+    background: rgba(16, 185, 129, 0.14);
+    border: 1px solid rgba(16, 185, 129, 0.45);
+    color: #a7f3d0;
+}
+.h-diag-component-callout.green .callout-indicator .dot {
+    background: #10b981;
+    box-shadow: 0 0 10px #10b981;
+}
+.h-diag-component-callout.green .callout-title { color: #34d399; }
 .h-diag-viewport-controls {
     position: absolute;
     top: 1.25rem;

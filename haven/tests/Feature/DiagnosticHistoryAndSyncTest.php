@@ -91,4 +91,64 @@ class DiagnosticHistoryAndSyncTest extends TestCase
         $responseFiltered->assertSee('Session #'.$diag2->id);
         $responseFiltered->assertDontSee('Session #'.$diag1->id);
     }
+
+    public function test_diagnostic_show_highlights_component_faults_and_callout_badges(): void
+    {
+        $user = User::factory()->create();
+        $vehicle = Vehicle::create([
+            'user_id' => $user->id,
+            'make' => 'Mazda',
+            'model' => 'Miata',
+            'year' => 2021,
+            'body_type' => 'coupe',
+        ]);
+
+        // 1. Valve Clearance
+        $diagValve = Diagnostic::create([
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'completed',
+            'ml_condition' => 'valve_clearance',
+        ]);
+        $responseValve = $this->actingAs($user)->get(route('diagnostics.show', $diagValve));
+        $responseValve->assertStatus(200);
+        $responseValve->assertSee('fault-active valve');
+        $responseValve->assertSee('MECHANICAL TARGET: VALVETRAIN CAMSHAFT');
+
+        // 2. Misfire
+        $diagMisfire = Diagnostic::create([
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'completed',
+            'ml_condition' => 'misfire',
+        ]);
+        $responseMisfire = $this->actingAs($user)->get(route('diagnostics.show', $diagMisfire));
+        $responseMisfire->assertStatus(200);
+        $responseMisfire->assertSee('fault-active misfire');
+        $responseMisfire->assertSee('COMBUSTION TARGET: CYLINDER #3 CHAMBER');
+
+        // 3. Loose Component
+        $diagLoose = Diagnostic::create([
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'completed',
+            'ml_condition' => 'loose_component',
+        ]);
+        $responseLoose = $this->actingAs($user)->get(route('diagnostics.show', $diagLoose));
+        $responseLoose->assertStatus(200);
+        $responseLoose->assertSee('fault-active mounts');
+        $responseLoose->assertSee('STRUCTURAL TARGET: POWERTRAIN SUBFRAME ENGINE MOUNT');
+
+        // 4. Normal Condition
+        $diagNormal = Diagnostic::create([
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'status' => 'completed',
+            'ml_condition' => 'normal',
+        ]);
+        $responseNormal = $this->actingAs($user)->get(route('diagnostics.show', $diagNormal));
+        $responseNormal->assertStatus(200);
+        $responseNormal->assertSee('normal-active');
+        $responseNormal->assertSee('ALL POWERTRAIN SUB-ASSEMBLIES IN-SPEC');
+    }
 }
