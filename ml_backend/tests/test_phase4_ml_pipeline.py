@@ -602,5 +602,35 @@ def test_bug_audit_regressions_multivehicle_train_nan_json_and_range_g8(
     assert any("±8.0g" in err or "±8g" in err for err in clip_val.errors)
 
 
+def test_multiburst_vibration_csv_with_inter_burst_gaps_avoids_seam_distortion(tmp_path: pathlib.Path) -> None:
+    """
+    Verify that a vibration CSV composed of three 64-sample bursts at 100 Hz
+    separated by 5.0-second Wi-Fi polling gaps splits cleanly at the timestamp
+    discontinuities and recovers the true 25 Hz oscillation without seam artifacts.
+    """
+    burst_csv = tmp_path / "multiburst_vib.csv"
+    sr = 100.0
+    freq_hz = 25.0
+    amp_g = 0.40
+
+    with burst_csv.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["timestamp", "x", "y", "z"])
+        for burst_idx, burst_start_sec in enumerate([0.0, 5.0, 10.0]):
+            # Alternate starting phase across bursts so naive stitching would cause a sharp step jump
+            phase = np.pi * burst_idx
+            for i in range(64):
+                t = burst_start_sec + (i / sr)
+                x = amp_g * math.sin(2.0 * math.pi * freq_hz * (i / sr) + phase)
+                writer.writerow([f"{t:.4f}", f"{x:.5f}", "0.02000", "1.00000"])
+
+    feats = extract_vibration_features(str(burst_csv), ext="csv", include_windows=True)
+    assert feats["sample_rate_hz"] == pytest.approx(100.0, abs=0.5)
+    assert feats["window_count"] == 3
+    assert feats["dominant_freq_hz"] == pytest.approx(25.0, abs=2.0)
+    assert feats["peak_g"] == pytest.approx(amp_g, abs=0.06)
+
+
+
 
 

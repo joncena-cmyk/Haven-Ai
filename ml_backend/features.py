@@ -223,14 +223,13 @@ def compute_vibration_window_metrics(
     }
 
 
-def _load_raw_vibration_file(
+def _load_raw_vibration_with_timestamps(
     file_path: str,
     ext: str = "csv",
     sample_rate_hz: Optional[float] = None,
-) -> Tuple[np.ndarray, float]:
+) -> Tuple[np.ndarray, float, np.ndarray]:
     """
-    Parse a CSV or JSON vibration file into a `(N, C)` float64 array and return
-    `(raw_axes, real_sample_rate_hz)`.
+    Parse a CSV or JSON vibration file into `(raw_axes, real_sample_rate_hz, timestamps)`.
     """
     timestamps: List[float] = []
     rows_xyz: List[List[float]] = []
@@ -289,7 +288,7 @@ def _load_raw_vibration_file(
                     continue
 
     if not rows_xyz:
-        return np.zeros((0, 3), dtype=np.float64), float(sample_rate_hz or 0.0)
+        return np.zeros((0, 3), dtype=np.float64), float(sample_rate_hz or 0.0), np.zeros(0, dtype=np.float64)
 
     arr = np.asarray(rows_xyz, dtype=np.float64)
     ts_arr = np.asarray(timestamps, dtype=np.float64)
@@ -301,7 +300,49 @@ def _load_raw_vibration_file(
         header_col=first_col_name,
         fallback_sr=effective_fallback_sr,
     )
+    return arr, inferred_sr, ts_arr
+
+
+def _load_raw_vibration_file(
+    file_path: str,
+    ext: str = "csv",
+    sample_rate_hz: Optional[float] = None,
+) -> Tuple[np.ndarray, float]:
+    """
+    Parse a CSV or JSON vibration file into a `(N, C)` float64 array and return
+    `(raw_axes, real_sample_rate_hz)`.
+    """
+    arr, inferred_sr, _ = _load_raw_vibration_with_timestamps(
+        file_path, ext=ext, sample_rate_hz=sample_rate_hz
+    )
     return arr, inferred_sr
+
+
+def _split_contiguous_bursts(arr: np.ndarray, ts_arr: np.ndarray) -> List[np.ndarray]:
+    """
+    Split a vibration array at timestamp gaps (`dt > 3.5 * median_dt`) so that
+    periodic Wi-Fi telemetry bursts (e.g. 64 samples @ 100 Hz every 5 s) are
+    filtered and FFT-analyzed as contiguous phase-coherent segments rather than
+    stitching across multi-second gaps.
+    """
+    if ts_arr.size != arr.shape[0] or arr.shape[0] < 16:
+        return [arr]
+
+    dt = np.diff(ts_arr)
+    pos_dt = dt[dt > 0]
+    if pos_dt.size == 0:
+        return [arr]
+
+    median_dt = float(np.median(pos_dt))
+    if median_dt <= 0:
+        return [arr]
+
+    gap_indices = np.where(dt > (3.5 * median_dt))[0] + 1
+    if gap_indices.size == 0:
+        return [arr]
+
+    segments = [seg for seg in np.split(arr, gap_indices) if seg.shape[0] >= 8]
+    return segments if segments else [arr]
 
 
 def extract_vibration_windows(
@@ -314,27 +355,31 @@ def extract_vibration_windows(
     apply_filter: bool = True,
 ) -> Tuple[List[Dict[str, float]], float, int]:
     """
-    Load a vibration file, infer its real sample rate from timestamps, remove DC
-    gravity offset, optionally apply a SciPy Butterworth band-pass filter, segment
-    into 1-2 s windows with 50% overlap, and return `(window_feature_dicts, sr, total_samples)`.
+    Load a vibration file, infer its real sample rate from timestamps, split at
+    inter-burst timestamp discontinuities if present, remove DC gravity offset,
+    optionally apply a SciPy Butterworth band-pass filter, segment into windows,
+    and return `(window_feature_dicts, sr, total_samples)`.
     """
-    arr, real_sr = _load_raw_vibration_file(file_path, ext=ext, sample_rate_hz=sample_rate_hz)
+    arr, real_sr, ts_arr = _load_raw_vibration_with_timestamps(
+        file_path, ext=ext, sample_rate_hz=sample_rate_hz
+    )
     if arr.shape[0] == 0:
         return [], real_sr, 0
 
-    # Remove global per-axis DC offset (gravity) first
-    centered = arr - np.mean(arr, axis=0, keepdims=True)
+    contiguous_bursts = _split_contiguous_bursts(arr, ts_arr)
+    windows: List[np.ndarray] = []
 
-    # Apply SciPy Butterworth band-pass / high-pass filter (2 Hz .. 0.45*fs)
-    if apply_filter and real_sr >= 20.0 and centered.shape[0] >= 32:
-        centered = bandpass_filter_signal(
-            centered,
-            sample_rate_hz=real_sr,
-            lowcut_hz=2.0,
-            highcut_hz=min(0.45 * real_sr, 450.0),
-        )
+    for burst in contiguous_bursts:
+        centered = burst - np.mean(burst, axis=0, keepdims=True)
+        if apply_filter and real_sr >= 20.0 and centered.shape[0] >= 32:
+            centered = bandpass_filter_signal(
+                centered,
+                sample_rate_hz=real_sr,
+                lowcut_hz=2.0,
+                highcut_hz=min(0.45 * real_sr, 450.0),
+            )
+        windows.extend(segment_windows(centered, real_sr, window_sec=window_sec, overlap=overlap))
 
-    windows = segment_windows(centered, real_sr, window_sec=window_sec, overlap=overlap)
     win_features = [
         compute_vibration_window_metrics(w, sample_rate_hz=real_sr, rpm=rpm)
         for w in windows

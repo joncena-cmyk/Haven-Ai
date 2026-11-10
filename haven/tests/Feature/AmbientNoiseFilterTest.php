@@ -83,4 +83,45 @@ class AmbientNoiseFilterTest extends TestCase
         $this->assertNotEquals('ambient_noise', $diagnostic->ml_condition);
         $this->assertEquals('normal', $diagnostic->ml_condition);
     }
+
+    public function test_resting_battery_voltage_below_13_2v_without_vibration_is_gated_as_ambient_noise(): void
+    {
+        $user = User::factory()->create();
+        $vehicle = Vehicle::create([
+            'user_id' => $user->id,
+            'make' => 'Toyota',
+            'model' => 'Corolla',
+            'year' => 2022,
+            'body_type' => 'sedan',
+        ]);
+
+        $audio = UploadedFile::fake()->create('cabin_talk.wav', 100, 'audio/wav');
+
+        // 12.6V resting battery (engine OFF, key ON) without vibration or RPM must be gated as ambient_noise
+        $this->actingAs($user)->post(route('diagnostics.store'), [
+            'vehicle_id' => $vehicle->id,
+            'audio_file' => $audio,
+            'vibration_source' => 'skipped',
+            'voltage_v' => 12.6,
+            'temperature_c' => 28.0,
+            'rpm' => 0,
+        ]);
+
+        $restingDiag = Diagnostic::latest('id')->firstOrFail();
+        $this->assertEquals('ambient_noise', $restingDiag->ml_condition);
+
+        // 13.8V active alternator charging voltage passes the engine-running gate
+        $audio2 = UploadedFile::fake()->create('engine_idle.wav', 100, 'audio/wav');
+        $this->actingAs($user)->post(route('diagnostics.store'), [
+            'vehicle_id' => $vehicle->id,
+            'audio_file' => $audio2,
+            'vibration_source' => 'skipped',
+            'voltage_v' => 13.8,
+            'temperature_c' => 28.0,
+            'rpm' => 0,
+        ]);
+
+        $chargingDiag = Diagnostic::latest('id')->firstOrFail();
+        $this->assertNotEquals('ambient_noise', $chargingDiag->ml_condition);
+    }
 }

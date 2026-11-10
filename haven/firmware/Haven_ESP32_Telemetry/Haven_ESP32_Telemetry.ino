@@ -8,8 +8,11 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <HTTPClient.h>
+#include <Wire.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 #if __has_include("secrets.h")
   #include "secrets.h"
@@ -45,46 +48,74 @@ char deviceKey[64]  = HAVEN_DEVICE_KEY;
 const int vehicleId = HAVEN_VEHICLE_ID;
 // ────────────────────────────────────────────────────────────
 
-// ── 2. SENSOR PIN ASSIGNMENTS & 100Hz RING BUFFER ───────────
+// ── 2. SENSOR PIN ASSIGNMENTS & 100Hz 3-AXIS RING BUFFER ────
 #define PIN_DS18B20    4    // Temperature (OneWire, async non-blocking mode)
 #define PIN_HALL_RPM   23   // RPM sensor
 #define PIN_MPU_SDA    21   // MPU6050 SDA
 #define PIN_MPU_SCL    22   // MPU6050 SCL
+#define MPU_ADDR       0x68
 #define VIB_BUFFER_SIZE 128
-float vibBuffer[VIB_BUFFER_SIZE];
+
+OneWire oneWire(PIN_DS18B20);
+DallasTemperature tempSensor(&oneWire);
+float vibBufX[VIB_BUFFER_SIZE];
+float vibBufY[VIB_BUFFER_SIZE];
+float vibBufZ[VIB_BUFFER_SIZE];
 int vibBufferIdx = 0;
+bool vibBufferFull = false;
+bool accelReady = false;
+float latestAx = 0.0f, latestAy = 0.0f, latestAz = 0.0f;
 unsigned long lastSampleMs = 0;
 // ────────────────────────────────────────────────────────────
 
 // ── 3. SEND INTERVAL ─────────────────────────────────────────
-const unsigned long SEND_INTERVAL_MS = 10000; // Ingest every 10 seconds
+const unsigned long SEND_INTERVAL_MS = 5000; // Ingest every 5 seconds
 unsigned long lastSend = 0;
 // ────────────────────────────────────────────────────────────
 
-// ── 4. SENSOR READINGS (Simulated / Ready for real sensor libs)
+// ── 4. HARDWARE I2C ACCELEROMETER & SENSOR READINGS ──────────
+bool initAccelI2C() {
+  Wire.begin(PIN_MPU_SDA, PIN_MPU_SCL, 400000);
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x6B); // PWR_MGMT_1: wake up
+  Wire.write(0x00);
+  if (Wire.endTransmission() != 0) return false;
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x1C); // ACCEL_CONFIG: +/- 8g (4096 LSB/g)
+  Wire.write(0x10);
+  return (Wire.endTransmission() == 0);
+}
+
+bool readAccelG(float &ax, float &ay, float &az) {
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x3B);
+  if (Wire.endTransmission(false) != 0) return false;
+  if (Wire.requestFrom((uint8_t)MPU_ADDR, (uint8_t)6, (uint8_t)true) != 6) return false;
+  int16_t rx = (int16_t)((Wire.read() << 8) | Wire.read());
+  int16_t ry = (int16_t)((Wire.read() << 8) | Wire.read());
+  int16_t rz = (int16_t)((Wire.read() << 8) | Wire.read());
+  ax = (float)rx / 4096.0f;
+  ay = (float)ry / 4096.0f;
+  az = (float)rz / 4096.0f;
+  return true;
+}
+
 float readTemperatureC() {
-  return 72.5 + random(0, 230) / 10.0;
+  if (tempSensor.getDeviceCount() == 0) return NAN;
+  float t = tempSensor.getTempCByIndex(0);
+  tempSensor.requestTemperatures();
+  return (t >= -50.0f && t <= 125.0f && t != DEVICE_DISCONNECTED_C && t != 85.0f) ? t : NAN;
 }
 
-int readRPM() {
-  return 750 + random(0, 100);
-}
-
-float readVoltageV() {
-  return 12.4 + random(0, 40) / 100.0;
-}
-
-float readCurrentMa() {
-  return 150.0 + random(0, 500) / 10.0;
-}
-
-void collectVibrationSamples(JsonArray& arr, int count) {
-  for (int i = 0; i < count; i++) {
-    float x = 0.05 + random(-50, 50) / 1000.0;
-    float y = 0.03 + random(-30, 30) / 1000.0;
-    float z = 1.00 + random(-80, 80) / 1000.0;
-    float mag = sqrt(x*x + y*y + z*z);
-    arr.add(round(mag * 10000.0) / 10000.0);
+void collectVibrationSamples(JsonArray& arr, int maxCount) {
+  int available = vibBufferFull ? VIB_BUFFER_SIZE : vibBufferIdx;
+  int countToSend = (available > maxCount) ? maxCount : available;
+  for (int i = 0; i < countToSend; i++) {
+    int idx = (vibBufferIdx - countToSend + i + VIB_BUFFER_SIZE) % VIB_BUFFER_SIZE;
+    JsonObject sObj = arr.createNestedObject();
+    sObj["x"] = round(vibBufX[idx] * 1000.0f) / 1000.0f;
+    sObj["y"] = round(vibBufY[idx] * 1000.0f) / 1000.0f;
+    sObj["z"] = round(vibBufZ[idx] * 1000.0f) / 1000.0f;
   }
 }
 // ────────────────────────────────────────────────────────────
@@ -129,26 +160,29 @@ void sendTelemetry() {
     return;
   }
 
-  StaticJsonDocument<2048> doc;
+  DynamicJsonDocument doc(8192);
   doc["vehicle_id"]      = vehicleId;
   doc["device_id"]       = "ESP32-HAVEN-NODE-01";
   doc["device_key"]      = deviceKey;
-  doc["sample_rate_hz"]  = 50;
-  doc["save_session"]    = true;
-  doc["auto_analyze"]    = true;
+  doc["sample_rate_hz"]  = 100;
+  doc["save_session"]    = false;
+  doc["auto_analyze"]    = false;
 
-  float tempC     = readTemperatureC();
-  int   rpm       = readRPM();
-  float voltageV  = readVoltageV();
-  float currentMa = readCurrentMa();
+  float tempC = readTemperatureC();
+  if (!isnan(tempC)) {
+    doc["temperature_c"] = round(tempC * 10.0f) / 10.0f;
+  } else {
+    doc["temperature_c"] = nullptr;
+  }
 
-  doc["temperature_c"] = tempC;
-  doc["rpm"]           = rpm;
-  doc["voltage_v"]     = voltageV;
-  doc["current_ma"]    = currentMa;
-
-  JsonArray samples = doc.createNestedArray("samples");
-  collectVibrationSamples(samples, 50);
+  if (accelReady) {
+    JsonArray samples = doc.createNestedArray("samples");
+    collectVibrationSamples(samples, 64);
+    JsonObject mpuObj = doc.createNestedObject("sensor_data").createNestedObject("mpu6050");
+    mpuObj["ax"] = latestAx;
+    mpuObj["ay"] = latestAy;
+    mpuObj["az"] = latestAz;
+  }
 
   String body;
   serializeJson(doc, body);
@@ -161,9 +195,6 @@ void sendTelemetry() {
   http.addHeader("X-Haven-Device-Key", deviceKey);
 
   Serial.println("\n[HAVEN] Sending telemetry...");
-  Serial.printf("  Temp: %.1f deg C | RPM: %d | Battery: %.2f V | Current: %.1f mA\n",
-                tempC, rpm, voltageV, currentMa);
-
   int responseCode = http.POST(body);
   Serial.printf("[HAVEN] Server Response Code: %d\n", responseCode);
 
@@ -205,6 +236,12 @@ void setup() {
   }
   prefs.end();
 
+  accelReady = initAccelI2C();
+  tempSensor.begin();
+  tempSensor.setResolution(10);
+  tempSensor.setWaitForConversion(false);
+  tempSensor.requestTemperatures();
+
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("HAVEN_AI_LOCAL", "haven1234");
   connectWifi();
@@ -235,12 +272,18 @@ void setup() {
 void loop() {
   portalServer.handleClient();
   unsigned long now = millis();
-  // Strict 100Hz non-blocking vibration sampling (10ms interval)
+  // Strict 100Hz non-blocking 3-axis hardware vibration sampling (10ms interval)
   if (now - lastSampleMs >= 10) {
     lastSampleMs = now;
-    float z = 1.0 + random(-80, 80) / 1000.0;
-    vibBuffer[vibBufferIdx] = fabs(z);
-    vibBufferIdx = (vibBufferIdx + 1) % VIB_BUFFER_SIZE;
+    if (accelReady && readAccelG(latestAx, latestAy, latestAz)) {
+      vibBufX[vibBufferIdx] = latestAx;
+      vibBufY[vibBufferIdx] = latestAy;
+      vibBufZ[vibBufferIdx] = latestAz;
+      vibBufferIdx = (vibBufferIdx + 1) % VIB_BUFFER_SIZE;
+      if (vibBufferIdx == 0) vibBufferFull = true;
+    } else if (!accelReady && (now % 1000 < 10)) {
+      accelReady = initAccelI2C();
+    }
   }
   if (now - lastSend >= SEND_INTERVAL_MS) {
     lastSend = now;

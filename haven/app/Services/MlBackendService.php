@@ -637,7 +637,7 @@ class MlBackendService
         // ── Engine Presence & Ambient Noise Filter ──
         // An active ICE engine physically produces measurable mechanical vibration (at least 0.04g RMS / 0.08g Peak)
         // when physically coupled to the engine block via real hardware accelerometer (device_sensor or csv_import),
-        // or operating engine coolant temperature (>45°C), or alternator charging (>12.2V), or active RPM (>=300).
+        // or operating engine coolant temperature (>45°C), or alternator charging (>=13.2V), or active RPM (>=300).
         // Browser-simulated synthetic vibration (synthetic JS math) does NOT represent physical engine block coupling.
         $isHardwareVibration = (in_array($vibrationSource, ['adxl345_live', 'device_sensor', 'csv_import'], true) || (is_null($vibrationSource) && $rmsG > 0.04));
         $hasMechanicalCoupling = $isHardwareVibration && ($peakG >= 0.08 || $rmsG >= 0.04);

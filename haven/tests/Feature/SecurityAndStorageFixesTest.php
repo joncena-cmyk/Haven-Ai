@@ -215,4 +215,54 @@ class SecurityAndStorageFixesTest extends TestCase
         $this->assertSame(0.0, $diag->voltage_v);
         $this->assertNull($diag->current_ma);
     }
+
+    public function test_live_checkup_ingest_does_not_leak_files_and_caches_3axis_samples_and_sketch_uses_hardware_i2c(): void
+    {
+        Storage::fake('local');
+        Cache::flush();
+
+        $owner = User::factory()->create();
+        $vehicle = Vehicle::create([
+            'user_id' => $owner->id,
+            'make' => 'Toyota',
+            'model' => 'Corolla',
+            'year' => 2024,
+            'device_key' => 'hvn_dev_live_burst_key_9988776655443322',
+        ]);
+
+        // 1. Sketch endpoint returns genuine hardware I2C 3-axis accelerometer code (not synthetic sin())
+        $sketchResp = $this->actingAs($owner)
+            ->getJson('/api/v1/telemetry/sketch?vehicle_id='.$vehicle->id)
+            ->assertOk();
+        $sketchCode = $sketchResp->json('sketch');
+        $this->assertStringContainsString('readAccelG', $sketchCode);
+        $this->assertStringNotContainsString('sin(vibIdx', $sketchCode);
+
+        // 2. Periodic checkup (save_session=false) caches 3-axis samples & packet_id without writing files to disk
+        $burstSamples = [
+            ['x' => 0.12, 'y' => -0.04, 'z' => 0.98],
+            ['x' => -0.11, 'y' => 0.05, 'z' => 1.02],
+        ];
+        $this->postJson('/api/v1/telemetry/ingest', [
+            'vehicle_id' => $vehicle->id,
+            'sample_rate_hz' => 100,
+            'samples' => $burstSamples,
+            'audio_base64' => base64_encode('RIFF____WAVEfmt '),
+            'save_session' => false,
+            'auto_analyze' => false,
+        ], ['X-Haven-Device-Key' => $vehicle->device_key])->assertOk();
+
+        $this->assertSame(0, Diagnostic::count());
+        $this->assertEmpty(Storage::disk('local')->allFiles());
+
+        $latestResp = $this->actingAs($owner)
+            ->getJson('/api/v1/telemetry/latest?vehicle_id='.$vehicle->id)
+            ->assertOk()
+            ->assertJsonPath('online', true)
+            ->assertJsonPath('sample_rate_hz', 100);
+
+        $this->assertNotEmpty($latestResp->json('packet_id'));
+        $this->assertCount(2, $latestResp->json('samples'));
+        $this->assertEquals(0.12, $latestResp->json('samples.0.x'));
+    }
 }

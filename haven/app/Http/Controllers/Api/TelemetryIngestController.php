@@ -610,6 +610,7 @@ class TelemetryIngestController extends Controller
 #include <WiFi.h>
 #include <WebServer.h>
 #include <HTTPClient.h>
+#include <Wire.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <OneWire.h>
@@ -623,18 +624,50 @@ char password[64]  = "YOUR_WIFI_PASSWORD";
 char serverUrl[128]= "http://YOUR_SERVER_IP:8000/api/v1/telemetry/ingest";
 char deviceKey[64] = "{$deviceKey}";
 
-// Hardware ADXL345 / MPU6050 I2C & DS18B20 OneWire pins
+// Hardware MPU6050 / ADXL345 I2C & DS18B20 OneWire pins
 #define SENSOR_SDA 21
 #define SENSOR_SCL 22
+#define MPU_ADDR   0x68
 #define TEMP_PIN   4
 #define VIB_BUFFER_SIZE 128
 
 OneWire oneWire(TEMP_PIN);
 DallasTemperature tempSensor(&oneWire);
-float vibBuffer[VIB_BUFFER_SIZE];
+float vibBufX[VIB_BUFFER_SIZE];
+float vibBufY[VIB_BUFFER_SIZE];
+float vibBufZ[VIB_BUFFER_SIZE];
 int vibIdx = 0;
+bool vibFull = false;
+bool accelReady = false;
+float latestAx = 0.0f, latestAy = 0.0f, latestAz = 0.0f;
 unsigned long lastSampleMs = 0;
 unsigned long lastUploadMs = 0;
+
+bool initAccelI2C() {
+  Wire.begin(SENSOR_SDA, SENSOR_SCL, 400000);
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x6B); // PWR_MGMT_1: wake up
+  Wire.write(0x00);
+  if (Wire.endTransmission() != 0) return false;
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x1C); // ACCEL_CONFIG: +/- 8g (4096 LSB/g)
+  Wire.write(0x10);
+  return (Wire.endTransmission() == 0);
+}
+
+bool readAccelG(float &ax, float &ay, float &az) {
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x3B); // ACCEL_XOUT_H
+  if (Wire.endTransmission(false) != 0) return false;
+  if (Wire.requestFrom((uint8_t)MPU_ADDR, (uint8_t)6, (uint8_t)true) != 6) return false;
+  int16_t rx = (int16_t)((Wire.read() << 8) | Wire.read());
+  int16_t ry = (int16_t)((Wire.read() << 8) | Wire.read());
+  int16_t rz = (int16_t)((Wire.read() << 8) | Wire.read());
+  ax = (float)rx / 4096.0f;
+  ay = (float)ry / 4096.0f;
+  az = (float)rz / 4096.0f;
+  return true;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -645,6 +678,8 @@ void setup() {
     prefs.getString("server", serverUrl, sizeof(serverUrl));
   }
   prefs.end();
+
+  accelReady = initAccelI2C();
 
   // Async non-blocking temperature conversion (eliminates 750ms 1-Wire stall)
   tempSensor.begin();
@@ -680,11 +715,18 @@ void loop() {
   server.handleClient();
   unsigned long now = millis();
 
-  // Strict 100Hz non-blocking vibration sampling loop (10ms interval)
+  // Strict 100Hz non-blocking 3-axis hardware vibration sampling loop (10ms interval)
   if (now - lastSampleMs >= 10) {
     lastSampleMs = now;
-    vibBuffer[vibIdx] = 1.0 + (sin(vibIdx * 0.2) * 0.35);
-    vibIdx = (vibIdx + 1) % VIB_BUFFER_SIZE;
+    if (accelReady && readAccelG(latestAx, latestAy, latestAz)) {
+      vibBufX[vibIdx] = latestAx;
+      vibBufY[vibIdx] = latestAy;
+      vibBufZ[vibIdx] = latestAz;
+      vibIdx = (vibIdx + 1) % VIB_BUFFER_SIZE;
+      if (vibIdx == 0) vibFull = true;
+    } else if (!accelReady && (now % 1000 < 10)) {
+      accelReady = initAccelI2C();
+    }
   }
 
   if (now - lastUploadMs >= 5000 && WiFi.status() == WL_CONNECTED) {
@@ -694,15 +736,28 @@ void loop() {
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Haven-Device-Key", deviceKey);
 
-    StaticJsonDocument<4096> doc;
+    DynamicJsonDocument doc(8192);
     doc["vehicle_id"]     = {$vId};
     doc["device_id"]      = "ESP32-HAVEN-NODE-01";
     doc["sample_rate_hz"] = 100;
-    doc["auto_analyze"]   = true;
+    doc["save_session"]   = false;
+    doc["auto_analyze"]   = false;
 
-    JsonArray samples = doc.createNestedArray("samples");
-    for (int i = 0; i < 64; i++) {
-      samples.add(vibBuffer[i]);
+    int available = vibFull ? VIB_BUFFER_SIZE : vibIdx;
+    int countToSend = (available > 64) ? 64 : available;
+    if (accelReady && countToSend > 0) {
+      JsonArray samples = doc.createNestedArray("samples");
+      for (int i = 0; i < countToSend; i++) {
+        int idx = (vibIdx - countToSend + i + VIB_BUFFER_SIZE) % VIB_BUFFER_SIZE;
+        JsonObject sObj = samples.createNestedObject();
+        sObj["x"] = round(vibBufX[idx] * 1000.0f) / 1000.0f;
+        sObj["y"] = round(vibBufY[idx] * 1000.0f) / 1000.0f;
+        sObj["z"] = round(vibBufZ[idx] * 1000.0f) / 1000.0f;
+      }
+      JsonObject mpuObj = doc.createNestedObject("sensor_data").createNestedObject("mpu6050");
+      mpuObj["ax"] = latestAx;
+      mpuObj["ay"] = latestAy;
+      mpuObj["az"] = latestAz;
     }
 
     String requestBody;

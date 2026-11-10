@@ -296,7 +296,7 @@ void postTelemetryToHaven() {
   http.addHeader("Accept", "application/json");
   http.addHeader("X-Haven-Device-Key", havenDeviceKey);
 
-  StaticJsonDocument<4096> doc;
+  DynamicJsonDocument doc(8192);
   doc["vehicle_id"]     = vehicleId;
   doc["device_id"]      = "ESP32-5SENSOR-NODE";
   doc["device_key"]     = havenDeviceKey;
@@ -333,7 +333,7 @@ void postTelemetryToHaven() {
     doc["rms_g"]        = round(windowRmsG * 1000.0) / 1000.0;
     doc["crest_factor"] = round(windowCrestFactor * 100.0) / 100.0;
     JsonArray samplesArr = doc.createNestedArray("samples");
-    int countToSend = (sampleCount > 32) ? 32 : sampleCount;
+    int countToSend = (sampleCount > 64) ? 64 : sampleCount;
     for (int i = 0; i < countToSend; i++) {
       int idx = (vibBufferIdx - countToSend + i + VIB_BUFFER_SIZE) % VIB_BUFFER_SIZE;
       JsonObject sObj = samplesArr.createNestedObject();

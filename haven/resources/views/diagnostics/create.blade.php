@@ -3367,6 +3367,7 @@
     let vibInterval = null, vibSeconds = 0, vibrationSamples = [], vibAnimFrame = null;
     let checkLiveDaqInterval = null;
     let lastVibPacketId = null;
+    let vibStartMs = 0;
     window.isEsp32Online = false;
     window.latestEsp32Accel = null;
 
@@ -3860,15 +3861,17 @@
 
         const rateHz = data.sample_rate_hz || 100;
         const dt = 1.0 / rateHz;
-        let baseT = vibrationSamples.length > 0 ? (vibrationSamples[vibrationSamples.length - 1].t + dt) : 0;
+        const elapsedSec = vibStartMs > 0 ? Math.max(0, (performance.now() - vibStartMs) / 1000) : 0;
+        const minNextT = vibrationSamples.length > 0 ? (vibrationSamples[vibrationSamples.length - 1].t + dt) : 0;
+        let baseT = Math.max(minNextT, elapsedSec);
 
         if (Array.isArray(data.samples) && data.samples.length > 0) {
             data.samples.forEach(s => {
                 let sx = 0, sy = 0, sz = 0;
                 if (typeof s === 'object' && s !== null) {
-                    sx = Number(s.x ?? 0);
-                    sy = Number(s.y ?? 0);
-                    sz = Number(s.z ?? (s.magnitude ?? 0));
+                    sx = Number(s.x ?? s.ax ?? 0);
+                    sy = Number(s.y ?? s.ay ?? 0);
+                    sz = Number(s.z ?? s.az ?? (s.magnitude ?? 0));
                 } else if (typeof s === 'number') {
                     sz = Number(s);
                 }
@@ -3905,6 +3908,7 @@
         if (carModel) carModel.classList.add('recording-vib');
         vibrationSamples = [];
         lastVibPacketId = null;
+        vibStartMs = performance.now();
         vibSeconds = 0;
 
         window.setDiagnosisFlowStep('vibration');
