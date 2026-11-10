@@ -7,6 +7,7 @@
             $errors->has('phone') ||
             $errors->has('two_factor_enabled') ||
             $errors->has('two_factor_channel') ||
+            session('two_factor_test_status') ||
             in_array(session('status'), ['password-updated', 'two-factor-updated'], true)
         ) {
             $initialTab = 'security';
@@ -134,6 +135,13 @@
                 Back to Dashboard
             </a>
         </div>
+
+        @if (session('error'))
+            <div style="background:var(--h-red-bg);border:1px solid var(--h-red);border-radius:var(--h-radius);padding:0.75rem 1rem;margin-bottom:1.25rem;font-size:0.82rem;color:var(--h-red);display:flex;align-items:center;gap:0.5rem;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                {{ session('error') }}
+            </div>
+        @endif
 
         <div class="haven-settings-grid">
             {{-- ════════════════════════════════════════════════════════════════
@@ -624,14 +632,19 @@
         const modal = document.getElementById('haven-regen-modal');
         const msg   = document.getElementById('haven-regen-msg');
         const btn   = document.getElementById('haven-regen-confirm-btn');
+        if (modal && modal.parentNode !== document.body) {
+            document.body.appendChild(modal);
+        }
         msg.textContent = 'You are about to regenerate the ESP32 device key for "' + vehicleName + '". This action cannot be undone.';
         btn.onclick = () => {
             document.getElementById('regen-form-' + vehicleId).submit();
         };
         modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
     }
     function havenCloseModal() {
         document.getElementById('haven-regen-modal').style.display = 'none';
+        document.body.style.overflow = '';
     }
     document.getElementById('haven-regen-modal').addEventListener('click', function(e) {
         if (e.target === this) havenCloseModal();
@@ -642,7 +655,10 @@
         const vid   = card.dataset.vehicleId;
         const dot   = card.querySelector('.vehicle-status-dot');
         const label = card.querySelector('.vehicle-status-label');
-        fetch('/api/v1/telemetry/latest?vehicle_id=' + encodeURIComponent(vid), { cache: 'no-store' })
+        fetch('/api/v1/telemetry/latest?vehicle_id=' + encodeURIComponent(vid), {
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        })
             .then(r => r.json())
             .then(data => {
                 if (data.online) {

@@ -101,6 +101,8 @@
             <span id="login-submit-text">Sign In</span>
         </button>
 
+        <x-google-signin-button />
+
         {{-- Register link --}}
         <p style="text-align:center;margin-top:1.5rem;font-size:0.875rem;color:var(--h-text2);">
             Don't have an account?

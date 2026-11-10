@@ -31,11 +31,16 @@ class Vehicle extends Model
         'alert_thresholds',
     ];
 
+    public static function generateDeviceKey(): string
+    {
+        return 'hvn_dev_'.bin2hex(random_bytes(16));
+    }
+
     protected static function booted(): void
     {
         static::creating(function (Vehicle $vehicle) {
             if (empty($vehicle->device_key)) {
-                $vehicle->device_key = 'hvn_dev_'.bin2hex(random_bytes(16));
+                $vehicle->device_key = static::generateDeviceKey();
             }
         });
 

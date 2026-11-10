@@ -543,7 +543,8 @@ class LiveSensorMonitor:
                 ser = open_esp32_serial(port, baud_rate=baud_rate, timeout=0.05)
                 ensure_esp32_logger_mode(ser, target_baud=baud_rate)
                 ser.reset_input_buffer()
-                t_start = time.monotonic()
+                last_rate_t = time.monotonic()
+                last_rate_n = 0
                 total_n = 0
                 while not self._stop.is_set():
                     raw = ser.readline()
@@ -557,7 +558,11 @@ class LiveSensorMonitor:
                         if len(vib_ring) > 300:
                             del vib_ring[:-300]
                         if total_n % 25 == 0:
-                            elapsed = max(time.monotonic() - t_start, 1e-3)
+                            now_m = time.monotonic()
+                            # Rolling rate over the last 25-sample window (not since connect).
+                            win_dt = max(now_m - last_rate_t, 1e-3)
+                            win_rate = (total_n - last_rate_n) / win_dt
+                            last_rate_t, last_rate_n = now_m, total_n
                             arr = np.asarray([s[1:4] for s in vib_ring[-160:]], dtype=np.float64)
                             ax, ay, az = parsed[1], parsed[2], parsed[3]
                             mag = math.sqrt(ax * ax + ay * ay + az * az)
@@ -571,7 +576,7 @@ class LiveSensorMonitor:
                                 self.state["vib_xyz"] = (ax, ay, az)
                                 self.state["vib_mag_g"] = mag
                                 self.state["vib_dyn_g"] = dyn_rms
-                                self.state["vib_rate_hz"] = total_n / elapsed
+                                self.state["vib_rate_hz"] = win_rate
                                 self.state["vib_wave"] = tail
             except Exception as exc:
                 msg = str(exc)
@@ -1625,19 +1630,27 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
         if not vid:
             return
 
-        imported = 0
-        errors: List[str] = []
-        for f in folders:
-            try:
-                ctrl.import_recording_to_web(f, laravel_vehicle_id=vid, verified_by=operator_var.get())
-                imported += 1
-            except Exception as exc:
-                errors.append(f"{f.name}: {exc}")
+        def _sync_worker() -> None:
+            imported = 0
+            errors: List[str] = []
+            operator = operator_var.get()
+            for f in folders:
+                try:
+                    ctrl.import_recording_to_web(f, laravel_vehicle_id=vid, verified_by=operator)
+                    imported += 1
+                except Exception as exc:
+                    errors.append(f"{f.name}: {exc}")
 
-        msg = f"Successfully imported {imported} recording(s) into HAVEN Web App (Vehicle ID #{vid})."
-        if errors:
-            msg += "\n\nSkipped/Errors:\n" + "\n".join(errors[:3])
-        messagebox.showinfo("HAVEN Web Sync Complete", msg)
+            def _done() -> None:
+                msg = f"Successfully imported {imported} recording(s) into HAVEN Web App (Vehicle ID #{vid})."
+                if errors:
+                    msg += "\n\nSkipped/Errors:\n" + "\n".join(errors[:3])
+                messagebox.showinfo("HAVEN Web Sync Complete", msg)
+
+            root.after(0, _done)
+
+        # Run imports (which invoke synchronous ML analysis) off the Tk main thread so the GUI stays responsive.
+        threading.Thread(target=_sync_worker, daemon=True).start()
 
     def run_training() -> None:
         btn_train.config(state="disabled", text="⏳ Training AI...")

@@ -14,11 +14,13 @@ use Illuminate\View\View;
 class AuthenticatedSessionController extends Controller
 {
     /**
-     * Display the login view.
+     * Redirect standalone /login requests to the homepage pop-up login modal.
      */
-    public function create(): View
+    public function create(Request $request): RedirectResponse
     {
-        return view('auth.login');
+        $request->session()->reflash();
+
+        return redirect()->to(url('/?login=1'));
     }
 
     /**
@@ -30,9 +32,19 @@ class AuthenticatedSessionController extends Controller
 
         if ($requires2fa) {
             if ($request->wantsJson()) {
+                $twoFactorUser = \App\Models\User::find($request->session()->get('auth.two_factor_user_id'));
+                $activeChannel = $request->session()->get('auth.two_factor_active_channel', $twoFactorUser?->two_factor_channel ?? 'email');
+                $target = $activeChannel === 'sms' && ! empty($twoFactorUser?->phone)
+                    ? substr($twoFactorUser->phone, 0, 4).'****'.substr($twoFactorUser->phone, -3)
+                    : substr((string) $twoFactorUser?->email, 0, 2).'****@'.(explode('@', (string) $twoFactorUser?->email)[1] ?? '***');
+
                 return response()->json([
                     'success' => true,
                     'requires_2fa' => true,
+                    'channel' => $activeChannel,
+                    'target' => $target,
+                    'user_phone' => $twoFactorUser?->phone,
+                    'has_phone' => ! empty($twoFactorUser?->phone),
                     'redirect' => route('two-factor.challenge', absolute: false),
                 ]);
             }

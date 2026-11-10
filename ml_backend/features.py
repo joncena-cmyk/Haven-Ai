@@ -258,6 +258,7 @@ def _load_raw_vibration_with_timestamps(
         with open(file_path, "r", newline="", encoding="utf-8", errors="replace") as f:
             reader = csv.reader(f)
             header_seen = False
+            axis_indices: Tuple[int, int, int] = (1, 2, 3)
             for row in reader:
                 if not row:
                     continue
@@ -270,11 +271,21 @@ def _load_raw_vibration_with_timestamps(
                         float(first_cell)
                     except ValueError:
                         first_col_name = first_cell
+                        lower_cols = [c.strip().lower() for c in row]
+                        for candidate in (("ax", "ay", "az"), ("x", "y", "z"), ("channel 1", "channel 2", "channel 3")):
+                            if all(k in lower_cols for k in candidate):
+                                axis_indices = (
+                                    lower_cols.index(candidate[0]),
+                                    lower_cols.index(candidate[1]),
+                                    lower_cols.index(candidate[2]),
+                                )
+                                break
                         continue
                 try:
-                    if len(row) >= 4:
+                    max_idx = max(axis_indices)
+                    if len(row) > max_idx:
                         t_val = float(row[0])
-                        vals = [float(row[1]), float(row[2]), float(row[3])]
+                        vals = [float(row[axis_indices[0]]), float(row[axis_indices[1]]), float(row[axis_indices[2]])]
                         if all(math.isfinite(v) for v in vals) and math.isfinite(t_val):
                             timestamps.append(t_val)
                             rows_xyz.append(vals)

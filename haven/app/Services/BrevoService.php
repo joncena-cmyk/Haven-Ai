@@ -8,8 +8,11 @@ use Illuminate\Support\Facades\Log;
 class BrevoService
 {
     protected ?string $apiKey;
+
     protected string $fromEmail;
+
     protected string $fromName;
+
     protected string $smsSender;
 
     public function __construct()
@@ -23,20 +26,18 @@ class BrevoService
     /**
      * Send a 6-digit OTP code to a user via Transactional Email.
      *
-     * @param string $recipientEmail
-     * @param string $recipientName
-     * @param string $code
-     * @param string $purpose e.g. "Registration" or "Two-Factor Authentication"
+     * @param  string  $purpose  e.g. "Registration" or "Two-Factor Authentication"
      * @return array{success: bool, messageId: ?string, error: ?string}
      */
     public function sendEmailOtp(string $recipientEmail, string $recipientName, string $code, string $purpose = 'Two-Factor Authentication'): array
     {
         if (empty($this->apiKey)) {
             $loggedCode = app()->environment('production') ? '[REDACTED]' : $code;
-            Log::warning('[BrevoService] API key not configured. OTP email simulated for ' . $recipientEmail . ' with code: ' . $loggedCode);
+            Log::warning('[BrevoService] API key not configured. OTP email simulated for '.$recipientEmail.' with code: '.$loggedCode);
+
             return [
                 'success' => true,
-                'messageId' => 'simulated_local_' . uniqid(),
+                'messageId' => 'simulated_local_'.uniqid(),
                 'error' => null,
             ];
         }
@@ -65,7 +66,8 @@ class BrevoService
 
             if ($response->successful()) {
                 $data = $response->json();
-                Log::info("[BrevoService] OTP email sent successfully to {$recipientEmail}. MessageId: " . ($data['messageId'] ?? 'N/A'));
+                Log::info("[BrevoService] OTP email sent successfully to {$recipientEmail}. MessageId: ".($data['messageId'] ?? 'N/A'));
+
                 return [
                     'success' => true,
                     'messageId' => $data['messageId'] ?? null,
@@ -75,13 +77,15 @@ class BrevoService
 
             $errorMessage = $response->json('message') ?? $response->body();
             Log::error("[BrevoService] Failed to send email to {$recipientEmail}: {$errorMessage} (Status: {$response->status()})");
+
             return [
                 'success' => false,
                 'messageId' => null,
                 'error' => $errorMessage,
             ];
         } catch (\Throwable $e) {
-            Log::error("[BrevoService] Exception sending OTP email: " . $e->getMessage());
+            Log::error('[BrevoService] Exception sending OTP email: '.$e->getMessage());
+
             return [
                 'success' => false,
                 'messageId' => null,
@@ -93,19 +97,18 @@ class BrevoService
     /**
      * Send an OTP code via Transactional SMS.
      *
-     * @param string $recipientPhone E.164 formatted international phone number (e.g. +639...)
-     * @param string $code
-     * @param string $purpose
+     * @param  string  $recipientPhone  E.164 formatted international phone number (e.g. +639...)
      * @return array{success: bool, messageId: ?string, error: ?string}
      */
     public function sendSmsOtp(string $recipientPhone, string $code, string $purpose = '2FA'): array
     {
         if (empty($this->apiKey)) {
             $loggedCode = app()->environment('production') ? '[REDACTED]' : $code;
-            Log::warning('[BrevoService] API key not configured. OTP SMS simulated for ' . $recipientPhone . ' with code: ' . $loggedCode);
+            Log::warning('[BrevoService] API key not configured. OTP SMS simulated for '.$recipientPhone.' with code: '.$loggedCode);
+
             return [
                 'success' => true,
-                'messageId' => 'simulated_sms_' . uniqid(),
+                'messageId' => 'simulated_sms_'.uniqid(),
                 'error' => null,
             ];
         }
@@ -127,7 +130,8 @@ class BrevoService
 
             if ($response->successful()) {
                 $data = $response->json();
-                Log::info("[BrevoService] OTP SMS sent successfully to {$recipientPhone}. Reference: " . ($data['reference'] ?? 'N/A'));
+                Log::info("[BrevoService] OTP SMS sent successfully to {$recipientPhone}. Reference: ".($data['reference'] ?? 'N/A'));
+
                 return [
                     'success' => true,
                     'messageId' => $data['reference'] ?? null,
@@ -137,13 +141,15 @@ class BrevoService
 
             $errorMessage = $response->json('message') ?? $response->body();
             Log::error("[BrevoService] Failed to send SMS to {$recipientPhone}: {$errorMessage} (Status: {$response->status()})");
+
             return [
                 'success' => false,
                 'messageId' => null,
                 'error' => $errorMessage,
             ];
         } catch (\Throwable $e) {
-            Log::error("[BrevoService] Exception sending OTP SMS: " . $e->getMessage());
+            Log::error('[BrevoService] Exception sending OTP SMS: '.$e->getMessage());
+
             return [
                 'success' => false,
                 'messageId' => null,
@@ -221,4 +227,3 @@ class BrevoService
 HTML;
     }
 }
-

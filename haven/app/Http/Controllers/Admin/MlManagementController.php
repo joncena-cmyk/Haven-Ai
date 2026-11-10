@@ -97,8 +97,9 @@ class MlManagementController extends Controller
 
             if ($missingAudioFeats || $missingVibFeats) {
                 try {
-                    $extracted = $mlService->analyze($d);
-                    if (is_array($extracted) && (! empty($extracted['audio_features']) || ! empty($extracted['vibration_features']))) {
+                    // Never allow the simulated offline fallback to overwrite verified ground-truth records.
+                    $extracted = $mlService->analyze($d, false);
+                    if (is_array($extracted) && ! str_contains((string) ($extracted['mode'] ?? ''), 'mock') && (! empty($extracted['audio_features']) || ! empty($extracted['vibration_features']))) {
                         $raw = $extracted;
                         $audioFeat = is_array($raw['audio_features'] ?? null) ? $raw['audio_features'] : $audioFeat;
                         $vibFeat = is_array($raw['vibration_features'] ?? null) ? $raw['vibration_features'] : $vibFeat;

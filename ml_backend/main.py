@@ -279,6 +279,9 @@ async def analyze(
                 "hardware_features": context_metadata,
                 "context_metadata": context_metadata,
                 "mode": result.get("mode", "rule_based"),
+                "training_data_origin": result.get("training_data_origin", "rule_based"),
+                "real_training_samples": result.get("real_training_samples", 0),
+                "synthetic_training_samples": result.get("synthetic_training_samples", 0),
                 "warnings": errors + result.get("warnings", []),
                 "processed_at": datetime.now(timezone.utc).isoformat(),
             }

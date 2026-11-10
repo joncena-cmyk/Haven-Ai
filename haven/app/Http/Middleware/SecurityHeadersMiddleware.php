@@ -27,8 +27,8 @@ class SecurityHeadersMiddleware
         // 4. Referrer Policy: Send full URL on same-origin, domain-only on cross-origin
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-        // 5. Hardware Feature Policy: Allow microphone for engine audio, disallow camera/geolocation
-        $response->headers->set('Permissions-Policy', 'microphone=(self), camera=(), geolocation=(), payment=()');
+        // 5. Hardware Feature Policy: Allow microphone (engine audio) and geolocation (nearby repair shops) for this origin only; disallow camera/payment
+        $response->headers->set('Permissions-Policy', 'microphone=(self), camera=(), geolocation=(self), payment=()');
 
         // 6. Cross-Origin Resource Policy
         $response->headers->set('Cross-Origin-Resource-Policy', 'same-site');

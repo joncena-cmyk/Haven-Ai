@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -78,7 +79,12 @@ class DiagnosticController extends Controller
     public function create(Request $request): View
     {
         $vehicles = Auth::user()->vehicles()->orderBy('make')->get();
-        $selectedVehicleId = $request->query('vehicle_id') ?? $vehicles->first()?->id;
+        $liveCache = Cache::get('telemetry:live:user:'.Auth::id());
+        $liveVid = is_array($liveCache) ? ($liveCache['vehicle_id'] ?? null) : null;
+        $defaultVid = ($liveVid && $vehicles->contains('id', $liveVid))
+            ? $liveVid
+            : $vehicles->first()?->id;
+        $selectedVehicleId = $request->query('vehicle_id') ?? $defaultVid;
         $recentDiagnostics = Auth::user()->diagnostics()->with('vehicle')->latest()->take(8)->get();
 
         return view('diagnostics.create', compact('vehicles', 'selectedVehicleId', 'recentDiagnostics'));
@@ -94,14 +100,14 @@ class DiagnosticController extends Controller
             'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
             'audio_blob' => ['nullable', 'file', 'mimes:webm,ogg,wav,mp3,mp4', 'max:51200'], // 50 MB
             'audio_file' => ['nullable', 'file', 'mimes:webm,ogg,wav,mp3,mp4,m4a', 'max:51200'],
-            'vibration_file' => ['nullable', 'file', 'mimes:csv,json,txt', 'max:5120'], // 5 MB
+            'vibration_file' => ['nullable', 'file', 'mimes:csv,json,txt', 'max:51200'], // 50 MB
             'vibration_source' => ['nullable', 'string', 'in:adxl345_live,device_sensor,csv_import,simulated,skipped'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'recording_mode' => ['nullable', 'string', 'in:idle,revving'],
-            'temperature_c' => ['nullable', 'numeric', 'min:-40', 'max:200'],
-            'rpm' => ['nullable', 'integer', 'min:0', 'max:12000'],
-            'voltage_v' => ['nullable', 'numeric', 'min:0', 'max:50'],
-            'current_ma' => ['nullable', 'numeric', 'min:0', 'max:50000'],
+            'temperature_c' => ['nullable', 'numeric', 'min:-50', 'max:250'],
+            'rpm' => ['nullable', 'numeric', 'min:0', 'max:20000'],
+            'voltage_v' => ['nullable', 'numeric', 'min:-50', 'max:50'],
+            'current_ma' => ['nullable', 'numeric', 'min:-50000', 'max:50000'],
             'true_condition' => ['nullable', 'string', 'in:normal,misfire,loose_component,valve_clearance'],
             'session_id' => ['nullable', 'string', 'max:100'],
             'fault_detail' => ['nullable', 'string', 'max:2000'],
@@ -200,7 +206,11 @@ class DiagnosticController extends Controller
         $data['vibration_source'] = $vibrationSource;
 
         // Mark as submitted and auto-queue analysis if telemetry or files are present
-        $hasData = ! empty($data['audio_path']) || ! empty($data['vibration_path']) || ! empty($data['temperature_c']) || ! empty($data['rpm']);
+        $hasData = ! empty($data['audio_path'])
+            || ! empty($data['vibration_path'])
+            || isset($data['temperature_c'])
+            || isset($data['rpm'])
+            || isset($data['voltage_v']);
         if ($hasData) {
             $data['status'] = 'submitted';
         }
@@ -278,10 +288,12 @@ class DiagnosticController extends Controller
             ? $aiService->generateRecommendations($diagnostic)
             : null;
 
-        // Resolve vehicle reference baseline (prefer 'normal' session or prior completed session)
+        // Resolve vehicle reference baseline (prefer 'normal' session or prior valid completed session, excluding ambient_noise)
         $baseline = Diagnostic::where('vehicle_id', $diagnostic->vehicle_id)
             ->where('status', 'completed')
             ->where('id', '!=', $diagnostic->id)
+            ->whereNotNull('ml_condition')
+            ->whereNotIn('ml_condition', ['ambient_noise', 'no_engine', 'environmental_noise'])
             ->orderByRaw("CASE WHEN ml_condition = 'normal' THEN 0 ELSE 1 END")
             ->latest('id')
             ->first();
@@ -529,7 +541,7 @@ class DiagnosticController extends Controller
         $this->authorizeOwner($diagnostic);
 
         $tempFile = tempnam(sys_get_temp_dir(), 'haven_pkg_');
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
 
         if ($zip->open($tempFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             abort(500, 'Unable to create dataset ZIP archive.');
@@ -597,32 +609,32 @@ class DiagnosticController extends Controller
 
         // 4. Formatted Plain Text Summary
         $vName = $diagnostic->vehicle ? "{$diagnostic->vehicle->year} {$diagnostic->vehicle->make} {$diagnostic->vehicle->model}" : 'Vehicle';
-        $summaryTxt = "================================================================================\n" .
-                      "HAVEN AI — VEHICLE TELEMETRY & ML INGESTION DATASET\n" .
-                      "================================================================================\n" .
-                      "Diagnostic Session ID : #{$diagnostic->id}\n" .
-                      "Created Timestamp     : {$diagnostic->created_at}\n" .
-                      "Target Vehicle        : {$vName}\n" .
-                      "Classification Status : " . strtoupper($diagnostic->status) . "\n" .
-                      "Predicted Condition   : " . strtoupper($diagnostic->condition_label ?? 'Unclassified') . "\n" .
-                      "ML Model Confidence   : " . ($diagnostic->confidence_percent ?? 'N/A') . "\n\n" .
-                      "--------------------------------------------------------------------------------\n" .
-                      "TELEMETRY ACQUISITION DATA:\n" .
-                      "- Audio Duration      : " . ($diagnostic->audio_duration_sec ? ($diagnostic->audio_duration_sec . ' seconds') : 'None') . "\n" .
-                      "- Vibration Peak Accel: " . ($diagnostic->vibration_peak_g ? ($diagnostic->vibration_peak_g . ' g') : 'None') . "\n" .
-                      "- Vibration RMS Accel : " . ($diagnostic->vibration_rms_g ? ($diagnostic->vibration_rms_g . ' g') : 'None') . "\n" .
-                      "- Accelerometer Source: " . ($diagnostic->vibration_source ?? 'N/A') . "\n" .
-                      "- Engine Speed (RPM)  : " . ($diagnostic->rpm !== null ? ($diagnostic->rpm . ' RPM') : 'Unrecorded') . "\n" .
-                      "- Coolant Temp        : " . ($diagnostic->temperature_c !== null ? ($diagnostic->temperature_c . ' °C') : 'Unrecorded') . "\n" .
-                      "- DC Bus Voltage      : " . ($diagnostic->voltage_v !== null ? ($diagnostic->voltage_v . ' V') : 'Unrecorded') . "\n" .
-                      "- Bus Current Draw    : " . ($diagnostic->current_ma !== null ? ($diagnostic->current_ma . ' mA') : 'Unrecorded') . "\n" .
-                      "--------------------------------------------------------------------------------\n" .
-                      "FILES INCLUDED IN THIS ARCHIVE:\n" .
-                      "1. raw_audio.*               : Original acoustic recording captured via INMP441 MEMS microphone\n" .
-                      "2. raw_vibration.*           : 3-Axis accelerometer timeseries data (timestamp,x,y,z in Gs)\n" .
-                      "3. ml_classification_report.json : Full inference probabilities, feature vectors, and metadata\n" .
-                      "4. session_metadata.txt      : This human-readable diagnostic session sheet\n\n" .
-                      "Generated by HAVEN AI Engine Diagnostic Suite (University of Makati)\n" .
+        $summaryTxt = "================================================================================\n".
+                      "HAVEN AI — VEHICLE TELEMETRY & ML INGESTION DATASET\n".
+                      "================================================================================\n".
+                      "Diagnostic Session ID : #{$diagnostic->id}\n".
+                      "Created Timestamp     : {$diagnostic->created_at}\n".
+                      "Target Vehicle        : {$vName}\n".
+                      'Classification Status : '.strtoupper($diagnostic->status)."\n".
+                      'Predicted Condition   : '.strtoupper($diagnostic->condition_label ?? 'Unclassified')."\n".
+                      'ML Model Confidence   : '.($diagnostic->confidence_percent ?? 'N/A')."\n\n".
+                      "--------------------------------------------------------------------------------\n".
+                      "TELEMETRY ACQUISITION DATA:\n".
+                      '- Audio Duration      : '.($diagnostic->audio_duration_sec ? ($diagnostic->audio_duration_sec.' seconds') : 'None')."\n".
+                      '- Vibration Peak Accel: '.($diagnostic->vibration_peak_g ? ($diagnostic->vibration_peak_g.' g') : 'None')."\n".
+                      '- Vibration RMS Accel : '.($diagnostic->vibration_rms_g ? ($diagnostic->vibration_rms_g.' g') : 'None')."\n".
+                      '- Accelerometer Source: '.($diagnostic->vibration_source ?? 'N/A')."\n".
+                      '- Engine Speed (RPM)  : '.($diagnostic->rpm !== null ? ($diagnostic->rpm.' RPM') : 'Unrecorded')."\n".
+                      '- Coolant Temp        : '.($diagnostic->temperature_c !== null ? ($diagnostic->temperature_c.' °C') : 'Unrecorded')."\n".
+                      '- DC Bus Voltage      : '.($diagnostic->voltage_v !== null ? ($diagnostic->voltage_v.' V') : 'Unrecorded')."\n".
+                      '- Bus Current Draw    : '.($diagnostic->current_ma !== null ? ($diagnostic->current_ma.' mA') : 'Unrecorded')."\n".
+                      "--------------------------------------------------------------------------------\n".
+                      "FILES INCLUDED IN THIS ARCHIVE:\n".
+                      "1. raw_audio.*               : Original acoustic recording captured via INMP441 MEMS microphone\n".
+                      "2. raw_vibration.*           : 3-Axis accelerometer timeseries data (timestamp,x,y,z in Gs)\n".
+                      "3. ml_classification_report.json : Full inference probabilities, feature vectors, and metadata\n".
+                      "4. session_metadata.txt      : This human-readable diagnostic session sheet\n\n".
+                      "Generated by HAVEN AI Engine Diagnostic Suite (University of Makati)\n".
                       "================================================================================\n";
         $zip->addFromString('session_metadata.txt', $summaryTxt);
 
@@ -838,6 +850,7 @@ class DiagnosticController extends Controller
                 $rows = [];
                 $tVals = [];
                 $isMicrosHeader = false;
+                $axisIndices = [1, 2, 3];
 
                 foreach ($lines as $line) {
                     if ($line === '' || str_starts_with($line, '#')) {
@@ -852,14 +865,25 @@ class DiagnosticController extends Controller
                         if (str_contains($firstCol, 't_us') || str_contains($firstCol, 'micros')) {
                             $isMicrosHeader = true;
                         }
+                        $lowerCols = array_map(fn ($c) => strtolower(trim((string) $c)), $cols);
+                        foreach ([['ax', 'ay', 'az'], ['x', 'y', 'z'], ['channel 1', 'channel 2', 'channel 3']] as $cand) {
+                            $i0 = array_search($cand[0], $lowerCols, true);
+                            $i1 = array_search($cand[1], $lowerCols, true);
+                            $i2 = array_search($cand[2], $lowerCols, true);
+                            if ($i0 !== false && $i1 !== false && $i2 !== false) {
+                                $axisIndices = [(int) $i0, (int) $i1, (int) $i2];
+                                break;
+                            }
+                        }
 
                         continue;
                     }
 
                     $tVals[] = (float) $cols[0];
-                    if (count($cols) >= 4) {
-                        $rows[] = [(float) $cols[1], (float) $cols[2], (float) $cols[3]];
-                    } elseif (count($cols) >= 2) {
+                    $maxIdx = max($axisIndices);
+                    if (count($cols) > $maxIdx && is_numeric($cols[$axisIndices[0]]) && is_numeric($cols[$axisIndices[1]]) && is_numeric($cols[$axisIndices[2]])) {
+                        $rows[] = [(float) $cols[$axisIndices[0]], (float) $cols[$axisIndices[1]], (float) $cols[$axisIndices[2]]];
+                    } elseif (count($cols) >= 2 && is_numeric($cols[1])) {
                         $rows[] = [(float) $cols[1]];
                     }
                 }
@@ -870,15 +894,29 @@ class DiagnosticController extends Controller
 
                 $count = count($rows);
                 if (count($tVals) >= 10) {
-                    $span = $tVals[count($tVals) - 1] - $tVals[0];
-                    if ($span > 0) {
-                        if ($isMicrosHeader || $span > 1e5) {
-                            $rate = ($count - 1) / ($span / 1e6);
-                        } else {
-                            $rate = ($count - 1) / $span;
+                    $diffs = [];
+                    for ($i = 1, $n = count($tVals); $i < $n; $i++) {
+                        $dt = $tVals[$i] - $tVals[$i - 1];
+                        if ($dt > 0) {
+                            $diffs[] = $dt;
                         }
-                        if ($rate >= 10 && $rate <= 50000) {
-                            $inferredRateHz = (int) round($rate);
+                    }
+                    if (! empty($diffs)) {
+                        sort($diffs);
+                        $mid = intdiv(count($diffs), 2);
+                        $medianDt = (count($diffs) % 2 === 1)
+                            ? $diffs[$mid]
+                            : (($diffs[$mid - 1] + $diffs[$mid]) / 2.0);
+                        if ($medianDt > 0) {
+                            $span = $tVals[count($tVals) - 1] - $tVals[0];
+                            if ($isMicrosHeader || $medianDt > 10.0 || $span > 1e5) {
+                                $rate = 1e6 / $medianDt;
+                            } else {
+                                $rate = 1.0 / $medianDt;
+                            }
+                            if ($rate >= 10 && $rate <= 50000) {
+                                $inferredRateHz = (int) round($rate);
+                            }
                         }
                     }
                 }

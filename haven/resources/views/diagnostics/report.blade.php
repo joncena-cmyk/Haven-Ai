@@ -244,14 +244,21 @@
     @if($diagnostic->status === 'completed' && $diagnostic->ml_condition)
         @php
             $topClasses = $diagnostic->ml_result_raw['top_classes'] ?? [];
-            $isMock = str_contains($diagnostic->ml_result_raw['mode'] ?? '', 'mock');
+            $rawMode = $diagnostic->ml_result_raw['mode'] ?? '';
+            $isMock = str_contains($rawMode, 'mock');
+            $trainOrigin = $diagnostic->ml_result_raw['training_data_origin'] ?? null;
+            $isSynthModel = ($trainOrigin === 'synthetic_bootstrap');
         @endphp
         <div class="result-banner {{ $diagnostic->ml_condition }}">
             <div>
                 <div class="result-label">Detected Condition</div>
                 <div class="result-condition">{{ $diagnostic->condition_label ?? ucwords(str_replace('_',' ',$diagnostic->ml_condition)) }}</div>
                 @if($isMock)
-                    <div style="font-size:0.72rem;color:#f59e0b;margin-top:0.2rem;">⚠ Simulated result — ML server was offline</div>
+                    <div style="font-size:0.72rem;color:#f59e0b;margin-top:0.2rem;">⚠ Simulated heuristic result — FastAPI ML server was offline</div>
+                @elseif($rawMode === 'rule_based')
+                    <div style="font-size:0.72rem;color:#f59e0b;margin-top:0.2rem;">⚠ Rule-based domain threshold classification</div>
+                @elseif($isSynthModel)
+                    <div style="font-size:0.72rem;color:#0284c7;margin-top:0.2rem;">ℹ Preliminary Prototype ML — Model calibrated on synthetic bootstrap dataset (0 real-engine samples)</div>
                 @endif
             </div>
             @if($diagnostic->ml_confidence !== null)

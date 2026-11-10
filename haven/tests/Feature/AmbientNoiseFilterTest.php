@@ -124,4 +124,55 @@ class AmbientNoiseFilterTest extends TestCase
         $chargingDiag = Diagnostic::latest('id')->firstOrFail();
         $this->assertNotEquals('ambient_noise', $chargingDiag->ml_condition);
     }
+
+    public function test_multiburst_vibration_csv_infers_correct_100hz_sample_rate_and_baseline_excludes_ambient_noise(): void
+    {
+        $user = User::factory()->create();
+        $vehicle = Vehicle::create([
+            'user_id' => $user->id,
+            'make' => 'Honda',
+            'model' => 'Civic',
+            'year' => 2021,
+            'body_type' => 'sedan',
+        ]);
+
+        // 1. Create an initial ambient_noise session that should NEVER be chosen as baseline
+        $ambientDiag = Diagnostic::create([
+            'vehicle_id' => $vehicle->id,
+            'user_id' => $user->id,
+            'status' => 'completed',
+            'ml_condition' => 'ambient_noise',
+            'ml_confidence' => 0.95,
+            'vibration_peak_g' => 0.0,
+            'vibration_rms_g' => 0.0,
+        ]);
+
+        // 2. Build a multi-burst CSV (2 bursts of 16 samples at 100Hz = 0.01s step, separated by a 4.5s wall-clock gap)
+        $lines = ['timestamp,x,y,z'];
+        for ($i = 0; $i < 16; $i++) {
+            $t = round($i * 0.01, 4);
+            $lines[] = "{$t},0.05,-0.04,1.02";
+        }
+        for ($i = 0; $i < 16; $i++) {
+            $t = round(4.50 + ($i * 0.01), 4);
+            $lines[] = "{$t},-0.05,0.04,0.98";
+        }
+        $vibration = UploadedFile::fake()->createWithContent('multiburst.csv', implode("\n", $lines));
+
+        $this->actingAs($user)->post(route('diagnostics.store'), [
+            'vehicle_id' => $vehicle->id,
+            'vibration_file' => $vibration,
+            'vibration_source' => 'adxl345_live',
+            'rpm' => 800,
+        ]);
+
+        $realDiag = Diagnostic::latest('id')->firstOrFail();
+        $this->assertEquals(100, $realDiag->sample_rate_hz);
+        $this->assertNotEquals('ambient_noise', $realDiag->ml_condition);
+
+        // 3. Viewing the real diagnostic must NOT compare against the ambient_noise session
+        $showResponse = $this->actingAs($user)->get(route('diagnostics.show', $realDiag));
+        $showResponse->assertStatus(200);
+        $showResponse->assertDontSee("Baseline (#{$ambientDiag->id})");
+    }
 }

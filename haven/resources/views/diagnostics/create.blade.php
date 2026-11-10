@@ -133,10 +133,6 @@
                     <span id="hud-condition-icon">✓</span>
                     <span id="hud-condition-name">ENGINE STANDBY</span>
                 </div>
-                <button type="button" class="h-diag-ai-report-btn" onclick="openReportModal()" title="View Model Architecture & Thesis Specifications">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    <span>AI Report</span>
-                </button>
             </div>
 
             {{-- Dynamic Mini Step Ticker --}}
@@ -435,7 +431,7 @@
                         <div class="h-diag-probe-cap"></div>
                     </div>
                     <div class="h-diag-probe-name">Vibration</div>
-                    <div class="h-diag-probe-val" id="probe-vib-val">1.24 g</div>
+                    <div class="h-diag-probe-val" id="probe-vib-val">-- g</div>
                 </div>
 
                 {{-- Probe 3: Temperature DS18B20 (Contextual) --}}
@@ -477,7 +473,7 @@
                 </div>
                 <div class="h-diag-footer-metric">
                     <span class="lbl">Continuous RMS</span>
-                    <span class="val" id="daq-rms-val">0.38 g</span>
+                    <span class="val" id="daq-rms-val">-- g</span>
                 </div>
                 <div class="h-diag-footer-metric">
                     <span class="lbl">Thesis Scope</span>
@@ -490,12 +486,12 @@
         <div class="h-diag-card dark-mode-card">
             <div class="h-diag-card-head" style="border-color: rgba(255,255,255,0.1);">
                 <span class="h-diag-card-title" style="color:#fff;">POWERTRAIN DAQ</span>
-                <span class="h-diag-daq-badge-live">94% SENSOR HEALTH</span>
+                <span class="h-diag-daq-badge-live">SENSORS STANDBY</span>
             </div>
 
             <div class="h-diag-dark-card-body">
                 <div class="h-diag-dark-left">
-                    <div class="h-diag-dark-big-val" id="dark-peak-val">1.24 <span style="font-size:1rem;color:#94a3b8;">g</span></div>
+                    <div class="h-diag-dark-big-val" id="dark-peak-val">-- <span style="font-size:1rem;color:#94a3b8;">g</span></div>
                     <div class="h-diag-dark-sub">Peak Mechanical Impact Force</div>
                     <div class="h-diag-dark-chip" id="dark-status-chip">
                         <span class="dot"></span>
@@ -912,7 +908,7 @@
     <input type="hidden" name="vehicle_id" id="form_vehicle_id" value="{{ $selectedVehicle?->id }}">
     <input type="hidden" name="recording_mode" id="form_recording_mode" value="idle">
     <input type="hidden" name="notes" id="form_notes" value="Live Diagnostic Studio Session">
-    <input type="hidden" name="vibration_source" id="form_vibration_source" value="none">
+    <input type="hidden" name="vibration_source" id="form_vibration_source" value="">
     <input type="file" name="audio_blob" id="form_audio_blob">
     <input type="file" name="audio_file" id="form_audio_file">
     <input type="file" name="vibration_file" id="form_vibration_file">
@@ -4302,6 +4298,9 @@
                 document.getElementById('hud-progress-pct').textContent = '90%';
                 document.getElementById('hud-progress-label').textContent = 'ALL SIGNALS CAPTURED · READY TO ANALYZE';
                 window.setDiagnosisFlowStep('analyze');
+            } else if (captureState === 'IDLE') {
+                // Vibration-only submission is supported by the backend.
+                document.getElementById('btn-submit-session').disabled = false;
             }
         }
         closeSampleUploadModal();
@@ -4394,6 +4393,12 @@
             } else {
                 tickAux.classList.remove('completed');
             }
+        }
+
+        if ((temp || rpm || volt || curr) && captureState === 'IDLE') {
+            // Telemetry-only submission is supported by the backend.
+            const sb = document.getElementById('btn-submit-session');
+            if (sb) sb.disabled = false;
         }
 
         closeManualTelemetryDrawer();
@@ -4821,7 +4826,7 @@
                         }
 
                         const tag = document.getElementById('wb-status-tag');
-                        if (tag && (data.temperature_c !== null || data.rpm > 0 || data.voltage_v !== null)) {
+                        if (tag) {
                             tag.textContent = '🟢 ESP32 LIVE';
                             tag.style.background = 'rgba(16,185,129,0.15)';
                             tag.style.color = '#34d399';
@@ -4908,6 +4913,11 @@
 
                     const tickAux = document.getElementById('tick-aux');
                     if (tickAux) tickAux.classList.add('completed');
+
+                    if (interactive && capturedCount > 0 && captureState === 'IDLE') {
+                        const sb = document.getElementById('btn-submit-session');
+                        if (sb) sb.disabled = false;
+                    }
 
                     if (interactive) {
                         alert('✓ Captured Live Hardware DAQ from ESP32:\n• Engine Speed: ' + (data.rpm ?? '--') + ' RPM\n• Coolant Temp: ' + (data.temperature_c !== null ? (data.temperature_c + '°C') : 'Unplugged') + '\n• DC Bus Voltage: ' + (data.voltage_v !== null ? (data.voltage_v + 'V') : 'Unplugged') + '\n\n(Contextual metadata captured with diagnosis; excluded from ML feature vector).');

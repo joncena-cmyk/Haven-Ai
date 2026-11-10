@@ -207,11 +207,24 @@
                     <span>{{ $diagnostic->condition_label ?? 'SESSION CAPTURED' }}</span>
                 </div>
                 @if($diagnostic->ml_confidence !== null)
-                    <div style="background:rgba(2,132,199,0.1);color:#0284c7;font-weight:700;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:999px;">
-                        {{ $diagnostic->confidence_percent }} CONFIDENCE
-                    </div>
+                    @if($diagnostic->ml_confidence < 0.60 && $canon !== 'ambient_noise')
+                        <div style="background:rgba(217,119,6,0.14);color:#b45309;border:1px solid rgba(217,119,6,0.35);font-weight:700;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:999px;" title="Model confidence is below 60%. A clean re-test at the engine bay is recommended before replacing parts.">
+                            ⚠️ {{ $diagnostic->confidence_percent }} LOW CONFIDENCE · RE-TEST ADVISED
+                        </div>
+                    @else
+                        <div style="background:rgba(2,132,199,0.1);color:#0284c7;font-weight:700;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:999px;">
+                            {{ $diagnostic->confidence_percent }} CONFIDENCE
+                        </div>
+                    @endif
                 @endif
             </div>
+
+            @if($diagnostic->status === 'completed' && $diagnostic->ml_confidence !== null && $diagnostic->ml_confidence < 0.60 && $canon !== 'ambient_noise')
+                <div style="margin-top:0.75rem;padding:0.65rem 0.85rem;background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.35);border-radius:10px;font-size:0.76rem;color:#92400e;line-height:1.45;">
+                    <strong>Borderline Classification ({{ $diagnostic->confidence_percent }} Confidence):</strong>
+                    Acoustic/vibrational probabilities were closely split across multiple engine states (&lt;60% certainty threshold). Re-run a 10-second capture with the sensor firmly coupled to the engine block before performing repairs.
+                </div>
+            @endif
 
             {{-- Summary details --}}
             <div class="h-diag-pipeline-ticker" style="margin-top:1.25rem;">
@@ -227,9 +240,15 @@
                     <span class="h-ticker-bullet"></span>
                     <span class="h-ticker-txt">AUX DAQ: {{ $diagnostic->temperature_c !== null ? number_format($diagnostic->temperature_c, 1) . '°C' : '--' }} · {{ $diagnostic->rpm !== null ? number_format($diagnostic->rpm) . ' RPM' : '--' }} · {{ $diagnostic->voltage_v !== null ? number_format($diagnostic->voltage_v, 1) . 'V' : '--' }}</span>
                 </div>
+                @php
+                    $rawMode = $diagnostic->ml_result_raw['mode'] ?? '';
+                    $trainOrigin = $diagnostic->ml_result_raw['training_data_origin'] ?? null;
+                    $realTrainCount = $diagnostic->ml_result_raw['real_training_samples'] ?? null;
+                    $isSynthModel = ($trainOrigin === 'synthetic_bootstrap') || (! $isMock && $rawMode !== 'rule_based' && $realTrainCount === 0 && isset($diagnostic->ml_result_raw['training_data_origin']));
+                @endphp
                 <div class="h-ticker-item {{ $diagnostic->status === 'completed' ? 'active' : '' }}">
                     <span class="h-ticker-bullet"></span>
-                    <span class="h-ticker-txt">FASTAPI: {{ $isMock ? 'SIMULATED' : 'LIVE ML' }}</span>
+                    <span class="h-ticker-txt">FASTAPI: {{ $isMock ? 'SIMULATED (OFFLINE)' : ($rawMode === 'rule_based' ? 'RULE-BASED' : ($isSynthModel ? 'SYNTHETIC-TRAINED PROTOTYPE ML' : 'LIVE ML')) }}</span>
                 </div>
             </div>
 
@@ -590,15 +609,15 @@
             {{-- Technical Sub-Bar: Hardware Metrics --}}
             <div class="h-diag-card-footer-metrics">
                 <div class="metric">
-                    <span class="m-val">{{ $diagnostic->vibration_sample_count ? number_format($diagnostic->vibration_sample_count) : '1,280' }}</span>
+                    <span class="m-val">{{ $diagnostic->vibration_sample_count !== null ? number_format($diagnostic->vibration_sample_count) : '0' }}</span>
                     <span class="m-lbl">Samples</span>
                 </div>
                 <div class="metric">
-                    <span class="m-val">{{ $diagnostic->vibration_rms_g ? number_format($diagnostic->vibration_rms_g, 3) . 'g' : '0.120g' }}</span>
+                    <span class="m-val">{{ $diagnostic->vibration_rms_g !== null ? number_format($diagnostic->vibration_rms_g, 3) . 'g' : '--' }}</span>
                     <span class="m-lbl">RMS Vibration</span>
                 </div>
                 <div class="metric">
-                    <span class="m-val">{{ $diagnostic->recording_mode === 'revving' ? '2,500' : 'Idle' }}</span>
+                    <span class="m-val">{{ $diagnostic->recording_mode === 'revving' ? 'Revving' : 'Idle' }}</span>
                     <span class="m-lbl">Mode</span>
                 </div>
             </div>
@@ -609,7 +628,7 @@
             <div class="h-diag-card-head">
                 <span class="h-diag-card-title light">DIAGNOSTIC DAQ</span>
                 <span class="h-diag-badge-dark" style="color:{{ $condColor['icon'] }};border-color:{{ $condColor['border'] }};">
-                    {{ $diagnostic->confidence_percent ? $diagnostic->confidence_percent : '94.2%' }}
+                    {{ $diagnostic->confidence_percent ?? '--' }}
                 </span>
             </div>
 
@@ -641,11 +660,11 @@
             </div>
 
             <div class="h-diag-daq-footer-specs">
-                <span>{{ $diagnostic->voltage_v ? number_format($diagnostic->voltage_v, 2) . 'V' : '13.8V' }}</span>
+                <span>{{ $diagnostic->voltage_v !== null ? number_format($diagnostic->voltage_v, 2) . 'V' : 'No Voltage Stream' }}</span>
                 <span>•</span>
-                <span>{{ $diagnostic->recording_mode === 'revving' ? '2500 RPM' : 'Idle 750 RPM' }}</span>
+                <span>{{ $diagnostic->rpm !== null ? number_format($diagnostic->rpm) . ' RPM' : ($diagnostic->recording_mode === 'revving' ? 'Revving Mode' : 'Idle Mode') }}</span>
                 <span>•</span>
-                <span>{{ $diagnostic->vibration_peak_g ? $diagnostic->vibration_peak_g . 'g' : '0.24g' }} Peak</span>
+                <span>{{ $diagnostic->vibration_peak_g !== null ? number_format($diagnostic->vibration_peak_g, 3) . 'g Peak' : 'No Vibration' }}</span>
             </div>
         </div>
 
@@ -874,8 +893,8 @@
                             <span>Target: &lt;1.5g Peak</span>
                         </div>
                         <div style="position:relative;height:14px;background:var(--h-surface3, #e2e8f0);border-radius:999px;overflow:hidden;">
-                            <div style="position:absolute;left:0;top:0;bottom:0;width:{{ min(100, ($comparison['peak_g']['baseline'] ?? 1.0) * 20) }}%;background:rgba(2,132,199,0.4);border-right:2px solid #0284c7;" title="Baseline"></div>
-                            <div style="position:absolute;left:0;top:3px;bottom:3px;width:{{ min(100, ($comparison['peak_g']['current'] ?? 1.0) * 20) }}%;background:{{ ($comparison['peak_g']['delta'] ?? 0) > 0.5 ? '#ef4444' : '#16a34a' }};border-radius:999px;" title="Current Session"></div>
+                            <div style="position:absolute;left:0;top:0;bottom:0;width:{{ min(100, ($comparison['peak_g']['baseline'] ?? 0) * 20) }}%;background:rgba(2,132,199,0.4);border-right:2px solid #0284c7;" title="Baseline"></div>
+                            <div style="position:absolute;left:0;top:3px;bottom:3px;width:{{ min(100, ($comparison['peak_g']['current'] ?? 0) * 20) }}%;background:{{ ($comparison['peak_g']['delta'] ?? 0) > 0.5 ? '#ef4444' : '#16a34a' }};border-radius:999px;" title="Current Session"></div>
                         </div>
                         <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--h-text3);margin-top:0.35rem;">
                             <span><strong style="color:var(--h-teal);">■</strong> Baseline (#{{ $comparison['baseline_id'] }})</span>
@@ -1115,13 +1134,78 @@
                     </button>
                 </div>
 
-                <div id="ai-status-indicator" style="display:none;font-size:0.74rem;color:#0284c7;margin-top:0.4rem;display:flex;align-items:center;gap:0.4rem;">
+                <div id="ai-status-indicator" style="display:none;font-size:0.74rem;color:#0284c7;margin-top:0.4rem;align-items:center;gap:0.4rem;">
                     <span class="spin" style="width:10px;height:10px;border:2px solid #0284c7;border-top-color:transparent;border-radius:50%;display:inline-block;"></span>
                     <span id="ai-status-text">Listening... Speak now</span>
                 </div>
             </div>
 
         </div>
+    @endif
+
+    {{-- Nearby repair shops (Google Places) — shown when a fault condition was detected --}}
+    @if(in_array($canon, ['misfire', 'valve_clearance', 'loose_component'], true))
+        <div id="haven-shops-card" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;box-shadow:0 2px 10px rgba(0,0,0,0.03);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+                <div>
+                    <div style="font-weight:700;font-size:0.9rem;color:#0f172a;">Nearby Repair Shops</div>
+                    <div style="font-size:0.74rem;color:#64748b;margin-top:0.15rem;">Find auto repair shops close to you to have this fault checked. Your location is used only for this search and is not stored.</div>
+                </div>
+                <button type="button" id="haven-shops-btn" class="h-diag-btn-primary" style="padding:0.55rem 1rem;font-size:0.8rem;height:auto;">Find shops near me</button>
+            </div>
+            <div id="haven-shops-msg" style="display:none;font-size:0.78rem;color:#64748b;margin-top:0.75rem;"></div>
+            <div id="haven-shops-list" style="display:grid;gap:0.6rem;margin-top:0.75rem;"></div>
+        </div>
+        <script>
+        (function () {
+            const btn = document.getElementById('haven-shops-btn');
+            const msg = document.getElementById('haven-shops-msg');
+            const list = document.getElementById('haven-shops-list');
+            const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            function say(t, isErr) { msg.style.display = 'block'; msg.style.color = isErr ? '#b91c1c' : '#64748b'; msg.textContent = t; }
+            function fallback(lat, lng) {
+                const q = (lat != null) ? `https://www.google.com/maps/search/auto+repair/@${lat},${lng},14z` : 'https://www.google.com/maps/search/auto+repair+near+me';
+                list.innerHTML = `<a href="${q}" target="_blank" rel="noopener" style="font-size:0.8rem;color:#0284c7;font-weight:600;">Open auto repair shops in Google Maps &rarr;</a>`;
+            }
+            btn.addEventListener('click', function () {
+                if (!navigator.geolocation) { say('Location is not available in this browser.', true); fallback(); return; }
+                btn.disabled = true; say('Getting your location…');
+                navigator.geolocation.getCurrentPosition(function (pos) {
+                    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+                    say('Searching nearby shops…');
+                    fetch('{{ route('google.nearby-shops') }}', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json'},
+                        body: JSON.stringify({lat: lat, lng: lng, limit: 8})
+                    }).then(r => r.json().then(d => ({status: r.status, d}))).then(({status, d}) => {
+                        btn.disabled = false;
+                        if (!d.ok) {
+                            say(d.error === 'not_configured' ? 'Shop search is not configured on this server yet (Google Maps key missing).' : 'Shop search is temporarily unavailable.', true);
+                            fallback(lat, lng); return;
+                        }
+                        if (!d.shops.length) { say('No repair shops found within the search radius.'); fallback(lat, lng); return; }
+                        say(d.shops.length + ' shop(s) found, nearest first. Verify hours and reviews before visiting.');
+                        list.innerHTML = d.shops.map(s => `
+                            <div style="border:1px solid #e2e8f0;border-radius:8px;padding:0.65rem 0.8rem;display:flex;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+                                <div>
+                                    <div style="font-weight:600;font-size:0.84rem;color:#0f172a;">${esc(s.name)}</div>
+                                    <div style="font-size:0.74rem;color:#64748b;">${esc(s.address)}</div>
+                                    <div style="font-size:0.72rem;color:#475569;margin-top:0.15rem;">
+                                        ${s.rating ? '★ ' + esc(s.rating) + ' (' + esc(s.rating_count) + ')' : 'No rating'}
+                                        ${s.open_now === true ? ' · Open now' : (s.open_now === false ? ' · Closed' : '')}
+                                        ${s.distance_km != null ? ' · ' + esc(s.distance_km) + ' km' : ''}
+                                        ${s.phone ? ' · ' + esc(s.phone) : ''}
+                                    </div>
+                                </div>
+                                ${s.maps_url ? `<a href="${esc(s.maps_url)}" target="_blank" rel="noopener" style="font-size:0.76rem;color:#0284c7;font-weight:600;align-self:center;">Directions</a>` : ''}
+                            </div>`).join('');
+                    }).catch(() => { btn.disabled = false; say('Could not reach the shop search service.', true); fallback(lat, lng); });
+                }, function () {
+                    btn.disabled = false; say('Location permission denied. You can still search manually:', true); fallback();
+                }, {enableHighAccuracy: false, timeout: 10000});
+            });
+        })();
+        </script>
     @endif
 
     {{-- ═══════════════════════════════════════════════════════════════
@@ -1908,7 +1992,7 @@
 /* Equalizer Probes */
 .h-diag-probes-container {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 0.5rem;
     align-items: flex-end;
     min-height: 110px;
@@ -2189,7 +2273,7 @@ document.addEventListener('DOMContentLoaded', function() {
         voiceToggleBtn.addEventListener('click', function() {
             voiceEnabled = !voiceEnabled;
             voiceToggleLabel.textContent = voiceEnabled ? 'Voice: Active' : 'Voice: Muted';
-            if (!voiceEnabled && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+            if (!voiceEnabled) { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); if (typeof ttsAudio !== 'undefined' && ttsAudio) ttsAudio.pause(); }
         });
     }
 
@@ -2215,6 +2299,66 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             if (isListening) { recognition.stop(); } else { recognition.start(); }
         });
+    } else if (micBtn && navigator.mediaDevices && window.MediaRecorder) {
+        // Fallback: browser has no built-in speech recognition -> record and transcribe with Google Cloud STT.
+        let mr = null, chunks = [], recStream = null;
+        micBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            if (mr && mr.state === 'recording') { mr.stop(); return; }
+            try {
+                recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (_) {
+                if (statusBox) { statusBox.style.display = 'flex'; statusText.textContent = 'Microphone permission denied.'; setTimeout(() => statusBox.style.display = 'none', 2500); }
+                return;
+            }
+            chunks = [];
+            mr = new MediaRecorder(recStream);
+            mr.ondataavailable = ev => { if (ev.data.size) chunks.push(ev.data); };
+            mr.onstart = function() {
+                micBtn.classList.add('mic-active');
+                if (statusBox) { statusBox.style.display = 'flex'; statusText.textContent = 'Listening... click the mic again to stop'; }
+                setTimeout(() => { if (mr && mr.state === 'recording') mr.stop(); }, 30000);
+            };
+            mr.onstop = async function() {
+                micBtn.classList.remove('mic-active');
+                recStream.getTracks().forEach(t => t.stop());
+                if (statusText) statusText.textContent = 'Transcribing...';
+                const blob = new Blob(chunks, { type: mr.mimeType || 'audio/webm' });
+                const fd = new FormData();
+                fd.append('audio', blob, 'speech.webm');
+                try {
+                    const r = await fetch('{{ route('google.speech.transcribe') }}', {
+                        method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }, body: fd
+                    });
+                    const d = await r.json();
+                    if (d.ok && d.transcript) { input.value = d.transcript; setTimeout(() => submitAiQuestion(), 300); }
+                    else if (statusText) { statusText.textContent = d.error === 'not_configured' ? 'Voice input is not configured on this server.' : 'Could not understand audio.'; await new Promise(r => setTimeout(r, 2200)); }
+                } catch (_) {}
+                if (statusBox) statusBox.style.display = 'none';
+            };
+            mr.start();
+        });
+    }
+
+    // Prefer Google Cloud TTS when configured on the server; otherwise use the browser voice.
+    let googleSpeech = false;
+    fetch('{{ route('google.status') }}', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+        .then(r => r.json()).then(d => { googleSpeech = !!d.speech; }).catch(() => {});
+    let ttsAudio = null;
+    function speakReply(text) {
+        const clean = text.replace(/[*#_`]/g, '');
+        const browserSpeak = () => { if ('speechSynthesis' in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance(clean)); };
+        if (!googleSpeech) { browserSpeak(); return; }
+        fetch('{{ route('google.speech.speak') }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+            body: JSON.stringify({ text: clean })
+        }).then(r => r.json()).then(d => {
+            if (!d.ok || !voiceEnabled) { if (!d.ok) browserSpeak(); return; }
+            if (ttsAudio) ttsAudio.pause();
+            ttsAudio = new Audio('data:' + d.mime + ';base64,' + d.audio_base64);
+            ttsAudio.play().catch(browserSpeak);
+        }).catch(browserSpeak);
     }
 
     window.submitAiQuestion = function() {
@@ -2237,10 +2381,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             const reply = data.answer || 'Thank you. I have logged your diagnostic query.';
             appendBotMsg(reply);
-            if (voiceEnabled && 'speechSynthesis' in window) {
-                const u = new SpeechSynthesisUtterance(reply.replace(/[*#_`]/g, ''));
-                window.speechSynthesis.speak(u);
-            }
+            if (voiceEnabled) speakReply(reply);
         })
         .catch(err => {
             appendBotMsg('An error occurred communicating with Haven AI. Please try again.');

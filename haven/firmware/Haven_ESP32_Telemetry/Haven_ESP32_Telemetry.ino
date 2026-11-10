@@ -189,7 +189,7 @@ void sendTelemetry() {
 
   HTTPClient http;
   http.begin(serverUrl);
-  http.setTimeout(10000);
+  http.setTimeout(2000);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Accept", "application/json");
   http.addHeader("X-Haven-Device-Key", deviceKey);
@@ -251,6 +251,10 @@ void setup() {
     portalServer.send(200, "text/html", html);
   });
   portalServer.on("/save", HTTP_POST, []() {
+    if (strlen(deviceKey) > 0 && portalServer.arg("key") != String(deviceKey)) {
+      portalServer.send(403, "text/plain", "Forbidden: matching device key required to overwrite NVS.");
+      return;
+    }
     prefs.begin("haven", false);
     if (portalServer.hasArg("ssid")) prefs.putString("ssid", portalServer.arg("ssid"));
     if (portalServer.hasArg("pass")) prefs.putString("pass", portalServer.arg("pass"));

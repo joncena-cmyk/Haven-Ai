@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class RegistrationTest extends TestCase
@@ -34,7 +36,7 @@ class RegistrationTest extends TestCase
         $this->assertGuest();
         $response->assertRedirect(route('register.verify-otp'));
 
-        $user = \App\Models\User::where('email', 'test@example.com')->first();
+        $user = User::where('email', 'test@example.com')->first();
         $this->assertNotNull($user);
         $this->assertNull($user->email_verified_at);
 
@@ -47,7 +49,7 @@ class RegistrationTest extends TestCase
         // Submit matching code
         $code = (string) random_int(100000, 999999);
         $user->forceFill([
-            'two_factor_code' => \Illuminate\Support\Facades\Hash::make($code),
+            'two_factor_code' => Hash::make($code),
             'two_factor_expires_at' => now()->addMinutes(10),
         ])->save();
 
@@ -63,8 +65,8 @@ class RegistrationTest extends TestCase
 
     public function test_registration_otp_locks_out_after_five_wrong_attempts(): void
     {
-        $user = \App\Models\User::factory()->unverified()->create([
-            'two_factor_code' => \Illuminate\Support\Facades\Hash::make('123456'),
+        $user = User::factory()->unverified()->create([
+            'two_factor_code' => Hash::make('123456'),
             'two_factor_expires_at' => now()->addMinutes(10),
         ]);
 

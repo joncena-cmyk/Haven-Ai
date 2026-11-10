@@ -528,12 +528,32 @@ class EngineClassifier:
             if X_wins is not None and len(X_wins) > 1:
                 mode_label += "_window_ensemble"
 
+            real_train_n = int(self._model_meta.get("real_samples_count", 0) or 0)
+            synth_train_n = int(self._model_meta.get("synthetic_samples_count", 0) or 0)
+            if real_train_n > 0 and synth_train_n == 0:
+                training_origin = "real_engine_verified"
+            elif real_train_n > 0 and synth_train_n > 0:
+                training_origin = "hybrid_calibrated"
+            else:
+                training_origin = "synthetic_bootstrap"
+
+            model_warnings = []
+            if training_origin == "synthetic_bootstrap":
+                model_warnings.append(
+                    "PROTOTYPE MODEL NOTICE: Active Random Forest model is calibrated on synthetic bootstrap data "
+                    "(0 verified real-engine training samples). Treat classification as preliminary prototype output."
+                )
+
             return {
                 "condition": str(pred),
                 "confidence": round(confidence, 4),
                 "top_classes": top_classes,
                 "mode": mode_label,
+                "training_data_origin": training_origin,
+                "real_training_samples": real_train_n,
+                "synthetic_training_samples": synth_train_n,
                 "window_ensemble_count": int(len(X_wins)) if X_wins is not None else 1,
+                "warnings": model_warnings,
             }
 
         except Exception as e:

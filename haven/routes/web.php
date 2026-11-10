@@ -65,10 +65,24 @@ Route::middleware(['auth:web'])->group(function () {
         ->middleware(['throttle:ai-ask'])
         ->name('ai.ask');
 
+    // Google Maps (Places) + Cloud Speech proxies (keys stay server-side)
+    Route::prefix('google')->name('google.')->group(function () {
+        Route::get('status', [\App\Http\Controllers\GoogleServicesController::class, 'status'])->name('status');
+        Route::post('nearby-shops', [\App\Http\Controllers\GoogleServicesController::class, 'nearbyShops'])
+            ->middleware('throttle:30,1')->name('nearby-shops');
+        Route::post('speech/transcribe', [\App\Http\Controllers\GoogleServicesController::class, 'transcribe'])
+            ->middleware('throttle:ai-ask')->name('speech.transcribe');
+        Route::post('speech/speak', [\App\Http\Controllers\GoogleServicesController::class, 'speak'])
+            ->middleware('throttle:ai-ask')->name('speech.speak');
+    });
+
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/two-factor', [ProfileController::class, 'updateTwoFactor'])->name('profile.two-factor.update');
+    Route::post('/profile/two-factor/test', [ProfileController::class, 'sendTestTwoFactor'])
+        ->middleware('throttle:5,1')
+        ->name('profile.two-factor.test');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Stage 3 — Vehicle Management

@@ -425,6 +425,8 @@ class MlBackendService
     ───────────────────────────────────────────── */
     private function mockAnalysis(Diagnostic $diagnostic, string $reason = 'server_offline'): array
     {
+        $hasVibration = $diagnostic->hasVibration();
+        $hasVerifiedAudio = $this->hasVerifiedAudioWave($diagnostic);
         $peakG = $diagnostic->vibration_peak_g ?? 0.0;
         $rmsG = $diagnostic->vibration_rms_g ?? 0.0;
         $crest = $rmsG > 0 ? round($peakG / $rmsG, 2) : 0.0;
@@ -436,10 +438,13 @@ class MlBackendService
 
         // Rule-based mock using stored vibration & hardware sensor stats
         [$condition, $confidence, $topClasses, $sensorWarnings] = $this->mockRules(
-            $peakG, $rmsG, $crest, $tempC, $rpm, $voltage, $mode, $diagnostic->vibration_source
+            $peakG, $rmsG, $crest, $tempC, $rpm, $voltage, $mode, $diagnostic->vibration_source, $hasVerifiedAudio
         );
 
-        $featuresUsed = ['peak_g', 'rms_g', 'crest_factor'];
+        $featuresUsed = $hasVibration ? ['peak_g', 'rms_g', 'crest_factor'] : [];
+        if ($diagnostic->hasAudio()) {
+            $featuresUsed[] = 'inmp441_audio_spectrum';
+        }
         if (! is_null($tempC)) {
             $featuresUsed[] = 'ds18b20_temperature';
         }
@@ -450,19 +455,19 @@ class MlBackendService
             $featuresUsed[] = 'ina219_battery_voltage';
         }
 
-        $domHz = round(($rpm ? ($rpm / 60.0) : 14.0) * (match ($condition) {
+        $domHz = $hasVibration ? round(($rpm ? ($rpm / 60.0) : 14.0) * (match ($condition) {
             'valve_clearance' => 0.5,
             'loose_component' => 2.0,
             default => 1.0,
-        }), 1);
-        $entropy = match ($condition) {
+        }), 1) : 0.0;
+        $entropy = $hasVibration ? (match ($condition) {
             'misfire' => 0.65,
             'valve_clearance' => 0.45,
             'loose_component' => 0.32,
             default => 0.25,
-        };
+        }) : 0.0;
 
-        $featureContributions = $this->mockExplainability($condition, $peakG, $rmsG, $crest, $domHz, $tempC, $rpm);
+        $featureContributions = $this->mockExplainability($condition, $peakG, $rmsG, $crest, $domHz, $tempC, $rpm, $hasVibration);
 
         return [
             'condition' => $condition,
@@ -472,14 +477,14 @@ class MlBackendService
             'feature_contributions' => $featureContributions,
             'features_used' => $featuresUsed,
             'audio_features' => [],
-            'vibration_features' => [
+            'vibration_features' => $hasVibration ? [
                 'peak_g' => $peakG,
                 'rms_g' => $rmsG,
                 'crest_factor' => $crest,
                 'dominant_freq_hz' => $domHz,
                 'spectral_entropy' => $entropy,
                 'sample_count' => $samples,
-            ],
+            ] : [],
             'hardware_telemetry' => [
                 'temperature_c' => $tempC,
                 'rpm' => $rpm,
@@ -494,7 +499,68 @@ class MlBackendService
         ];
     }
 
-    private function mockExplainability(string $condition, float $peakG, float $rmsG, float $crest, float $domHz, ?float $tempC, ?int $rpm): array
+    private function hasVerifiedAudioWave(Diagnostic $diagnostic): bool
+    {
+        if (! $diagnostic->hasAudio()) {
+            return false;
+        }
+
+        try {
+            $fullPath = null;
+            foreach (['local', 'public'] as $diskName) {
+                $candidate = Storage::disk($diskName)->path($diagnostic->audio_path);
+                if (is_file($candidate)) {
+                    $fullPath = $candidate;
+                    break;
+                }
+            }
+            if ($fullPath === null || filesize($fullPath) < 128) {
+                return false;
+            }
+
+            $fh = @fopen($fullPath, 'rb');
+            if (! $fh) {
+                return false;
+            }
+            $buf = fread($fh, 16384);
+            fclose($fh);
+
+            if ($buf === false || strlen($buf) < 128) {
+                return false;
+            }
+
+            // Verify genuine RIFF/WAVE container and non-silent PCM signal energy
+            if (substr($buf, 0, 4) !== 'RIFF' || substr($buf, 8, 4) !== 'WAVE') {
+                return false;
+            }
+
+            // Locate the 'data' chunk instead of assuming a fixed 44-byte header (LIST/JUNK chunks shift it).
+            $dataPos = strpos($buf, 'data', 12);
+            $pcm = $dataPos !== false ? substr($buf, $dataPos + 8) : substr($buf, 44);
+            if (strlen($pcm) % 2 === 1) {
+                $pcm = substr($pcm, 0, -1);
+            }
+            $samples = @unpack('s*', $pcm);
+            if (empty($samples)) {
+                return false;
+            }
+
+            $sumSq = 0.0;
+            $n = count($samples);
+            foreach ($samples as $s) {
+                $norm = $s / 32768.0;
+                $sumSq += $norm * $norm;
+            }
+
+            $rms = sqrt($sumSq / $n);
+
+            return $rms >= 0.015;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function mockExplainability(string $condition, float $peakG, float $rmsG, float $crest, float $domHz, ?float $tempC, ?int $rpm, bool $hasVibration = true): array
     {
         $contributions = [];
 
@@ -523,6 +589,39 @@ class MlBackendService
                 'impact_pct' => 20.0,
                 'explanation' => 'No active engine coolant thermal signature (>45°C) or alternator bus voltage (>13.2V) verified.',
             ];
+
+            return $contributions;
+        }
+
+        if (! $hasVibration) {
+            $contributions[] = [
+                'feature' => 'acoustic_harmonic_envelope',
+                'label' => 'Acoustic Harmonic Envelope',
+                'value' => $rpm ?? 800,
+                'unit' => 'RPM eq',
+                'impact_pct' => 55.0,
+                'explanation' => 'Audio-only/telemetry mode evaluated without mechanical vibration sensor data (vibration stream skipped).',
+            ];
+            if (! is_null($tempC)) {
+                $contributions[] = [
+                    'feature' => 'ds18b20_temperature',
+                    'label' => 'Coolant Thermal Context',
+                    'value' => round($tempC, 1),
+                    'unit' => '°C',
+                    'impact_pct' => 25.0,
+                    'explanation' => "DS18B20 coolant temperature recorded at {$tempC}°C during session.",
+                ];
+            }
+            if (! is_null($rpm)) {
+                $contributions[] = [
+                    'feature' => 'hall_tachometer_rpm',
+                    'label' => 'Crankshaft Rotational Speed',
+                    'value' => $rpm,
+                    'unit' => 'RPM',
+                    'impact_pct' => 20.0,
+                    'explanation' => "Hall tachometer confirmed engine rotational speed of {$rpm} RPM.",
+                ];
+            }
 
             return $contributions;
         }
@@ -632,18 +731,20 @@ class MlBackendService
         return $contributions;
     }
 
-    private function mockRules(float $peakG, float $rmsG, float $crest, ?float $tempC, ?int $rpm, ?float $voltage, string $mode = 'idle', ?string $vibrationSource = null): array
+    private function mockRules(float $peakG, float $rmsG, float $crest, ?float $tempC, ?int $rpm, ?float $voltage, string $mode = 'idle', ?string $vibrationSource = null, bool $hasVerifiedAudio = false): array
     {
         // ── Engine Presence & Ambient Noise Filter ──
         // An active ICE engine physically produces measurable mechanical vibration (at least 0.04g RMS / 0.08g Peak)
-        // when physically coupled to the engine block via real hardware accelerometer (device_sensor or csv_import),
-        // or operating engine coolant temperature (>45°C), or alternator charging (>=13.2V), or active RPM (>=300).
-        // Browser-simulated synthetic vibration (synthetic JS math) does NOT represent physical engine block coupling.
+        // when physically coupled to the engine block via real hardware accelerometer (adxl345_live, device_sensor, or csv_import),
+        // or operating engine coolant temperature (>45°C), or alternator charging (>=13.2V), or active RPM (>=300),
+        // or a verified RIFF/WAVE acoustic capture when no engine-off telemetry (RPM=0 or resting battery <13.2V) contradicts it.
         $isHardwareVibration = (in_array($vibrationSource, ['adxl345_live', 'device_sensor', 'csv_import'], true) || (is_null($vibrationSource) && $rmsG > 0.04));
         $hasMechanicalCoupling = $isHardwareVibration && ($peakG >= 0.08 || $rmsG >= 0.04);
         $hasActiveTelemetry = (! is_null($tempC) && $tempC >= 45.0) || (! is_null($voltage) && $voltage >= 13.2) || (! is_null($rpm) && $rpm >= 300);
+        $isExplicitlyEngineOff = (! is_null($rpm) && $rpm === 0) || (! is_null($voltage) && $voltage < 13.2 && (is_null($rpm) || $rpm < 300));
+        $hasActiveAudioCapture = $hasVerifiedAudio && ! $isExplicitlyEngineOff;
 
-        if (! $hasMechanicalCoupling && ! $hasActiveTelemetry) {
+        if (! $hasMechanicalCoupling && ! $hasActiveTelemetry && ! $hasActiveAudioCapture) {
             $gateWarning = 'SIGNAL GATE: No physical engine block vibration (hardware uncoupled) or operating telemetry detected. Ambient noise filter engaged.';
 
             return [

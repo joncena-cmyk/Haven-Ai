@@ -483,7 +483,11 @@ function toggleHardwareInfo() {
 function openEsp32WebSerialModal() {
     const modal = document.getElementById('esp32-webserial-modal');
     if (!modal) return;
+    if (modal.parentNode !== document.body) {
+        document.body.appendChild(modal);
+    }
     modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
 
     // Auto-detect browser WebSerial support
     const warn = document.getElementById('webserial-browser-warn');
@@ -528,6 +532,7 @@ function openEsp32WebSerialModal() {
 function closeEsp32WebSerialModal() {
     const modal = document.getElementById('esp32-webserial-modal');
     if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
 }
 
 function switchProvisionTab(mode) {

@@ -18,7 +18,9 @@ class DiagnosticAiService
         $condition = ($rawCondition === 'ambient_noise')
             ? 'ambient_noise'
             : Diagnostic::canonicalCondition($rawCondition);
-        $confidence = round(($diagnostic->ml_confidence ?? 0.8) * 100, 1);
+        $rawConfidence = $diagnostic->ml_confidence;
+        $confidence = round(($rawConfidence ?? 0.8) * 100, 1);
+        $isLowConfidence = ($rawConfidence !== null && $rawConfidence < 0.60);
         $peakG = $diagnostic->vibration_peak_g ?? 0;
         $rmsG = $diagnostic->vibration_rms_g ?? 0;
         $crestFactor = $diagnostic->crest_factor ?? ($rmsG > 0 ? round($peakG / $rmsG, 2) : 0);
@@ -27,6 +29,29 @@ class DiagnosticAiService
         $engine = $vehicle?->engine_type ?: 'Engine';
         $mileage = $vehicle?->mileage_km ? number_format($vehicle->mileage_km).' km' : 'unspecified mileage';
 
+        $recs = $this->buildConditionRecommendations($condition, $vehicleName, $engine, $peakG, $rmsG, $crestFactor);
+
+        if ($isLowConfidence && $condition !== 'ambient_noise') {
+            $recs['low_confidence_warning'] = true;
+            $recs['urgency'] = "{$recs['urgency']} (Verify via re-test — low ML confidence {$confidence}%)";
+            $recs['summary'] = "LOW CONFIDENCE NOTICE ({$confidence}%): Class probabilities were closely split below the 60% certainty threshold. {$recs['summary']}";
+            array_unshift(
+                $recs['action_checklist'],
+                "0. RE-VERIFY CAPTURE ({$confidence}% Confidence): Before purchasing parts, re-run a clean 10-second diagnostic with the sensor firmly coupled to the engine block to confirm this classification."
+            );
+        }
+
+        return $recs;
+    }
+
+    private function buildConditionRecommendations(
+        string $condition,
+        string $vehicleName,
+        string $engine,
+        float $peakG,
+        float $rmsG,
+        float $crestFactor
+    ): array {
         switch ($condition) {
             case 'valve_clearance':
             case 'knocking':

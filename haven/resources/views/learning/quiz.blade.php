@@ -251,7 +251,7 @@
                     const badge = document.getElementById('quiz-sync-status');
                     if (badge) {
                         badge.style.display = 'inline-flex';
-                        badge.innerHTML = '✓ Saved to Engineer Profile &middot; Best Score: ' + data.best_score + ' / ' + data.total + ' (' + data.percentage + '%) &middot; ' + data.attempts + ' {{ Str::plural("attempt", 1) }}';
+                        badge.innerHTML = '✓ Saved to Engineer Profile &middot; Best Score: ' + data.best_score + ' / ' + data.total + ' (' + data.percentage + '%) &middot; ' + data.attempts + (Number(data.attempts) === 1 ? ' attempt' : ' attempts');
                     }
                 }
             })

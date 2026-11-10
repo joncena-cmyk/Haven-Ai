@@ -445,7 +445,10 @@
             const labelEl = document.getElementById('lrn-progress-label');
             if (labelEl) labelEl.textContent = pct + '% Complete';
         }
+        // Authenticated users get DB-backed progress rendered server-side; only guests fall back to localStorage.
+        @guest
         document.addEventListener('DOMContentLoaded', loadProgress);
+        @endguest
     </script>
 
 </x-app-layout>

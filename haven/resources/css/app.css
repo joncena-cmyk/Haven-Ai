@@ -3848,7 +3848,7 @@ html, body {
 /* Silky smooth content reveal on page load (starts from 0.75 opacity - NEVER blinks black!) */
 .haven-content-container,
 .haven-auth-shell {
-    animation: havenSoftReveal 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: havenSoftReveal 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes havenSoftReveal {
@@ -3858,7 +3858,7 @@ html, body {
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: none;
     }
 }
 

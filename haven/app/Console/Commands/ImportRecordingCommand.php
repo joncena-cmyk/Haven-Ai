@@ -136,7 +136,7 @@ class ImportRecordingCommand extends Command
             ],
             'recording_mode' => $recordingMode,
             'notes' => $meta['notes'] ?? 'Imported via haven:import-recording',
-            'status' => 'completed',
+            'status' => $this->option('analyze') ? 'processing' : 'submitted',
             'true_condition' => $condition,
             'session_id' => $meta['session_id'] ?? null,
             'fault_detail' => $meta['fault_detail'] ?? null,
@@ -181,7 +181,11 @@ class ImportRecordingCommand extends Command
 
         foreach ($lines as $line) {
             $trimmed = trim($line);
-            if ($trimmed === '' || str_starts_with($trimmed, '#') || str_starts_with($trimmed, 't_us')) {
+            if ($trimmed === '' || str_starts_with($trimmed, '#')) {
+                continue;
+            }
+            // Skip a textual header row (t_us / timestamp / time_s / ax,ay,az ...) before any data.
+            if (empty($samples3d) && preg_match('/^[A-Za-z_"]/', $trimmed)) {
                 continue;
             }
             $cols = str_getcsv($trimmed);

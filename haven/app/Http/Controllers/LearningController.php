@@ -12,6 +12,14 @@ class LearningController extends Controller
     /**
      * Learning Modules repository.
      */
+    /**
+     * Total number of study modules (single source of truth for progress stats).
+     */
+    public static function totalModuleCount(): int
+    {
+        return count((new static)->getModules());
+    }
+
     protected function getModules(): array
     {
         return [

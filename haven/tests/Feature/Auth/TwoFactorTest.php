@@ -5,6 +5,7 @@ namespace Tests\Feature\Auth;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class TwoFactorTest extends TestCase
@@ -133,8 +134,8 @@ class TwoFactorTest extends TestCase
             'two_factor_channel' => 'sms',
         ]);
 
-        \Illuminate\Support\Facades\Http::fake([
-            'identitytoolkit.googleapis.com/*' => \Illuminate\Support\Facades\Http::sequence()
+        Http::fake([
+            'identitytoolkit.googleapis.com/*' => Http::sequence()
                 ->push(['users' => [['phoneNumber' => '+639998887777']]], 200)
                 ->push(['users' => [['phoneNumber' => '+639171234567']]], 200),
         ]);
@@ -158,4 +159,3 @@ class TwoFactorTest extends TestCase
         $goodResponse->assertRedirect(route('dashboard', absolute: false));
     }
 }
-

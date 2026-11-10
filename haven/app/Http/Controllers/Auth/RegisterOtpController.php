@@ -30,6 +30,7 @@ class RegisterOtpController extends Controller
 
         if (! $user) {
             $request->session()->forget('auth.registration_user_id');
+
             return redirect()->route('register');
         }
 
@@ -57,13 +58,14 @@ class RegisterOtpController extends Controller
 
         if (! $user) {
             $request->session()->forget('auth.registration_user_id');
+
             return redirect()->route('register');
         }
 
-        $attemptKey = 'reg-otp-attempt:' . $user->id . '|' . $request->ip();
+        $attemptKey = 'reg-otp-attempt:'.$user->id.'|'.$request->ip();
         if (RateLimiter::tooManyAttempts($attemptKey, 5)) {
             throw ValidationException::withMessages([
-                'code' => 'Too many incorrect attempts. Please wait ' . RateLimiter::availableIn($attemptKey) . ' seconds or request a new code.',
+                'code' => 'Too many incorrect attempts. Please wait '.RateLimiter::availableIn($attemptKey).' seconds or request a new code.',
             ]);
         }
 
@@ -111,13 +113,15 @@ class RegisterOtpController extends Controller
 
         if (! $user) {
             $request->session()->forget('auth.registration_user_id');
+
             return redirect()->route('register');
         }
 
-        $throttleKey = 'resend-reg-otp:' . $user->id . '|' . $request->ip();
+        $throttleKey = 'resend-reg-otp:'.$user->id.'|'.$request->ip();
 
         if (RateLimiter::tooManyAttempts($throttleKey, 3)) {
             $seconds = RateLimiter::availableIn($throttleKey);
+
             return back()->withErrors([
                 'code' => "Please wait {$seconds} seconds before requesting another code.",
             ]);
@@ -131,4 +135,3 @@ class RegisterOtpController extends Controller
         return back()->with('status', 'A new 6-digit verification code has been sent to your email.');
     }
 }
-

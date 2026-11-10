@@ -88,13 +88,10 @@ class LoginRequest extends FormRequest
             $this->session()->put('auth.two_factor_user_id', $userId);
             $this->session()->put('auth.two_factor_remember', $remember);
 
-            // Generate 6-digit OTP and dispatch via Brevo
-            $code = $user->generateTwoFactorCode();
-            $brevo = app(BrevoService::class);
-
-            if ($user->two_factor_channel === 'sms' && ! empty($user->phone)) {
-                $brevo->sendSmsOtp($user->phone, $code, '2FA Login');
-            } else {
+            // Generate 6-digit OTP and dispatch via Brevo only when channel is email (SMS uses Firebase client-side)
+            if ($user->two_factor_channel !== 'sms' || empty($user->phone)) {
+                $code = $user->generateTwoFactorCode();
+                $brevo = app(BrevoService::class);
                 $brevo->sendEmailOtp($user->email, $user->name, $code, 'Two-Factor Authentication');
             }
 

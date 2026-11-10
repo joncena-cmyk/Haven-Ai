@@ -118,9 +118,9 @@
                 <div>
                     <div class="h-stat-value">
                         @if($completedMods > 0)
-                            {{ $completedMods }}<span style="font-size:1rem;font-weight:600;opacity:0.85;"> / 12</span>
+                            {{ $completedMods }}<span style="font-size:1rem;font-weight:600;opacity:0.85;"> / {{ $learningStats['total_modules'] ?? 13 }}</span>
                         @else
-                            12
+                            {{ $learningStats['total_modules'] ?? 13 }}
                         @endif
                     </div>
                     <div class="h-stat-label">Learning Modules</div>

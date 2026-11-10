@@ -18,7 +18,7 @@ use Illuminate\View\View;
 class TwoFactorChallengeController extends Controller
 {
     /**
-     * Show the 2FA challenge screen.
+     * Show the 2FA challenge inside the homepage pop-up modal.
      */
     public function create(Request $request): View|RedirectResponse
     {
@@ -32,29 +32,12 @@ class TwoFactorChallengeController extends Controller
 
         if (! $user) {
             $request->session()->forget(['auth.two_factor_user_id', 'auth.two_factor_remember', 'auth.two_factor_active_channel']);
+
             return redirect()->route('login');
         }
 
-        $activeChannel = $request->session()->get('auth.two_factor_active_channel', $user->two_factor_channel ?? 'email');
-
-        // Mask recipient destination for security display
-        $target = $activeChannel === 'sms' && ! empty($user->phone)
-            ? substr($user->phone, 0, 4) . '****' . substr($user->phone, -3)
-            : substr($user->email, 0, 2) . '****@' . (explode('@', $user->email)[1] ?? '***');
-
-        $firebaseConfig = [
-            'apiKey' => config('services.firebase.api_key'),
-            'authDomain' => config('services.firebase.auth_domain'),
-            'projectId' => config('services.firebase.project_id'),
-            'appId' => config('services.firebase.app_id'),
-        ];
-
-        return view('auth.two-factor-challenge', [
-            'channel' => $activeChannel,
-            'target' => $target,
-            'userPhone' => $user->phone,
-            'hasPhone' => ! empty($user->phone),
-            'firebaseConfig' => $firebaseConfig,
+        return view('welcome', [
+            'openTwoFactorModal' => true,
         ]);
     }
 
@@ -73,10 +56,11 @@ class TwoFactorChallengeController extends Controller
 
         if (! $user) {
             $request->session()->forget(['auth.two_factor_user_id', 'auth.two_factor_remember', 'auth.two_factor_active_channel']);
+
             return redirect()->route('login');
         }
 
-        $throttleKey = '2fa-attempt:' . $user->id . '|' . $request->ip();
+        $throttleKey = '2fa-attempt:'.$user->id.'|'.$request->ip();
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
@@ -155,11 +139,15 @@ class TwoFactorChallengeController extends Controller
     /**
      * Resend a fresh 2FA code via the active channel.
      */
-    public function resend(Request $request, BrevoService $brevoService): RedirectResponse
+    public function resend(Request $request, BrevoService $brevoService): RedirectResponse|JsonResponse
     {
         $userId = $request->session()->get('auth.two_factor_user_id');
 
         if (! $userId) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Session expired. Please sign in again.'], 401);
+            }
+
             return redirect()->route('login');
         }
 
@@ -167,15 +155,26 @@ class TwoFactorChallengeController extends Controller
 
         if (! $user) {
             $request->session()->forget(['auth.two_factor_user_id', 'auth.two_factor_remember', 'auth.two_factor_active_channel']);
+
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Session expired. Please sign in again.'], 401);
+            }
+
             return redirect()->route('login');
         }
 
-        $throttleKey = 'resend-2fa:' . $user->id . '|' . $request->ip();
+        $throttleKey = 'resend-2fa:'.$user->id.'|'.$request->ip();
 
         if (RateLimiter::tooManyAttempts($throttleKey, 3)) {
             $seconds = RateLimiter::availableIn($throttleKey);
+            $msg = "Please wait {$seconds} seconds before requesting a new code.";
+
+            if ($request->wantsJson()) {
+                return response()->json(['message' => $msg], 429);
+            }
+
             return back()->withErrors([
-                'code' => "Please wait {$seconds} seconds before requesting a new code.",
+                'code' => $msg,
             ]);
         }
 
@@ -183,24 +182,40 @@ class TwoFactorChallengeController extends Controller
 
         $code = $user->generateTwoFactorCode();
         $brevoService->sendEmailOtp($user->email, $user->name, $code, 'Two-Factor Authentication');
+        $statusMsg = 'A fresh 6-digit code has been dispatched to your email.';
 
-        return back()->with('status', 'A fresh 6-digit code has been dispatched to your email.');
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'status' => $statusMsg,
+            ]);
+        }
+
+        return back()->with('status', $statusMsg);
     }
 
     /**
      * Switch between Email and SMS verification modes.
      */
-    public function switchChannel(Request $request, BrevoService $brevoService): RedirectResponse
+    public function switchChannel(Request $request, BrevoService $brevoService): RedirectResponse|JsonResponse
     {
         $userId = $request->session()->get('auth.two_factor_user_id');
 
         if (! $userId) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Session expired. Please sign in again.'], 401);
+            }
+
             return redirect()->route('login');
         }
 
         $user = User::find($userId);
 
         if (! $user) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Session expired. Please sign in again.'], 401);
+            }
+
             return redirect()->route('login');
         }
 
@@ -208,17 +223,52 @@ class TwoFactorChallengeController extends Controller
         $newChannel = $current === 'email' ? 'sms' : 'email';
 
         if ($newChannel === 'sms' && empty($user->phone)) {
-            return back()->withErrors(['code' => 'No mobile phone is registered for your account. Please use Email verification.']);
+            $errMsg = 'No mobile phone is registered for your account. Please use Email verification.';
+            if ($request->wantsJson()) {
+                return response()->json(['message' => $errMsg], 422);
+            }
+
+            return back()->withErrors(['code' => $errMsg]);
         }
 
         $request->session()->put('auth.two_factor_active_channel', $newChannel);
 
+        $target = $newChannel === 'sms' && ! empty($user->phone)
+            ? substr($user->phone, 0, 4).'****'.substr($user->phone, -3)
+            : substr($user->email, 0, 2).'****@'.(explode('@', $user->email)[1] ?? '***');
+
         if ($newChannel === 'email') {
             $code = $user->generateTwoFactorCode();
             $brevoService->sendEmailOtp($user->email, $user->name, $code, 'Two-Factor Authentication');
-            return back()->with('status', 'Switched to Email verification. A 6-digit code has been sent to your email.');
+            $statusMsg = 'Switched to Email verification. A 6-digit code has been sent to your email.';
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'channel' => $newChannel,
+                    'target' => $target,
+                    'user_phone' => $user->phone,
+                    'has_phone' => ! empty($user->phone),
+                    'status' => $statusMsg,
+                ]);
+            }
+
+            return back()->with('status', $statusMsg);
         }
 
-        return back()->with('status', 'Switched to SMS Phone verification.');
+        $statusMsg = 'Switched to Firebase SMS Phone verification.';
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'channel' => $newChannel,
+                'target' => $target,
+                'user_phone' => $user->phone,
+                'has_phone' => ! empty($user->phone),
+                'status' => $statusMsg,
+            ]);
+        }
+
+        return back()->with('status', $statusMsg);
     }
 }

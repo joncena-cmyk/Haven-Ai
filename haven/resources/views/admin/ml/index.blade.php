@@ -245,7 +245,7 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                         <span class="h-badge {{ $realSamples > 0 ? 'h-badge-green' : 'h-badge-amber' }}" style="font-size:0.63rem;">
-                            {{ $realSamples > 0 ? 'REAL + SYNTHETIC HYBRID' : 'SYNTHETIC CALIBRATION BASELINE' }}
+                            {{ $realSamples > 0 ? ($synSamples > 0 ? 'REAL + SYNTHETIC HYBRID' : 'REAL-ENGINE DATA ONLY') : 'SYNTHETIC CALIBRATION BASELINE' }}
                         </span>
                         <span class="h-badge h-badge-teal" style="font-size:0.65rem;">ACCURACY: {{ $accPct }}%</span>
                     </div>
@@ -284,7 +284,7 @@
                 <div style="margin-top:0.85rem;padding:0.65rem 0.85rem;background:var(--h-surface2);border-radius:var(--h-radius);display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:0.55rem;font-size:0.74rem;">
                     <div><span style="color:var(--h-text3);">Macro F1-Score:</span> <strong style="color:var(--h-text);">{{ $f1Macro }}</strong></div>
                     <div><span style="color:var(--h-text3);">5-Fold CV:</span> <strong style="color:var(--h-teal);">{{ $cvAccPct }}% &plusmn; {{ $cvStdPct }}%</strong></div>
-                    <div><span style="color:var(--h-text3);">Holdout Split:</span> <strong style="color:var(--h-green);">{{ $modelMeta['test_samples'] ?? 120 }} test / {{ $modelMeta['train_samples'] ?? 480 }} train</strong></div>
+                    <div><span style="color:var(--h-text3);">Holdout Split:</span> <strong style="color:var(--h-green);">{{ isset($modelMeta['test_samples'], $modelMeta['train_samples']) ? ($modelMeta['test_samples'].' test / '.$modelMeta['train_samples'].' train') : 'Not recorded (see evaluation scheme; '.($modelMeta['n_samples'] ?? '—').' total windows)' }}</strong></div>
                     <div><span style="color:var(--h-text3);">Dataset Mix:</span> <strong style="color:var(--h-text);">{{ $realSamples }} real &middot; {{ $synSamples }} synthetic</strong></div>
                     <div style="grid-column:1 / -1;border-top:1px solid var(--h-border);padding-top:0.4rem;color:var(--h-text3);">
                         Evaluation Scheme: <strong style="color:var(--h-text2);">{{ $evalScheme }}</strong>

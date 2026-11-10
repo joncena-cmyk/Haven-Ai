@@ -72,8 +72,10 @@
             </p>
         </div>
 
-        {{-- Invisible reCAPTCHA container for Firebase --}}
-        <div id="recaptcha-container"></div>
+        {{-- reCAPTCHA container for Firebase (Invisible first, auto-switches to Visible checkbox if localhost requires human check) --}}
+        <div id="recaptcha-wrapper" style="display:flex;justify-content:center;margin-bottom:1rem;">
+            <div id="recaptcha-container"></div>
+        </div>
 
         <button type="submit" id="submit-btn" class="haven-btn-primary" style="width:100%;margin-bottom:1.25rem;">
             Authenticate &amp; Continue
@@ -94,7 +96,7 @@
         @else
             <div>
                 <p style="font-size:0.8rem;color:var(--h-text3);margin:0 0 0.25rem 0;">Didn't receive the SMS?</p>
-                <button type="button" onclick="sendFirebaseSms()" class="haven-link" style="background:none;border:none;cursor:pointer;font-size:0.85rem;font-weight:600;">
+                <button type="button" onclick="sendFirebaseSms(true)" class="haven-link" style="background:none;border:none;cursor:pointer;font-size:0.85rem;font-weight:600;">
                     Resend SMS code
                 </button>
             </div>
@@ -118,10 +120,10 @@
         @endif
     </div>
 
-    {{-- Firebase Phone Auth Integration Script --}}
+    {{-- Firebase Phone Auth Integration Script (v11.0.2 with Identity Platform support) --}}
     @if ($channel === 'sms' && ! empty($userPhone))
-        <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-auth-compat.js"></script>
         <script>
             const firebaseConfig = @json($firebaseConfig);
             if (!firebase.apps.length) {
@@ -130,6 +132,8 @@
 
             let confirmationResult = null;
             let recaptchaVerifier = null;
+            let recaptchaMode = 'invisible';
+            let smsDispatchInFlight = false;
             const targetPhone = @json($userPhone);
 
             function showStatus(msg, isError = false) {
@@ -140,36 +144,102 @@
                 txt.style.color = isError ? 'var(--h-red)' : 'var(--h-text2)';
             }
 
-            function sendFirebaseSms() {
-                showStatus('Requesting SMS verification code from Google...');
-                
-                if (!recaptchaVerifier) {
-                    recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                        'size': 'invisible',
-                        'callback': function(response) {
-                            // reCAPTCHA solved
-                        }
-                    });
+            function initRecaptchaVerifier(sizeMode) {
+                if (recaptchaVerifier && recaptchaMode === sizeMode) {
+                    return recaptchaVerifier;
                 }
+                if (recaptchaVerifier) {
+                    try {
+                        recaptchaVerifier.clear();
+                    } catch (e) {}
+                    recaptchaVerifier = null;
+                }
+                const wrapper = document.getElementById('recaptcha-wrapper');
+                if (wrapper) {
+                    wrapper.innerHTML = '<div id="recaptcha-container"></div>';
+                }
+                recaptchaMode = sizeMode;
+                recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+                    'size': sizeMode,
+                    'theme': 'dark',
+                    'callback': function() {
+                        if (sizeMode === 'normal' && !smsDispatchInFlight) {
+                            executePhoneSignIn();
+                        }
+                    },
+                    'expired-callback': function() {
+                        showStatus('Security check expired. Please click the checkbox or Resend SMS code again.', true);
+                    }
+                });
+                return recaptchaVerifier;
+            }
+
+            const hasServerError = @json($errors->any());
+            const smsStorageKey = 'haven_sms_sent_at_' + targetPhone;
+
+            function executePhoneSignIn() {
+                if (smsDispatchInFlight) return;
+                smsDispatchInFlight = true;
+                showStatus('Requesting SMS verification code from Google Firebase...');
 
                 firebase.auth().signInWithPhoneNumber(targetPhone, recaptchaVerifier)
                     .then(function(result) {
+                        smsDispatchInFlight = false;
                         confirmationResult = result;
-                        showStatus('SMS code sent! Check your phone for the 6-digit text.');
+                        sessionStorage.setItem(smsStorageKey, String(Date.now()));
+                        showStatus('SMS code sent via Firebase! Check your phone (' + targetPhone + ') for the 6-digit text.');
                     })
                     .catch(function(error) {
+                        smsDispatchInFlight = false;
                         console.error('Firebase SMS error:', error);
-                        showStatus('Failed to send SMS: ' + (error.message || 'Check connection'), true);
+                        const code = (error && error.code) ? error.code : '';
+                        const msg = (error && error.message) ? error.message : 'Unable to send SMS';
+
+                        if ((code === 'auth/invalid-app-credential' || code === 'auth/captcha-check-failed' || msg.includes('invalid-app-credential')) && recaptchaMode === 'invisible') {
+                            showStatus('Localhost security check required: Please check the "I\'m not a robot" box below to send your SMS code.', false);
+                            const normalVerifier = initRecaptchaVerifier('normal');
+                            normalVerifier.render();
+                            return;
+                        }
+
+                        if (msg.includes('OPERATION_NOT_ALLOWED') || msg.includes('region')) {
+                            showStatus('Firebase SMS blocked: Philippines (+63) is not enabled in Firebase Console → Authentication → Settings → SMS region policy.', true);
+                        } else if (msg.includes('too-many-requests') || code === 'auth/too-many-requests') {
+                            showStatus('Firebase rate limit reached (auth/too-many-requests): Too many SMS requests were sent to ' + targetPhone + ' in a short time. Wait ~15–30 minutes for Google\'s cooldown, or click "Switch to Email verification" below.', true);
+                        } else {
+                            showStatus('Firebase SMS error: ' + msg, true);
+                        }
                     });
             }
 
-            // Auto-trigger SMS on page load
-            window.addEventListener('DOMContentLoaded', function() {
-                sendFirebaseSms();
+            function sendFirebaseSms(isManualResend = false) {
+                const lastSent = parseInt(sessionStorage.getItem(smsStorageKey) || '0', 10);
+                const elapsedSec = Math.floor((Date.now() - lastSent) / 1000);
+                if (!isManualResend && lastSent > 0 && elapsedSec < 60) {
+                    showStatus('SMS code was already requested ' + elapsedSec + 's ago. Check your phone or click "Resend SMS code" below.', false);
+                    return;
+                }
+
+                initRecaptchaVerifier(recaptchaMode);
+                if (recaptchaMode === 'normal') {
+                    recaptchaVerifier.render().then(function() {
+                        showStatus('Please check the "I\'m not a robot" box above to send your SMS code.');
+                    });
+                } else {
+                    executePhoneSignIn();
+                }
+            }
+
+            // Wait for full window load (including scripts) before initializing Firebase reCAPTCHA
+            window.addEventListener('load', function() {
+                if (!hasServerError) {
+                    sendFirebaseSms(false);
+                }
             });
 
             // Intercept form submission to confirm code with Firebase
             document.getElementById('two-factor-form').addEventListener('submit', function(e) {
+                const form = this;
                 const code = document.getElementById('code').value.trim();
                 const errBox = document.getElementById('client-error');
                 errBox.style.display = 'none';
@@ -177,7 +247,7 @@
                 if (confirmationResult && code.length === 6) {
                     e.preventDefault();
                     document.getElementById('submit-btn').disabled = true;
-                    showStatus('Verifying code with Google...');
+                    showStatus('Verifying SMS code with Google Firebase...');
 
                     confirmationResult.confirm(code)
                         .then(function(userCredential) {
@@ -185,14 +255,14 @@
                         })
                         .then(function(idToken) {
                             document.getElementById('firebase_token').value = idToken;
-                            document.getElementById('two-factor-form').submit();
+                            form.submit();
                         })
                         .catch(function(error) {
                             console.error('Code confirmation error:', error);
                             document.getElementById('submit-btn').disabled = false;
-                            errBox.textContent = 'Invalid verification code. Please check the code and try again.';
+                            errBox.textContent = 'Invalid SMS verification code. Please check the 6-digit code and try again.';
                             errBox.style.display = 'block';
-                            showStatus('Invalid code.', true);
+                            showStatus('Invalid verification code.', true);
                         });
                 }
             });

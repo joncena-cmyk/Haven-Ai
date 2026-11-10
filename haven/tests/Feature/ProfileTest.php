@@ -96,4 +96,27 @@ class ProfileTest extends TestCase
 
         $this->assertNotNull($user->fresh());
     }
+
+    public function test_two_factor_settings_can_be_enabled_and_local_ph_phone_is_normalized(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->put('/profile/two-factor', [
+                'two_factor_enabled' => '1',
+                'two_factor_channel' => 'sms',
+                'phone' => '0917 123 4567',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', 'two-factor-updated');
+
+        $user->refresh();
+
+        $this->assertTrue((bool) $user->two_factor_enabled);
+        $this->assertSame('sms', $user->two_factor_channel);
+        $this->assertSame('+639171234567', $user->phone);
+    }
 }

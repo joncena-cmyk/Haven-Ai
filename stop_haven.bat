@@ -1,5 +1,5 @@
 @echo off
-title HAVEN AI - Stopping Services
+title Stopping Services - HAVEN
 cd /d "%~dp0"
 color 0C
 

@@ -78,4 +78,26 @@ return [
         'app_id' => env('FIREBASE_APP_ID'),
     ],
 
+    // Google Sign-In (OAuth 2.0). Redirect URI to register in Google Cloud Console:
+    //   {APP_URL}/auth/google/callback
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', rtrim((string) env('APP_URL', 'http://localhost:8000'), '/').'/auth/google/callback'),
+    ],
+
+    // Google Places API (New) — nearby repair shops. Server-side key (restrict by API, not by referrer).
+    'google_maps' => [
+        'key' => env('GOOGLE_MAPS_API_KEY'),
+        'radius_m' => (int) env('GOOGLE_MAPS_RADIUS_M', 10000),
+    ],
+
+    // Google Cloud Speech-to-Text & Text-to-Speech (REST, API-key auth, server-side only).
+    'google_cloud' => [
+        'key' => env('GOOGLE_CLOUD_API_KEY'),
+        'stt_language' => env('GOOGLE_STT_LANGUAGE', 'en-US'),
+        'tts_voice' => env('GOOGLE_TTS_VOICE', 'en-US-Neural2-D'),
+        'tts_language' => env('GOOGLE_TTS_LANGUAGE', 'en-US'),
+    ],
+
 ];

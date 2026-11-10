@@ -175,8 +175,8 @@ class Diagnostic extends Model
     public function getVibrationSourceLabelAttribute(): string
     {
         return match ($this->vibration_source) {
-            'adxl345_live' => 'ADXL345 Hardware Stream',
-            'device_sensor' => 'Device Motion Accelerometer',
+            'adxl345_live' => 'ESP32 Hardware Stream (MPU6050 / ADXL345)',
+            'device_sensor' => 'ESP32 Hardware Accelerometer (MPU6050)',
             'csv_import' => 'Imported CSV Telemetry',
             'simulated' => 'Simulated Waveform (Demo)',
             'skipped' => 'Skipped (Audio Only)',

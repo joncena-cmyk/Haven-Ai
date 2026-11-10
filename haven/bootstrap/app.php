@@ -20,7 +20,6 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
-        $middleware->statefulApi();
         $middleware->validateCsrfTokens(except: [
             'logout',
             'admin/logout',

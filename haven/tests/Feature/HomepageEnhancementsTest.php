@@ -39,13 +39,12 @@ class HomepageEnhancementsTest extends TestCase
 
     public function test_login_page_renders_back_home_link_and_legal_links(): void
     {
-        $response = $this->get('/login');
+        $response = $this->followingRedirects()->get('/login');
 
         $response->assertOk();
-        $response->assertSee('Back to homepage');
+        $response->assertSee('haven-auth-modal', false);
         $response->assertSee('Terms &amp; Conditions', false);
         $response->assertSee('Privacy Policy');
-        $response->assertSee('Caps Lock is ON');
     }
 
     public function test_guests_can_browse_learning_hub_without_authentication(): void

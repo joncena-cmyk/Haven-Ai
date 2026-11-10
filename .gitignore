@@ -47,3 +47,5 @@ ENV/
 recordings/
 recordings_quarantine/
 .pytest_cache/
+Engine Journal Bearings Dataset/
+PetrolClean/

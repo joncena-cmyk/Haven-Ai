@@ -165,7 +165,7 @@ class User extends Authenticatable
         $progress = $this->learningProgress;
         $completed = is_array($progress?->completed_modules) ? $progress->completed_modules : [];
         $completedCount = count($completed);
-        $totalModules = 12;
+        $totalModules = \App\Http\Controllers\LearningController::totalModuleCount();
         $quizBestScore = (int) ($progress?->quiz_best_score ?? 0);
         $quizTotal = (int) ($progress?->quiz_total ?? 10);
         $quizAttempts = (int) ($progress?->quiz_attempts ?? 0);

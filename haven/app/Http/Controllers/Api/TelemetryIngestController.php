@@ -238,8 +238,8 @@ class TelemetryIngestController extends Controller
             'hall_rpm' => [
                 'name' => 'Tachometer / Speed (Hall Sensor)',
                 'pin' => 'D23 (Digital Interrupt)',
-                'connected' => true,
-                'status' => $rpm > 0 ? 'PULSES DETECTED' : 'IDLE / READY',
+                'connected' => ! is_null($rpm),
+                'status' => $rpm > 0 ? 'PULSES DETECTED' : (! is_null($rpm) ? 'IDLE / READY' : 'NOT REPORTED'),
                 'value' => number_format((int) ($rpm ?? 0)).' RPM',
                 'hint' => $rpm > 0 ? 'Pulses registering (if not on engine, consider 10kΩ pull-up to stop noise)' : 'Waiting for magnet pass',
             ],
@@ -296,7 +296,6 @@ class TelemetryIngestController extends Controller
         }
         Cache::put($historyKey, $history, 60);
         if ($vehicle->user_id) {
-            Cache::put($historyKey, $history, 60);
             Cache::put('telemetry:history:user:'.$vehicle->user_id, $history, 60);
         }
 
@@ -322,6 +321,8 @@ class TelemetryIngestController extends Controller
 
         // Formal Diagnostic Session Creation (Only when save_session=true)
         $autoAnalyze = $request->boolean('auto_analyze', true);
+        $hasAnalyzableData = $audioPath || $vibrationPath || ! is_null($tempC) || ! is_null($rpm) || ! is_null($voltageV);
+        $shouldAnalyze = $autoAnalyze && $hasAnalyzableData;
         $deviceId = $validated['device_id'] ?? 'ESP32-Automotive-DAQ';
 
         $notesList = ["ESP32 Wi-Fi DAQ Node [{$deviceId}]."];
@@ -341,7 +342,7 @@ class TelemetryIngestController extends Controller
         $diagnostic = Diagnostic::create([
             'vehicle_id' => $vehicle->id,
             'user_id' => $user->id,
-            'status' => $autoAnalyze ? 'processing' : 'submitted',
+            'status' => $shouldAnalyze ? 'processing' : 'submitted',
             'audio_path' => $audioPath,
             'vibration_path' => $vibrationPath,
             'vibration_source' => ! empty($vibrationPath) ? 'device_sensor' : null,
@@ -373,7 +374,7 @@ class TelemetryIngestController extends Controller
         ], $user->id, 'success');
 
         // 8. Dispatch Background ML Analysis Job if requested
-        if ($autoAnalyze && ($audioPath || $vibrationPath || ! is_null($tempC) || ! is_null($rpm))) {
+        if ($shouldAnalyze) {
             AnalyzeDiagnosticJob::dispatch($diagnostic);
         }
 
@@ -442,7 +443,8 @@ class TelemetryIngestController extends Controller
                     'message' => 'Unauthorized vehicle access.',
                 ], 403);
             }
-            $cached = Cache::get('telemetry:live:'.$vehicle->id);
+            $cached = Cache::get('telemetry:live:'.$vehicle->id)
+                ?? Cache::get('telemetry:live:user:'.$user->id);
         } else {
             $vehicle = Vehicle::where('user_id', $user->id)->first();
             $cached = Cache::get('telemetry:live:user:'.$user->id)
@@ -540,7 +542,7 @@ class TelemetryIngestController extends Controller
             flush();
 
             $cached = ($vehicleId && $vehicle)
-                ? Cache::get('telemetry:live:'.$vehicle->id)
+                ? (Cache::get('telemetry:live:'.$vehicle->id) ?? Cache::get('telemetry:live:user:'.$user->id))
                 : (Cache::get('telemetry:live:user:'.$user->id)
                     ?? ($vehicle ? Cache::get('telemetry:live:'.$vehicle->id) : null));
 
@@ -615,6 +617,8 @@ class TelemetryIngestController extends Controller
 #include <Preferences.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <Adafruit_INA219.h>
+#include <driver/i2s.h>
 
 Preferences prefs;
 WebServer server(80);
@@ -624,24 +628,61 @@ char password[64]  = "YOUR_WIFI_PASSWORD";
 char serverUrl[128]= "http://YOUR_SERVER_IP:8000/api/v1/telemetry/ingest";
 char deviceKey[64] = "{$deviceKey}";
 
-// Hardware MPU6050 / ADXL345 I2C & DS18B20 OneWire pins
+// Pins: MPU6050 + INA219 share I2C (D21/D22), DS18B20 on D4, Hall on D23, INMP441 on D18/D19/D5
 #define SENSOR_SDA 21
 #define SENSOR_SCL 22
 #define MPU_ADDR   0x68
+#define INA_ADDR   0x40
 #define TEMP_PIN   4
+#define HALL_PIN   23
+#define MIC_BCLK   18
+#define MIC_WS     19
+#define MIC_SD     5
 #define VIB_BUFFER_SIZE 128
 
 OneWire oneWire(TEMP_PIN);
 DallasTemperature tempSensor(&oneWire);
+Adafruit_INA219 ina219(INA_ADDR);
+
 float vibBufX[VIB_BUFFER_SIZE];
 float vibBufY[VIB_BUFFER_SIZE];
 float vibBufZ[VIB_BUFFER_SIZE];
 int vibIdx = 0;
 bool vibFull = false;
 bool accelReady = false;
+bool inaReady = false;
+bool micReady = false;
 float latestAx = 0.0f, latestAy = 0.0f, latestAz = 0.0f;
+float tempC = NAN;
+bool ds18Plugged = false;
+float busVoltage = 0, currentMA = 0, powerMW = 0;
+float audioRMS = 0, audioPeak = 0;
+float rpmValue = 0;
+
+volatile unsigned long pulseCount = 0;
+volatile unsigned long lastPulseUs = 0;
+portMUX_TYPE pulseMux = portMUX_INITIALIZER_UNLOCKED;
+unsigned long lastRpmMs = 0;
+
 unsigned long lastSampleMs = 0;
 unsigned long lastUploadMs = 0;
+unsigned long lastTempMs = 0;
+unsigned long lastWifiRetryMs = 0;
+
+void IRAM_ATTR countPulse() {
+  unsigned long nowUs = micros();
+  portENTER_CRITICAL_ISR(&pulseMux);
+  if ((unsigned long)(nowUs - lastPulseUs) >= 20000UL && digitalRead(HALL_PIN) == LOW) {
+    pulseCount++;
+    lastPulseUs = nowUs;
+  }
+  portEXIT_CRITICAL_ISR(&pulseMux);
+}
+
+bool probeI2C(uint8_t addr) {
+  Wire.beginTransmission(addr);
+  return (Wire.endTransmission() == 0);
+}
 
 bool initAccelI2C() {
   Wire.begin(SENSOR_SDA, SENSOR_SCL, 400000);
@@ -669,6 +710,51 @@ bool readAccelG(float &ax, float &ay, float &az) {
   return true;
 }
 
+void setupMicrophone() {
+  i2s_config_t config = {};
+  config.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX);
+  config.sample_rate = 16000;
+  config.bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT;
+  config.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT;
+  config.communication_format = I2S_COMM_FORMAT_STAND_I2S;
+  config.intr_alloc_flags = 0;
+  config.dma_buf_count = 4;
+  config.dma_buf_len = 256;
+  config.use_apll = false;
+  i2s_pin_config_t pins = {};
+  pins.bck_io_num = MIC_BCLK;
+  pins.ws_io_num = MIC_WS;
+  pins.data_out_num = I2S_PIN_NO_CHANGE;
+  pins.data_in_num = MIC_SD;
+  if (i2s_driver_install(I2S_NUM_0, &config, 0, NULL) != ESP_OK) { micReady = false; return; }
+  micReady = (i2s_set_pin(I2S_NUM_0, &pins) == ESP_OK);
+}
+
+void readMicrophone() {
+  if (!micReady) return;
+  int32_t buf[256];
+  size_t bytesRead = 0;
+  if (i2s_read(I2S_NUM_0, buf, sizeof(buf), &bytesRead, pdMS_TO_TICKS(50)) != ESP_OK || bytesRead == 0) return;
+  int count = bytesRead / sizeof(int32_t);
+  double sum = 0, sumSq = 0, peak = 0;
+  for (int i = 0; i < count; i++) {
+    double s = buf[i] / 256.0;
+    sum += s;
+    sumSq += s * s;
+    if (fabs(s) > peak) peak = fabs(s);
+  }
+  double mean = sum / count;
+  double variance = (sumSq / count) - (mean * mean);
+  if (variance < 0) variance = 0;
+  audioRMS = sqrt(variance);
+  audioPeak = peak;
+}
+
+// Config page is protected by this device's key (printed in the website pairing dialog).
+bool configAuthorized() {
+  return server.arg("key") == String(deviceKey);
+}
+
 void setup() {
   Serial.begin(115200);
   prefs.begin("haven", true);
@@ -680,6 +766,14 @@ void setup() {
   prefs.end();
 
   accelReady = initAccelI2C();
+  if (probeI2C(INA_ADDR)) {
+    inaReady = ina219.begin(&Wire);
+    if (inaReady) ina219.setCalibration_32V_2A();
+  }
+  setupMicrophone();
+
+  pinMode(HALL_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(HALL_PIN), countPulse, FALLING);
 
   // Async non-blocking temperature conversion (eliminates 750ms 1-Wire stall)
   tempSensor.begin();
@@ -687,8 +781,12 @@ void setup() {
   tempSensor.setWaitForConversion(false);
   tempSensor.requestTemperatures();
 
+  // Soft AP password = last 8 chars of the device key (unique per vehicle, not a shared default)
+  String apPass = String(deviceKey);
+  apPass = apPass.substring(apPass.length() > 8 ? apPass.length() - 8 : 0);
   WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP("HAVEN_AI_LOCAL", "haven1234");
+  WiFi.softAP("HAVEN_AI_LOCAL", apPass.c_str());
+  WiFi.setAutoReconnect(true);
   WiFi.begin(ssid, password);
   int tries = 0;
   while (WiFi.status() != WL_CONNECTED && tries++ < 20) {
@@ -696,9 +794,13 @@ void setup() {
   }
 
   server.on("/config", []() {
-    server.send(200, "text/html", "<form method='POST' action='/save'>SSID:<input name='ssid'><br>Pass:<input name='pass' type='password'><br>Server:<input name='server'><br><button>Save</button></form>");
+    server.send(200, "text/html", "<form method='POST' action='/save'>Device key:<input name='key' type='password'><br>SSID:<input name='ssid'><br>Pass:<input name='pass' type='password'><br>Server:<input name='server'><br><button>Save</button></form>");
   });
   server.on("/save", HTTP_POST, []() {
+    if (!configAuthorized()) {
+      server.send(403, "text/plain", "Forbidden: invalid device key");
+      return;
+    }
     prefs.begin("haven", false);
     prefs.putString("ssid", server.arg("ssid"));
     prefs.putString("pass", server.arg("pass"));
@@ -715,6 +817,13 @@ void loop() {
   server.handleClient();
   unsigned long now = millis();
 
+  // Wi-Fi auto-reconnect every 15s if the link dropped
+  if (WiFi.status() != WL_CONNECTED && now - lastWifiRetryMs >= 15000) {
+    lastWifiRetryMs = now;
+    WiFi.disconnect();
+    WiFi.begin(ssid, password);
+  }
+
   // Strict 100Hz non-blocking 3-axis hardware vibration sampling loop (10ms interval)
   if (now - lastSampleMs >= 10) {
     lastSampleMs = now;
@@ -729,9 +838,45 @@ void loop() {
     }
   }
 
+  // DS18B20 async read once per second
+  if (now - lastTempMs >= 1000) {
+    lastTempMs = now;
+    float t = tempSensor.getTempCByIndex(0);
+    ds18Plugged = (t > -55.0f && t < 125.0f && t != DEVICE_DISCONNECTED_C);
+    tempC = ds18Plugged ? t : NAN;
+    tempSensor.requestTemperatures();
+  }
+
+  // Hall RPM over 1s windows
+  if (now - lastRpmMs >= 1000) {
+    unsigned long pulses;
+    portENTER_CRITICAL(&pulseMux);
+    pulses = pulseCount;
+    pulseCount = 0;
+    portEXIT_CRITICAL(&pulseMux);
+    rpmValue = (float)pulses * 60.0f * 1000.0f / (float)(now - lastRpmMs);
+    lastRpmMs = now;
+  }
+
   if (now - lastUploadMs >= 5000 && WiFi.status() == WL_CONNECTED) {
     lastUploadMs = now;
+
+    // Refresh INA219 (hot-plug aware) and microphone level
+    if (!inaReady && probeI2C(INA_ADDR)) {
+      inaReady = ina219.begin(&Wire);
+      if (inaReady) ina219.setCalibration_32V_2A();
+    } else if (inaReady && !probeI2C(INA_ADDR)) {
+      inaReady = false;
+    }
+    if (inaReady) {
+      busVoltage = ina219.getBusVoltage_V();
+      currentMA  = ina219.getCurrent_mA();
+      powerMW    = ina219.getPower_mW();
+    }
+    readMicrophone();
+
     HTTPClient http;
+    http.setTimeout(2000);
     http.begin(serverUrl);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Haven-Device-Key", deviceKey);
@@ -742,6 +887,34 @@ void loop() {
     doc["sample_rate_hz"] = 100;
     doc["save_session"]   = false;
     doc["auto_analyze"]   = false;
+    doc["rpm"]            = (int)rpmValue;
+    if (ds18Plugged) doc["temperature_c"] = tempC;
+    if (inaReady) {
+      doc["voltage_v"]  = busVoltage;
+      doc["current_ma"] = currentMA;
+    }
+
+    JsonObject health = doc.createNestedObject("health");
+    health["ds18b20"]  = ds18Plugged;
+    health["mpu6050"]  = accelReady;
+    health["ina219"]   = inaReady;
+    health["inmp441"]  = micReady && audioRMS > 0;
+    health["hall_rpm"] = true;
+
+    JsonObject sd = doc.createNestedObject("sensor_data");
+    if (ds18Plugged) sd.createNestedObject("ds18b20")["temp_c"] = tempC;
+    sd.createNestedObject("hall_rpm")["rpm"] = (int)rpmValue;
+    if (inaReady) {
+      JsonObject inaObj = sd.createNestedObject("ina219");
+      inaObj["voltage_v"]  = busVoltage;
+      inaObj["current_ma"] = currentMA;
+      inaObj["power_mw"]   = powerMW;
+    }
+    if (micReady) {
+      JsonObject micObj = sd.createNestedObject("inmp441");
+      micObj["rms"]  = audioRMS;
+      micObj["peak"] = audioPeak;
+    }
 
     int available = vibFull ? VIB_BUFFER_SIZE : vibIdx;
     int countToSend = (available > 64) ? 64 : available;
@@ -754,7 +927,7 @@ void loop() {
         sObj["y"] = round(vibBufY[idx] * 1000.0f) / 1000.0f;
         sObj["z"] = round(vibBufZ[idx] * 1000.0f) / 1000.0f;
       }
-      JsonObject mpuObj = doc.createNestedObject("sensor_data").createNestedObject("mpu6050");
+      JsonObject mpuObj = sd.createNestedObject("mpu6050");
       mpuObj["ax"] = latestAx;
       mpuObj["ay"] = latestAy;
       mpuObj["az"] = latestAz;
