@@ -4031,6 +4031,41 @@ html, body {
         border-radius: 10px;
     }
 
+    /* Diagnostic File & Form Input (Adaptive Dark & Light Mode) */
+    .h-diag-file-input {
+        width: 100%;
+        background: var(--h-surface2, #f1f5f9);
+        color: var(--h-text, #0f172a);
+        border: 1px solid var(--h-border, #e2e8f0);
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+        font-family: inherit;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+        box-sizing: border-box;
+    }
+    .h-diag-file-input:focus {
+        outline: none;
+        border-color: var(--h-teal, #0284c7);
+        box-shadow: 0 0 0 2px var(--h-focus-ring, rgba(2, 132, 199, 0.15));
+    }
+    .h-diag-file-input::placeholder {
+        color: var(--h-text3, #94a3b8);
+    }
+    .h-diag-file-input option {
+        background: var(--h-surface, #ffffff);
+        color: var(--h-text, #0f172a);
+    }
+    [data-theme="dark"] .h-diag-file-input {
+        background: var(--h-surface2, #131a27);
+        color: var(--h-text, #f8fafc);
+        border-color: var(--h-border, #1e293b);
+    }
+    [data-theme="dark"] .h-diag-file-input option {
+        background: var(--h-surface, #0d111a);
+        color: var(--h-text, #f8fafc);
+    }
+
     @media (max-width: 767px) {
         .haven-content-container {
             padding-top: 1rem;

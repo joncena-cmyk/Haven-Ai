@@ -910,13 +910,13 @@
     {{-- ═══════════════════════════════════════════════════════════════
          3C. GROUND-TRUTH LABELING & SESSION METADATA (ML DATASET CURATION)
          ═══════════════════════════════════════════════════════════════ --}}
-    <div class="h-card" style="padding:1.35rem 1.45rem;background:var(--h-surface, #ffffff);border:1px solid var(--h-border, #e2e8f0);border-radius:14px;margin-bottom:1.5rem;box-shadow:var(--h-card-shadow, 0 4px 20px rgba(15,23,42,0.04));">
+    <div class="h-card" style="padding:1.35rem 1.45rem;background:var(--ds-surface);border:1px solid var(--ds-border);border-radius:14px;margin-bottom:1.5rem;box-shadow:var(--ds-shadow-card);">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
             <div>
-                <h3 style="font-size:0.95rem;font-weight:700;color:var(--h-text, #0f172a);margin:0;">
+                <h3 style="font-size:0.95rem;font-weight:700;color:var(--ds-text);margin:0;">
                     Ground-Truth Verification &amp; Session Metadata
                 </h3>
-                <p style="font-size:0.75rem;color:var(--h-text3, #64748b);margin:0.2rem 0 0;">
+                <p style="font-size:0.75rem;color:var(--ds-text-muted);margin:0.2rem 0 0;">
                     Model prediction (<code class="h-mono">{{ $diagnostic->ml_condition ?? 'none' }}</code>) is never used as a training label. Set verified ground truth below to include this session in dataset export &amp; retraining.
                 </p>
             </div>
@@ -936,7 +936,7 @@
             @method('PATCH')
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.85rem;">
                 <div>
-                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">True Condition (Ground Truth)</label>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--ds-text-muted);margin-bottom:0.3rem;">True Condition (Ground Truth)</label>
                     <select name="true_condition" class="h-diag-file-input" style="width:100%;">
                         <option value="">-- Unlabeled --</option>
                         <option value="normal" @selected($diagnostic->true_condition === 'normal')>Normal Engine Operation (normal)</option>
@@ -946,45 +946,45 @@
                     </select>
                 </div>
                 <div>
-                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Session ID</label>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--ds-text-muted);margin-bottom:0.3rem;">Session ID</label>
                     <input type="text" name="session_id" value="{{ old('session_id', $diagnostic->session_id) }}" placeholder="e.g. SESS-2026-001" class="h-diag-file-input">
                 </div>
                 <div>
-                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Target RPM</label>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--ds-text-muted);margin-bottom:0.3rem;">Target RPM</label>
                     <input type="number" name="target_rpm" value="{{ old('target_rpm', $diagnostic->target_rpm) }}" placeholder="e.g. 850" class="h-diag-file-input">
                 </div>
                 <div>
-                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Load State</label>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--ds-text-muted);margin-bottom:0.3rem;">Load State</label>
                     <input type="text" name="load_state" value="{{ old('load_state', $diagnostic->load_state) }}" placeholder="e.g. Park / Neutral, AC Off" class="h-diag-file-input">
                 </div>
                 <div>
-                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Sensor Position</label>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--ds-text-muted);margin-bottom:0.3rem;">Sensor Position</label>
                     <input type="text" name="sensor_position" value="{{ old('sensor_position', $diagnostic->sensor_position) }}" placeholder="e.g. Cylinder head bolt #2" class="h-diag-file-input">
                 </div>
                 <div>
-                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Microphone Position</label>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--ds-text-muted);margin-bottom:0.3rem;">Microphone Position</label>
                     <input type="text" name="mic_position" value="{{ old('mic_position', $diagnostic->mic_position) }}" placeholder="e.g. 15cm above valve cover" class="h-diag-file-input">
                 </div>
                 <div>
-                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Operator</label>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--ds-text-muted);margin-bottom:0.3rem;">Operator</label>
                     <input type="text" name="operator" value="{{ old('operator', $diagnostic->operator) }}" placeholder="Operator name" class="h-diag-file-input">
                 </div>
                 <div>
-                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Verified By</label>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--ds-text-muted);margin-bottom:0.3rem;">Verified By</label>
                     <input type="text" name="verified_by" value="{{ old('verified_by', $diagnostic->verified_by) }}" placeholder="Certifying mechanic" class="h-diag-file-input">
                 </div>
                 <div>
-                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Sample Rate (Hz)</label>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--ds-text-muted);margin-bottom:0.3rem;">Sample Rate (Hz)</label>
                     <input type="number" name="sample_rate_hz" value="{{ old('sample_rate_hz', $diagnostic->sample_rate_hz) }}" placeholder="e.g. 1000" class="h-diag-file-input">
                 </div>
                 <div style="grid-column:1 / -1;">
-                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--h-text2, #334155);margin-bottom:0.3rem;">Fault Detail / Mechanical Verification Notes</label>
+                    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--ds-text-muted);margin-bottom:0.3rem;">Fault Detail / Mechanical Verification Notes</label>
                     <textarea name="fault_detail" rows="2" placeholder="Document physical inspection findings (e.g. Cylinder 3 coil unplugged, intake lash 0.35mm)..." class="h-diag-file-input" style="width:100%;">{{ old('fault_detail', $diagnostic->fault_detail) }}</textarea>
                 </div>
             </div>
 
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-top:1rem;padding-top:0.85rem;border-top:1px solid var(--h-border, #e2e8f0);">
-                <label style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.8rem;font-weight:700;color:var(--h-text, #0f172a);cursor:pointer;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-top:1rem;padding-top:0.85rem;border-top:1px solid var(--ds-border);">
+                <label style="display:inline-flex;align-items:center;gap:0.5rem;font-size:0.8rem;font-weight:700;color:var(--ds-text);cursor:pointer;">
                     <input type="checkbox" name="is_training_sample" value="1" @checked($diagnostic->is_training_sample) style="accent-color:#0284c7;width:16px;height:16px;">
                     <span>Mark as verified training sample (<code class="h-mono">is_training_sample = true</code>)</span>
                 </label>
@@ -999,20 +999,20 @@
          4. DETAILED RECOMMENDATIONS & COPILOT CONSOLE
          ═══════════════════════════════════════════════════════════════ --}}
     @if(!empty($aiRecommendations))
-        <div class="haven-ai-copilot-container" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;margin-bottom:1.5rem;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,0.06);">
+        <div class="haven-ai-copilot-container" style="background:var(--ds-surface);border:1px solid var(--ds-border);border-radius:16px;margin-bottom:1.5rem;overflow:hidden;box-shadow:var(--ds-shadow-card);">
             
             {{-- Copilot Header Bar --}}
-            <div style="padding:1rem 1.25rem;border-bottom:1px solid #e2e8f0;background:linear-gradient(90deg, rgba(2,132,199,0.06) 0%, rgba(248,250,252,0.9) 100%);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+            <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--ds-border);background:linear-gradient(90deg, var(--ds-blue-light) 0%, var(--ds-surface-subtle) 100%);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
                 <div style="display:flex;align-items:center;gap:0.875rem;">
                     <div id="haven-ai-orb" class="haven-siri-orb" title="HAVEN AI Mechanic Copilot"></div>
                     <div>
                         <div style="display:flex;align-items:center;gap:0.5rem;">
-                            <h3 style="font-size:0.95rem;font-weight:700;color:#0f172a;margin:0;letter-spacing:-0.01em;">
+                            <h3 style="font-size:0.95rem;font-weight:700;color:var(--ds-text);margin:0;letter-spacing:-0.01em;">
                                 HAVEN AI · Mechanic Copilot & Recommendations
                             </h3>
                             <span class="h-badge h-badge-teal" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;">V2.5 Live</span>
                         </div>
-                        <div style="font-size:0.75rem;color:#64748b;margin-top:0.15rem;">
+                        <div style="font-size:0.75rem;color:var(--ds-text-muted);margin-top:0.15rem;">
                             Interactive diagnostic assistant for {{ $vehicle->display_name }}
                         </div>
                     </div>
@@ -1020,10 +1020,10 @@
 
                 {{-- Actions: Voice Readout Toggle --}}
                 <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                    <span id="diag-history-badge" title="Saved questions in session" style="font-size:0.68rem;font-weight:600;color:#64748b;background:#f1f5f9;border:1px solid #cbd5e1;padding:0.2rem 0.55rem;border-radius:999px;display:none;">
+                    <span id="diag-history-badge" title="Saved questions in session" style="font-size:0.68rem;font-weight:600;color:var(--ds-text-muted);background:var(--ds-surface-subtle);border:1px solid var(--ds-border);padding:0.2rem 0.55rem;border-radius:999px;display:none;">
                         0 msgs
                     </span>
-                    <button type="button" id="voice-toggle-btn" class="h-btn h-btn-subtle" style="font-size:0.75rem;padding:0.35rem 0.75rem;display:inline-flex;align-items:center;gap:0.4rem;background:#ffffff;border:1px solid #cbd5e1;color:#0f172a;border-radius:8px;cursor:pointer;">
+                    <button type="button" id="voice-toggle-btn" class="h-btn h-btn-subtle" style="font-size:0.75rem;padding:0.35rem 0.75rem;display:inline-flex;align-items:center;gap:0.4rem;background:var(--ds-surface-subtle);border:1px solid var(--ds-border);color:var(--ds-text);border-radius:8px;cursor:pointer;">
                         <svg id="voice-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                             <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
@@ -1034,51 +1034,51 @@
             </div>
 
             {{-- Safety Verdict & Urgency Banner --}}
-            <div style="padding:1.1rem 1.25rem;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+            <div style="padding:1.1rem 1.25rem;border-bottom:1px solid var(--ds-border);background:var(--ds-surface-subtle);">
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.6rem;">
                     <div style="display:flex;align-items:center;gap:0.6rem;">
-                        <span style="background:{{ $condColor['bg'] }};color:{{ $condColor['label'] }};border:1px solid {{ $condColor['border'] }};font-size:0.75rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;letter-spacing:0.02em;">
+                        <span class="h-badge {{ $condColor['badge'] }}" style="font-size:0.75rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:999px;letter-spacing:0.02em;">
                             {{ $aiRecommendations['safety_status'] ?? 'OPERATIONAL' }}
                         </span>
-                        <span style="font-size:0.75rem;color:#64748b;">Urgency: <strong style="color:#0f172a;">{{ $aiRecommendations['urgency'] ?? 'Standard' }}</strong></span>
+                        <span style="font-size:0.75rem;color:var(--ds-text-muted);">Urgency: <strong style="color:var(--ds-text);">{{ $aiRecommendations['urgency'] ?? 'Standard' }}</strong></span>
                     </div>
-                    <div style="font-size:0.78rem;color:#0f172a;background:#ffffff;padding:0.25rem 0.75rem;border-radius:8px;border:1px solid #e2e8f0;">
+                    <div style="font-size:0.78rem;color:var(--ds-text);background:var(--ds-surface);padding:0.25rem 0.75rem;border-radius:8px;border:1px solid var(--ds-border);">
                         Estimated Repair: <strong style="color:#0284c7;">{{ $aiRecommendations['cost_estimate'] ?? 'N/A' }}</strong>
                     </div>
                 </div>
-                <div style="font-size:0.84rem;color:#334155;line-height:1.6;">
+                <div style="font-size:0.84rem;color:var(--ds-text-muted);line-height:1.6;">
                     {{ $aiRecommendations['drive_safety'] ?? 'Review inspection steps before extended operation.' }}
                 </div>
             </div>
 
             {{-- Two-Column Diagnosis: Causes & Priority Actions --}}
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%, 280px),1fr));gap:1px;background:#e2e8f0;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%, 280px),1fr));gap:1px;background:var(--ds-border);">
                 
                 {{-- Probable Causes --}}
-                <div style="background:#ffffff;padding:1.15rem 1.25rem;">
-                    <div style="display:flex;align-items:center;gap:0.45rem;font-size:0.78rem;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.75rem;">
+                <div style="background:var(--ds-surface);padding:1.15rem 1.25rem;">
+                    <div style="display:flex;align-items:center;gap:0.45rem;font-size:0.78rem;font-weight:700;color:var(--ds-text);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.75rem;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                         Probable Root Causes
                     </div>
                     <ul style="margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:0.45rem;">
                         @foreach($aiRecommendations['probable_causes'] ?? ['Check spark plugs and ignition coils', 'Verify valvetrain lash adjustment', 'Inspect engine mount bushings'] as $cause)
-                            <li style="font-size:0.8rem;color:#334155;line-height:1.5;">{{ $cause }}</li>
+                            <li style="font-size:0.8rem;color:var(--ds-text-muted);line-height:1.5;">{{ $cause }}</li>
                         @endforeach
                     </ul>
                 </div>
 
                 {{-- Priority Action Checklist --}}
-                <div style="background:#ffffff;padding:1.15rem 1.25rem;">
+                <div style="background:var(--ds-surface);padding:1.15rem 1.25rem;">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-                        <div style="display:flex;align-items:center;gap:0.45rem;font-size:0.78rem;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.04em;">
+                        <div style="display:flex;align-items:center;gap:0.45rem;font-size:0.78rem;font-weight:700;color:var(--ds-text);text-transform:uppercase;letter-spacing:0.04em;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
                             Priority Action Checklist
                         </div>
-                        <span style="font-size:0.7rem;color:#64748b;">Interactive</span>
+                        <span style="font-size:0.7rem;color:var(--ds-text-dim);">Interactive</span>
                     </div>
                     <div style="display:flex;flex-direction:column;gap:0.45rem;">
                         @foreach($aiRecommendations['action_checklist'] ?? ['Connect OBD2 scanner to verify cylinder misfire counts', 'Use feeler gauge on intake/exhaust valve rocker clearance', 'Torque engine bracket mounting hardware to factory spec'] as $idx => $action)
-                            <label style="display:flex;align-items:flex-start;gap:0.5rem;font-size:0.8rem;color:#334155;cursor:pointer;line-height:1.45;">
+                            <label style="display:flex;align-items:flex-start;gap:0.5rem;font-size:0.8rem;color:var(--ds-text-muted);cursor:pointer;line-height:1.45;">
                                 <input type="checkbox" style="margin-top:0.2rem;accent-color:#0284c7;" onchange="this.parentElement.style.opacity = this.checked ? '0.45' : '1'; this.parentElement.style.textDecoration = this.checked ? 'line-through' : 'none';">
                                 <span>{{ $action }}</span>
                             </label>
@@ -1089,21 +1089,21 @@
             </div>
 
             {{-- Interactive Chat Thread & Speech Input --}}
-            <div style="padding:1.25rem;background:#f8fafc;border-top:1px solid #e2e8f0;">
+            <div style="padding:1.25rem;background:var(--ds-surface-subtle);border-top:1px solid var(--ds-border);">
                 <div id="ai-chat-thread" style="display:flex;flex-direction:column;gap:0.75rem;max-height:260px;overflow-y:auto;padding-right:0.25rem;margin-bottom:1rem;">
                     <div style="display:flex;align-items:flex-start;gap:0.75rem;">
                         <div style="width:28px;height:28px;border-radius:50%;background:#0284c7;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;margin-top:2px;">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                         </div>
                         <div style="flex:1;min-width:0;">
-                            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;border-top-left-radius:4px;padding:0.85rem 1.05rem;font-size:0.84rem;color:#0f172a;line-height:1.58;max-width:90%;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                            <div style="background:var(--ds-surface);border:1px solid var(--ds-border);border-radius:14px;border-top-left-radius:4px;padding:0.85rem 1.05rem;font-size:0.84rem;color:var(--ds-text);line-height:1.58;max-width:90%;box-shadow:var(--ds-shadow-card);">
                                 <strong style="color:#0284c7;font-weight:600;">Welcome to Haven AI Copilot.</strong><br>
                                 {{ $aiRecommendations['summary'] ?? 'Engine signals recorded and processed.' }}
-                                <div style="margin-top:0.45rem;font-size:0.75rem;color:#64748b;">
+                                <div style="margin-top:0.45rem;font-size:0.75rem;color:var(--ds-text-muted);">
                                     Type your questions below or select a suggested prompt to explore next steps.
                                 </div>
                             </div>
-                            <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.3rem;margin-left:0.25rem;">
+                            <div style="font-size:0.68rem;color:var(--ds-text-dim);margin-top:0.3rem;margin-left:0.25rem;">
                                 Haven AI Assistant | {{ now()->format('g:i A') }}
                             </div>
                         </div>
@@ -1112,9 +1112,9 @@
 
                 {{-- Quick Suggestions --}}
                 <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.85rem;">
-                    <span style="font-size:0.72rem;color:#64748b;font-weight:600;margin-right:0.2rem;">Suggestions:</span>
+                    <span style="font-size:0.72rem;color:var(--ds-text-muted);font-weight:600;margin-right:0.2rem;">Suggestions:</span>
                     @foreach($aiRecommendations['prompt_suggestions'] ?? ['Can I drive 10 miles to a garage?', 'What tools do I need for this?', 'Estimated repair cost?'] as $promptChip)
-                        <button type="button" class="haven-prompt-chip" onclick="askAiQuestion('{{ addslashes($promptChip) }}')" style="background:#ffffff;border:1px solid #cbd5e1;color:#334155;padding:0.28rem 0.65rem;border-radius:999px;font-size:0.73rem;cursor:pointer;transition:all 0.15s ease;">
+                        <button type="button" class="haven-prompt-chip" onclick="askAiQuestion('{{ addslashes($promptChip) }}')" style="background:var(--ds-surface);border:1px solid var(--ds-border);color:var(--ds-text-muted);padding:0.28rem 0.65rem;border-radius:999px;font-size:0.73rem;cursor:pointer;transition:all 0.15s ease;">
                             {{ $promptChip }}
                         </button>
                     @endforeach
@@ -1123,8 +1123,8 @@
                 {{-- Input Bar --}}
                 <div style="display:flex;align-items:center;gap:0.5rem;position:relative;">
                     <div style="position:relative;flex:1;">
-                        <input type="text" id="ai-question-input" placeholder="Ask a diagnostic question or type your symptom..." style="width:100%;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;padding:0.6rem 2.5rem 0.6rem 0.85rem;font-size:0.82rem;color:#0f172a;box-sizing:border-box;outline:none;" onkeydown="if(event.key === 'Enter') submitAiQuestion();">
-                        <button type="button" id="ai-mic-btn" title="Click to speak (Voice Input)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;padding:5px;">
+                        <input type="text" id="ai-question-input" placeholder="Ask a diagnostic question or type your symptom..." style="width:100%;background:var(--ds-surface);border:1px solid var(--ds-border);border-radius:8px;padding:0.6rem 2.5rem 0.6rem 0.85rem;font-size:0.82rem;color:var(--ds-text);box-sizing:border-box;outline:none;" onkeydown="if(event.key === 'Enter') submitAiQuestion();">
+                        <button type="button" id="ai-mic-btn" title="Click to speak (Voice Input)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--ds-text-muted);cursor:pointer;padding:5px;">
                             <svg id="mic-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
                         </button>
                     </div>
@@ -1145,15 +1145,15 @@
 
     {{-- Nearby repair shops (Google Places) — shown when a fault condition was detected --}}
     @if(in_array($canon, ['misfire', 'valve_clearance', 'loose_component'], true))
-        <div id="haven-shops-card" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;box-shadow:0 2px 10px rgba(0,0,0,0.03);">
+        <div id="haven-shops-card" style="background:var(--ds-surface);border:1px solid var(--ds-border);border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;box-shadow:var(--ds-shadow-card);">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
                 <div>
-                    <div style="font-weight:700;font-size:0.9rem;color:#0f172a;">Nearby Repair Shops</div>
-                    <div style="font-size:0.74rem;color:#64748b;margin-top:0.15rem;">Find auto repair shops close to you to have this fault checked. Your location is used only for this search and is not stored.</div>
+                    <div style="font-weight:700;font-size:0.9rem;color:var(--ds-text);">Nearby Repair Shops</div>
+                    <div style="font-size:0.74rem;color:var(--ds-text-muted);margin-top:0.15rem;">Find auto repair shops close to you to have this fault checked. Your location is used only for this search and is not stored.</div>
                 </div>
                 <button type="button" id="haven-shops-btn" class="h-diag-btn-primary" style="padding:0.55rem 1rem;font-size:0.8rem;height:auto;">Find shops near me</button>
             </div>
-            <div id="haven-shops-msg" style="display:none;font-size:0.78rem;color:#64748b;margin-top:0.75rem;"></div>
+            <div id="haven-shops-msg" style="display:none;font-size:0.78rem;color:var(--ds-text-muted);margin-top:0.75rem;"></div>
             <div id="haven-shops-list" style="display:grid;gap:0.6rem;margin-top:0.75rem;"></div>
         </div>
         <script>
@@ -1162,7 +1162,7 @@
             const msg = document.getElementById('haven-shops-msg');
             const list = document.getElementById('haven-shops-list');
             const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-            function say(t, isErr) { msg.style.display = 'block'; msg.style.color = isErr ? '#b91c1c' : '#64748b'; msg.textContent = t; }
+            function say(t, isErr) { msg.style.display = 'block'; msg.style.color = isErr ? '#ef4444' : 'var(--ds-text-muted)'; msg.textContent = t; }
             function fallback(lat, lng) {
                 const q = (lat != null) ? `https://www.google.com/maps/search/auto+repair/@${lat},${lng},14z` : 'https://www.google.com/maps/search/auto+repair+near+me';
                 list.innerHTML = `<a href="${q}" target="_blank" rel="noopener" style="font-size:0.8rem;color:#0284c7;font-weight:600;">Open auto repair shops in Google Maps &rarr;</a>`;
@@ -1186,11 +1186,11 @@
                         if (!d.shops.length) { say('No repair shops found within the search radius.'); fallback(lat, lng); return; }
                         say(d.shops.length + ' shop(s) found, nearest first. Verify hours and reviews before visiting.');
                         list.innerHTML = d.shops.map(s => `
-                            <div style="border:1px solid #e2e8f0;border-radius:8px;padding:0.65rem 0.8rem;display:flex;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+                            <div style="border:1px solid var(--ds-border);border-radius:8px;padding:0.65rem 0.8rem;background:var(--ds-surface-subtle);display:flex;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
                                 <div>
-                                    <div style="font-weight:600;font-size:0.84rem;color:#0f172a;">${esc(s.name)}</div>
-                                    <div style="font-size:0.74rem;color:#64748b;">${esc(s.address)}</div>
-                                    <div style="font-size:0.72rem;color:#475569;margin-top:0.15rem;">
+                                    <div style="font-weight:600;font-size:0.84rem;color:var(--ds-text);">${esc(s.name)}</div>
+                                    <div style="font-size:0.74rem;color:var(--ds-text-muted);">${esc(s.address)}</div>
+                                    <div style="font-size:0.72rem;color:var(--ds-text-dim);margin-top:0.15rem;">
                                         ${s.rating ? '★ ' + esc(s.rating) + ' (' + esc(s.rating_count) + ')' : 'No rating'}
                                         ${s.open_now === true ? ' · Open now' : (s.open_now === false ? ' · Closed' : '')}
                                         ${s.distance_km != null ? ' · ' + esc(s.distance_km) + ' km' : ''}
@@ -1214,9 +1214,9 @@
     <div class="haven-detail-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%, 300px),1fr));gap:1rem;margin-bottom:1.5rem;">
         
         {{-- Audio Player Card --}}
-        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:1.25rem;box-shadow:0 2px 10px rgba(0,0,0,0.03);">
+        <div style="background:var(--ds-surface);border:1px solid var(--ds-border);border-radius:12px;padding:1.25rem;box-shadow:var(--ds-shadow-card);">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-                <div style="display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.88rem;color:#0f172a;">
+                <div style="display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.88rem;color:var(--ds-text);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
                     Engine Audio (INMP441)
                 </div>
@@ -1225,7 +1225,7 @@
                 </span>
             </div>
             @if($diagnostic->hasAudio())
-                <div style="font-size:0.75rem;color:#64748b;margin-bottom:0.65rem;">
+                <div style="font-size:0.75rem;color:var(--ds-text-muted);margin-bottom:0.65rem;">
                     Duration: <strong>{{ floor($diagnostic->audio_duration_sec/60) }}:{{ str_pad($diagnostic->audio_duration_sec%60,2,'0',STR_PAD_LEFT) }}</strong>
                     @if($diagnostic->audio_original_name) · {{ $diagnostic->audio_original_name }} @endif
                 </div>
@@ -1254,14 +1254,14 @@
                     </div>
                 </div>
             @else
-                <p style="font-size:0.78rem;color:#94a3b8;margin:0;">No audio recorded for this session.</p>
+                <p style="font-size:0.78rem;color:var(--ds-text-dim);margin:0;">No audio recorded for this session.</p>
             @endif
         </div>
 
         {{-- Vibration Data Card --}}
-        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:1.25rem;box-shadow:0 2px 10px rgba(0,0,0,0.03);">
+        <div style="background:var(--ds-surface);border:1px solid var(--ds-border);border-radius:12px;padding:1.25rem;box-shadow:var(--ds-shadow-card);">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-                <div style="display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.88rem;color:#0f172a;">
+                <div style="display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.88rem;color:var(--ds-text);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                     Vibration Telemetry
                 </div>
@@ -1270,13 +1270,13 @@
                 </span>
             </div>
             @if($diagnostic->hasVibration())
-                <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:0.75rem;">
+                <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:0.75rem;color:var(--ds-text);">
                     <span>Samples: <strong>{{ number_format($diagnostic->vibration_sample_count) }}</strong></span>
                     <span>Peak: <strong style="color:#d97706;">{{ $diagnostic->vibration_peak_g }}g</strong></span>
                     <span>RMS: <strong style="color:#0284c7;">{{ $diagnostic->vibration_rms_g }}g</strong></span>
                 </div>
                 @if($diagnostic->vibration_source === 'simulated')
-                    <div style="margin-bottom:0.75rem;padding:0.4rem 0.6rem;border-radius:6px;background:#fef3c7;border:1px solid #fde68a;font-size:0.73rem;color:#92400e;">
+                    <div style="margin-bottom:0.75rem;padding:0.4rem 0.6rem;border-radius:6px;background:rgba(245, 158, 11, 0.15);border:1px solid rgba(245, 158, 11, 0.35);font-size:0.73rem;color:#f59e0b;">
                         <strong>Demo Notice:</strong> Synthesized browser waveform. Excluded from machine learning retraining datasets.
                     </div>
                 @endif
@@ -1285,20 +1285,20 @@
                     Download Vibration CSV
                 </a>
             @else
-                <p style="font-size:0.78rem;color:#94a3b8;margin:0;">{{ $diagnostic->vibration_source === 'skipped' ? 'Vibration capture was skipped (Audio-only session).' : 'No vibration data captured.' }}</p>
+                <p style="font-size:0.78rem;color:var(--ds-text-dim);margin:0;">{{ $diagnostic->vibration_source === 'skipped' ? 'Vibration capture was skipped (Audio-only session).' : 'No vibration data captured.' }}</p>
             @endif
         </div>
 
         {{-- Session Meta Card --}}
-        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:1.25rem;box-shadow:0 2px 10px rgba(0,0,0,0.03);">
-            <div style="font-weight:700;font-size:0.88rem;color:#0f172a;margin-bottom:0.75rem;">Session Metadata</div>
+        <div style="background:var(--ds-surface);border:1px solid var(--ds-border);border-radius:12px;padding:1.25rem;box-shadow:var(--ds-shadow-card);">
+            <div style="font-weight:700;font-size:0.88rem;color:var(--ds-text);margin-bottom:0.75rem;">Session Metadata</div>
             <div style="display:flex;flex-direction:column;gap:0.4rem;font-size:0.78rem;">
-                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Vehicle:</span><span style="font-weight:600;color:#0f172a;">{{ $vehicle->display_name }}</span></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Date:</span><span style="font-weight:600;color:#0f172a;">{{ $diagnostic->created_at->format('M j, Y · g:i A') }}</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:var(--ds-text-dim);">Vehicle:</span><span style="font-weight:600;color:var(--ds-text);">{{ $vehicle->display_name }}</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:var(--ds-text-dim);">Date:</span><span style="font-weight:600;color:var(--ds-text);">{{ $diagnostic->created_at->format('M j, Y · g:i A') }}</span></div>
                 @if($diagnostic->ml_processed_at)
-                    <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Analyzed:</span><span style="font-weight:600;color:#0284c7;">{{ $diagnostic->ml_processed_at->format('M j, g:i A') }}</span></div>
+                    <div style="display:flex;justify-content:space-between;"><span style="color:var(--ds-text-dim);">Analyzed:</span><span style="font-weight:600;color:#0284c7;">{{ $diagnostic->ml_processed_at->format('M j, g:i A') }}</span></div>
                 @endif
-                <div style="display:flex;justify-content:space-between;"><span style="color:#64748b;">Mode:</span><span style="font-weight:600;color:#0f172a;">{{ $diagnostic->recording_mode_label }}</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:var(--ds-text-dim);">Mode:</span><span style="font-weight:600;color:var(--ds-text);">{{ $diagnostic->recording_mode_label }}</span></div>
             </div>
         </div>
 
@@ -2227,6 +2227,40 @@
 @keyframes micPulse {
     from { transform: translateY(-50%) scale(1); }
     to { transform: translateY(-50%) scale(1.2); }
+}
+
+.h-diag-file-input {
+    width: 100%;
+    background: var(--ds-surface-subtle);
+    color: var(--ds-text);
+    border: 1px solid var(--ds-border);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    font-family: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-sizing: border-box;
+}
+.h-diag-file-input:focus {
+    outline: none;
+    border-color: var(--ds-blue);
+    box-shadow: 0 0 0 2px var(--ds-blue-light);
+}
+.h-diag-file-input::placeholder {
+    color: var(--ds-text-dim);
+}
+.h-diag-file-input option {
+    background: var(--ds-surface);
+    color: var(--ds-text);
+}
+[data-theme="dark"] .h-diag-file-input {
+    background: var(--ds-surface-subtle);
+    color: var(--ds-text);
+    border-color: var(--ds-border);
+}
+[data-theme="dark"] .h-diag-file-input option {
+    background: var(--ds-surface);
+    color: var(--ds-text);
 }
 
 @media (max-width: 640px) {

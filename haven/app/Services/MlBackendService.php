@@ -314,6 +314,14 @@ class MlBackendService
             if (! $allowTransientFallback) {
                 throw new \RuntimeException("ML backend unavailable at {$this->baseUrl} for diagnostic #{$diagnostic->id}");
             }
+
+            if (! app()->runningUnitTests()) {
+                $localResult = $this->runLocalPythonAnalysis($diagnostic);
+                if (is_array($localResult) && ! empty($localResult['condition'])) {
+                    return $localResult;
+                }
+            }
+
             Log::info("ML backend unavailable — using mock classifier for diagnostic #{$diagnostic->id}");
 
             return $this->mockAnalysis($diagnostic);
@@ -416,6 +424,135 @@ class MlBackendService
 
             return $this->mockAnalysis($diagnostic, 'unexpected_error');
         }
+    }
+
+    /**
+     * Direct local Python ML pipeline execution when the FastAPI HTTP daemon (:8001)
+     * is not running, ensuring uploaded audio/vibration files are still analyzed by
+     * features.py + classifier.py (model.pkl) rather than falling back to simulated mocks.
+     */
+    private function runLocalPythonAnalysis(Diagnostic $diagnostic): ?array
+    {
+        $mlDir = base_path('../ml_backend');
+        if (! is_dir($mlDir) || ! file_exists($mlDir.'/features.py') || ! file_exists($mlDir.'/classifier.py')) {
+            return null;
+        }
+
+        $audioPath = null;
+        if ($diagnostic->hasAudio()) {
+            $audioDisk = Storage::disk('local')->exists($diagnostic->audio_path) ? 'local' : 'public';
+            $candidate = Storage::disk($audioDisk)->path($diagnostic->audio_path);
+            if (file_exists($candidate)) {
+                $audioPath = $candidate;
+            }
+        }
+
+        $vibPath = null;
+        if ($diagnostic->hasVibration()) {
+            $vibDisk = Storage::disk('local')->exists($diagnostic->vibration_path) ? 'local' : 'public';
+            $candidate = Storage::disk($vibDisk)->path($diagnostic->vibration_path);
+            if (file_exists($candidate)) {
+                $vibPath = $candidate;
+            }
+        }
+
+        if (! $audioPath && ! $vibPath) {
+            return null;
+        }
+
+        $payload = json_encode([
+            'diagnostic_id' => $diagnostic->id,
+            'vehicle_id' => $diagnostic->vehicle_id,
+            'audio_path' => $audioPath,
+            'vib_path' => $vibPath,
+            'recording_mode' => $diagnostic->recording_mode ?? 'idle',
+            'rpm' => $diagnostic->rpm,
+            'temperature_c' => $diagnostic->temperature_c,
+            'voltage_v' => $diagnostic->voltage_v,
+            'current_ma' => $diagnostic->current_ma,
+            'sample_rate_hz' => $diagnostic->sample_rate_hz,
+        ]);
+
+        $pyCode = <<<'PY'
+import sys, os, json, warnings
+warnings.filterwarnings("ignore")
+ml_dir = sys.argv[1]
+cfg = json.loads(sys.argv[2])
+sys.path.insert(0, ml_dir)
+import features, main
+
+aud_feat, aud_wins = {}, []
+vib_feat, vib_wins = {}, []
+if cfg.get("audio_path") and os.path.exists(cfg["audio_path"]):
+    aud_feat = features.extract_audio_features(cfg["audio_path"])
+    aud_wins = aud_feat.pop("_windows", [])
+if cfg.get("vib_path") and os.path.exists(cfg["vib_path"]):
+    ext = os.path.splitext(cfg["vib_path"])[1].lstrip(".") or "csv"
+    vib_feat = features.extract_vibration_features(cfg["vib_path"], ext=ext, sample_rate_hz=cfg.get("sample_rate_hz"), rpm=cfg.get("rpm"))
+    vib_wins = vib_feat.pop("_windows", [])
+
+win_list = []
+if aud_wins and vib_wins:
+    n_w = max(len(aud_wins), len(vib_wins))
+    for i in range(n_w):
+        ai = int(round(i * (len(aud_wins) - 1) / (n_w - 1))) if n_w > 1 else 0
+        vi = int(round(i * (len(vib_wins) - 1) / (n_w - 1))) if n_w > 1 else 0
+        win_list.append({**aud_wins[ai], **vib_wins[vi]})
+elif aud_wins:
+    win_list = list(aud_wins)
+elif vib_wins:
+    win_list = list(vib_wins)
+
+ctx = {
+    "recording_mode": cfg.get("recording_mode") or "idle",
+    "rpm": cfg.get("rpm"),
+    "temperature_c": cfg.get("temperature_c"),
+    "voltage_v": cfg.get("voltage_v"),
+    "current_ma": cfg.get("current_ma"),
+}
+all_feat = {**aud_feat, **vib_feat, **ctx, "_window_features": win_list}
+res = main.classifier.predict(all_feat)
+out = main._sanitize_json_floats({
+    "diagnostic_id": cfg.get("diagnostic_id"),
+    "vehicle_id": cfg.get("vehicle_id"),
+    "condition": res["condition"],
+    "confidence": res["confidence"],
+    "confidence_pct": f"{res['confidence'] * 100:.1f}%",
+    "top_classes": res.get("top_classes", []),
+    "feature_contributions": res.get("feature_contributions", []),
+    "audio_features": aud_feat,
+    "vibration_features": vib_feat,
+    "hardware_features": ctx,
+    "context_metadata": ctx,
+    "mode": res.get("mode", "trained"),
+    "training_data_origin": res.get("training_data_origin", "synthetic_bootstrap"),
+    "warnings": res.get("warnings", []),
+})
+print("__HAVEN_JSON__" + json.dumps(out))
+PY;
+
+        try {
+            $process = new Process([$this->resolvePythonBinary(), '-c', $pyCode, $mlDir, $payload]);
+            $process->setWorkingDirectory($mlDir);
+            $process->setTimeout(30);
+            $process->run();
+
+            if ($process->isSuccessful()) {
+                $stdout = $process->getOutput();
+                $markerPos = strpos($stdout, '__HAVEN_JSON__');
+                if ($markerPos !== false) {
+                    $jsonStr = trim(substr($stdout, $markerPos + strlen('__HAVEN_JSON__')));
+                    $decoded = json_decode($jsonStr, true);
+                    if (is_array($decoded) && ! empty($decoded['condition'])) {
+                        return $decoded;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Local Python ML fallback failed: '.$e->getMessage());
+        }
+
+        return null;
     }
 
     /* ─────────────────────────────────────────────
