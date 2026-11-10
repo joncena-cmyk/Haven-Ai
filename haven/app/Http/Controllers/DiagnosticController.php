@@ -351,12 +351,16 @@ class DiagnosticController extends Controller
     /* ─────────────────────────────────────────────
        REPORT  GET /diagnostics/{diagnostic}/report
     ───────────────────────────────────────────── */
-    public function report(Diagnostic $diagnostic): View
+    public function report(Diagnostic $diagnostic, DiagnosticAiService $aiService): View
     {
         $this->authorizeOwner($diagnostic);
         $diagnostic->load('vehicle');
 
-        return view('diagnostics.report', compact('diagnostic'));
+        $aiRecommendations = ($diagnostic->status === 'completed' && $diagnostic->ml_condition)
+            ? $aiService->generateRecommendations($diagnostic)
+            : null;
+
+        return view('diagnostics.report', compact('diagnostic', 'aiRecommendations'));
     }
 
     /* ─────────────────────────────────────────────
