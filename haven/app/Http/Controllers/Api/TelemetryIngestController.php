@@ -76,7 +76,8 @@ class TelemetryIngestController extends Controller
             ], 401);
         }
 
-        // 3. Process Vibration Telemetry (MPU6050: D21/D22) — stored on private disk
+        // 3. Process Vibration Telemetry (MPU6050: D21/D22) — stored on private disk ONLY when save_session=true
+        $saveSession = $request->boolean('save_session', false);
         $vibrationPath = null;
         $mags = [];
         $sampleCount = 0;
@@ -86,9 +87,11 @@ class TelemetryIngestController extends Controller
         $scalarRows = [];
 
         if (! empty($validated['csv_data'])) {
-            $filename = 'vibration/'.Str::uuid().'.csv';
-            Storage::disk('local')->put($filename, $validated['csv_data']);
-            $vibrationPath = $filename;
+            if ($saveSession) {
+                $filename = 'vibration/'.Str::uuid().'.csv';
+                Storage::disk('local')->put($filename, $validated['csv_data']);
+                $vibrationPath = $filename;
+            }
 
             $lines = array_filter(array_map('trim', explode("\n", $validated['csv_data'])));
             if (count($lines) > 1) {
@@ -108,9 +111,11 @@ class TelemetryIngestController extends Controller
                 }
             }
         } elseif (! empty($validated['samples']) && is_array($validated['samples'])) {
-            $filename = 'vibration/'.Str::uuid().'.json';
-            Storage::disk('local')->put($filename, json_encode($validated['samples'], JSON_PRETTY_PRINT));
-            $vibrationPath = $filename;
+            if ($saveSession) {
+                $filename = 'vibration/'.Str::uuid().'.json';
+                Storage::disk('local')->put($filename, json_encode($validated['samples'], JSON_PRETTY_PRINT));
+                $vibrationPath = $filename;
+            }
 
             foreach ($validated['samples'] as $sample) {
                 if (is_array($sample)) {
@@ -143,7 +148,7 @@ class TelemetryIngestController extends Controller
         $peakG = $validated['peak_g'] ?? (! empty($mags) ? round(max($mags), 4) : null);
         $rmsG = $validated['rms_g'] ?? (! empty($mags) ? round(sqrt(array_sum(array_map(fn ($v) => $v ** 2, $mags)) / $sampleCount), 4) : null);
 
-        // 4. Process Audio (INMP441 I2S MEMS Mic: D18/D19/D5) — stored on private disk
+        // 4. Process Audio (INMP441 I2S MEMS Mic: D18/D19/D5) — stored on private disk ONLY when save_session=true
         $audioPath = null;
         if (! empty($validated['audio_base64'])) {
             $base64Payload = $validated['audio_base64'];
@@ -157,7 +162,7 @@ class TelemetryIngestController extends Controller
                     'error' => 'Invalid or oversized audio_base64 payload (maximum 5 MB decoded).',
                 ], 422);
             }
-            if (strlen($rawAudio) > 0) {
+            if (strlen($rawAudio) > 0 && $saveSession) {
                 $mimeStr = strtolower((string) ($validated['audio_mime'] ?? ''));
                 $ext = match (true) {
                     str_contains($mimeStr, 'wav') => 'wav',
@@ -254,6 +259,14 @@ class TelemetryIngestController extends Controller
             'current_ma' => $currentMa !== null ? (float) $currentMa : null,
             'power_mw' => $powerMw !== null ? (float) $powerMw : null,
             'peak_g' => ! is_null($peakG) ? (float) $peakG : null,
+            'rms_g' => ! is_null($rmsG) ? (float) $rmsG : null,
+            'crest_factor' => isset($validated['crest_factor'])
+                ? (float) $validated['crest_factor']
+                : (($rmsG && $peakG && $rmsG > 0) ? round($peakG / $rmsG, 2) : null),
+            'samples' => $validated['samples'] ?? [],
+            'sample_rate_hz' => isset($validated['sample_rate_hz']) ? (int) $validated['sample_rate_hz'] : 100,
+            'sensor_type' => $mpuOk ? ($request->input('sensor_data.adxl345') ? 'ADXL345' : 'MPU6050') : 'ACCELEROMETER',
+            'packet_id' => Str::random(8),
             'accel_x' => $request->input('sensor_data.mpu6050.ax'),
             'accel_y' => $request->input('sensor_data.mpu6050.ay'),
             'accel_z' => $request->input('sensor_data.mpu6050.az'),
@@ -454,6 +467,9 @@ class TelemetryIngestController extends Controller
                 $cached['voltage_v'] = null;
                 $cached['current_ma'] = null;
                 $cached['peak_g'] = null;
+                $cached['rms_g'] = null;
+                $cached['crest_factor'] = null;
+                $cached['samples'] = [];
                 $cached['audio_rms'] = null;
                 $cached['rpm'] = 0;
             }

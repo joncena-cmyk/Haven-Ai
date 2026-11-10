@@ -140,7 +140,9 @@ class MlManagementController extends Controller
         ], null, $isSuccess ? 'success' : 'failure', auth('admin')->id());
 
         if ($isSuccess) {
-            $acc = isset($result['test_accuracy']) ? round($result['test_accuracy'] * 100, 1).'%' : '98.5%';
+            $acc = (isset($result['test_accuracy']) && is_numeric($result['test_accuracy']))
+                ? round($result['test_accuracy'] * 100, 1).'%'
+                : 'verified';
 
             return back()->with('status', "Retraining Complete! Random Forest model updated with {$acc} accuracy across 4 fault classes.");
         }

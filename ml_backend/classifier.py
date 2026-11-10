@@ -130,7 +130,7 @@ class EngineClassifier:
         has_mechanical = (vibration_source not in ("simulated", "skipped")) and (peak_g >= 0.08 or rms_g >= 0.04)
         has_telemetry = (
             (_has_finite_value(temp_c) and float(temp_c) >= 45.0)
-            or (_has_finite_value(voltage_v) and float(voltage_v) >= 12.2)
+            or (_has_finite_value(voltage_v) and float(voltage_v) >= 13.2)
             or (_has_finite_value(rpm) and float(rpm) >= 300.0)
         )
         # Acoustic engine presence requires sustained energy and plausible engine spectral envelope
@@ -204,7 +204,7 @@ class EngineClassifier:
                     "value": 0,
                     "unit": "sensors",
                     "impact_pct": 20.0,
-                    "explanation": "No active engine coolant thermal signature (>45°C) or alternator bus voltage (>12.2V) verified.",
+                    "explanation": "No active engine coolant thermal signature (>45°C) or alternator bus voltage (>13.2V) verified.",
                 },
             ]
 

@@ -236,8 +236,10 @@ async def analyze(
     if audio_windows and vibration_windows:
         n_wins = max(len(audio_windows), len(vibration_windows))
         for i in range(n_wins):
-            aw = audio_windows[min(i, len(audio_windows) - 1)]
-            vw = vibration_windows[min(i, len(vibration_windows) - 1)]
+            ai = int(round(i * (len(audio_windows) - 1) / (n_wins - 1))) if n_wins > 1 else 0
+            vi = int(round(i * (len(vibration_windows) - 1) / (n_wins - 1))) if n_wins > 1 else 0
+            aw = audio_windows[ai]
+            vw = vibration_windows[vi]
             window_features_list.append({**aw, **vw})
     elif audio_windows:
         window_features_list = list(audio_windows)

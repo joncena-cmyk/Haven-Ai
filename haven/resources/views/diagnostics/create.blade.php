@@ -3365,7 +3365,8 @@
     let captureState = 'IDLE';
     let mediaRecorder, audioChunks = [], audioBlob, analyser, animFrame, audioCtx, recordTimer, recSeconds = 0;
     let vibInterval = null, vibSeconds = 0, vibrationSamples = [], vibAnimFrame = null;
-    let latestDeviceAccel = null;
+    let checkLiveDaqInterval = null;
+    let lastVibPacketId = null;
     window.isEsp32Online = false;
     window.latestEsp32Accel = null;
 
@@ -3441,10 +3442,10 @@
                 qPill.style.display = 'inline-flex';
                 qPill.className = 'h-diag-quality-pill optimal';
                 const qTxt = document.getElementById('live-quality-txt');
-                if (qTxt) qTxt.textContent = 'Listening to Harmonics...';
+                if (qTxt) qTxt.textContent = 'INMP441 I2S Correlated';
             }
 
-            document.getElementById('hud-progress-label').textContent = 'RECORDING AUDIO HARMONICS (INMP441)...';
+            document.getElementById('hud-progress-label').textContent = 'RECORDING AUDIO HARMONICS (INMP441 I2S CORRELATED)...';
             document.getElementById('hud-progress-pct').textContent = '25%';
             window.setDiagnosisFlowStep('capture');
 
@@ -3599,7 +3600,7 @@
         if (skipVibBtn) skipVibBtn.style.display = 'inline-flex';
 
         // Master CTA update: If no physical sensor attached, offer Audio-Only ML inference directly
-        const hasHardwareVib = !!latestDeviceAccel || window.isEsp32Online;
+        const hasHardwareVib = window.isEsp32Online;
         const btnStartVib = document.getElementById('btn-start-vib');
         if (btnStartVib) {
             if (!hasHardwareVib) {
@@ -3816,7 +3817,7 @@
             document.getElementById('btn-start-rec').style.display = 'none';
             const uploadBtn = document.getElementById('btn-upload-audio');
             if (uploadBtn) uploadBtn.style.display = 'none';
-            const hasHardwareVib = !!latestDeviceAccel || window.isEsp32Online;
+            const hasHardwareVib = window.isEsp32Online;
             const btnStartVib = document.getElementById('btn-start-vib');
             if (btnStartVib) {
                 btnStartVib.style.display = 'inline-flex';
@@ -3847,10 +3848,54 @@
     };
 
     // ─────────────────────────────────────────────
-    // Stage 2: Live Vibration Recording (ADXL345 / Device Sensor)
+    // Stage 2: Live Vibration Recording (ADXL345 Hardware DAQ Node)
     // ─────────────────────────────────────────────
+    function ingestLiveVibrationPacket(data) {
+        if (!data || captureState !== 'RECORDING_VIBRATION') return;
+        const packetId = data.packet_id || (data.timestamp + '_' + (data.peak_g ?? ''));
+        if (packetId && packetId === lastVibPacketId) {
+            return;
+        }
+        lastVibPacketId = packetId;
+
+        const rateHz = data.sample_rate_hz || 100;
+        const dt = 1.0 / rateHz;
+        let baseT = vibrationSamples.length > 0 ? (vibrationSamples[vibrationSamples.length - 1].t + dt) : 0;
+
+        if (Array.isArray(data.samples) && data.samples.length > 0) {
+            data.samples.forEach(s => {
+                let sx = 0, sy = 0, sz = 0;
+                if (typeof s === 'object' && s !== null) {
+                    sx = Number(s.x ?? 0);
+                    sy = Number(s.y ?? 0);
+                    sz = Number(s.z ?? (s.magnitude ?? 0));
+                } else if (typeof s === 'number') {
+                    sz = Number(s);
+                }
+                vibrationSamples.push({ t: baseT, x: sx, y: sy, z: sz });
+                baseT += dt;
+            });
+        } else if (data.accel_x !== undefined && data.accel_x !== null) {
+            vibrationSamples.push({
+                t: baseT,
+                x: Number(data.accel_x),
+                y: Number(data.accel_y),
+                z: Number(data.accel_z)
+            });
+        }
+
+        if (vibrationSamples.length > 0) {
+            const last = vibrationSamples[vibrationSamples.length - 1];
+            const mag = Math.sqrt(last.x * last.x + last.y * last.y + last.z * last.z);
+            const probeVal = document.getElementById('probe-vib-val');
+            if (probeVal) {
+                probeVal.textContent = mag.toFixed(2) + ' g';
+            }
+        }
+    }
+
     window.startVibrationRecording = function() {
-        if (!window.isEsp32Online && !latestDeviceAccel) {
+        if (!window.isEsp32Online) {
             alert('⚠️ ESP32 DAQ Hardware Node Offline\n\nLive vibration capture requires the physical ESP32 accelerometer node streaming over Wi-Fi.\n\nPlease import an ADXL345 vibration CSV file or click "Skip Vibration" for audio-only analysis.');
             return;
         }
@@ -3859,11 +3904,12 @@
         const carModel = document.getElementById('car-3d-model');
         if (carModel) carModel.classList.add('recording-vib');
         vibrationSamples = [];
+        lastVibPacketId = null;
         vibSeconds = 0;
 
         window.setDiagnosisFlowStep('vibration');
         document.getElementById('hud-progress-pct').textContent = '65%';
-        document.getElementById('hud-progress-label').textContent = latestDeviceAccel ? 'STREAMING HARDWARE ACCELEROMETER...' : 'STREAMING ESP32 ADXL345 ACCELEROMETER...';
+        document.getElementById('hud-progress-label').textContent = 'STREAMING ESP32 ADXL345 ACCELEROMETER...';
         document.getElementById('tick-vib').classList.add('active');
 
         // Workbench UI
@@ -3889,64 +3935,10 @@
             }
         }, 1000);
 
-        // Hardware device accelerometer listener (phones/tablets / iOS permission)
-        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-            DeviceMotionEvent.requestPermission().catch(() => {});
-        }
-        if (window.DeviceMotionEvent && !window._vibDeviceMotionBound) {
-            window._vibDeviceMotionBound = true;
-            window.addEventListener('devicemotion', function(e) {
-                const a = e.accelerationIncludingGravity || e.acceleration;
-                if (a && (a.x !== null || a.y !== null || a.z !== null)) {
-                    latestDeviceAccel = {
-                        x: (a.x ?? 0) / 9.80665,
-                        y: (a.y ?? 0) / 9.80665,
-                        z: (a.z ?? 0) / 9.80665
-                    };
-                    const label = document.getElementById('hud-progress-label');
-                    if (label && captureState === 'RECORDING_VIBRATION') {
-                        label.textContent = 'STREAMING HARDWARE ACCELEROMETER...';
-                    }
-                }
-            });
-        }
-
-        // 50Hz Sampling Loop (every 20ms)
-        const sampleStartTime = performance.now();
-
-        clearInterval(vibInterval);
-        vibInterval = setInterval(() => {
-            const elapsed = (performance.now() - sampleStartTime) / 1000;
-            let x, y, z;
-
-            if (latestDeviceAccel) {
-                // Record uncontaminated physical device accelerometer readings (in Gs)
-                x = latestDeviceAccel.x;
-                y = latestDeviceAccel.y;
-                z = latestDeviceAccel.z;
-            } else if (window.latestEsp32Accel) {
-                // Record physical ESP32 ADXL345 / MPU6050 accelerometer readings (in Gs)
-                x = window.latestEsp32Accel.x;
-                y = window.latestEsp32Accel.y;
-                z = window.latestEsp32Accel.z;
-            } else {
-                // Hardware offline / no physical accelerometer active - abort fake vibration generation
-                clearInterval(vibInterval);
-                window.stopVibrationRecording();
-                alert('⚠️ No live accelerometer signal received from ESP32 node.\n\nSimulated vibration has been disabled to preserve hardware authenticity. Please import a vibration CSV file or skip vibration.');
-                skipVibrationCapture();
-                return;
-            }
-
-            vibrationSamples.push({ t: elapsed, x, y, z });
-
-            // Update probe in HUD
-            const mag = Math.sqrt(x * x + y * y + z * z);
-            const probeVal = document.getElementById('probe-vib-val');
-            if (probeVal) {
-                probeVal.textContent = mag.toFixed(2) + ' g';
-            }
-        }, 20);
+        // Immediately poll live telemetry and accelerate polling to 1000ms during capture
+        checkLiveDaq();
+        if (checkLiveDaqInterval) clearInterval(checkLiveDaqInterval);
+        checkLiveDaqInterval = setInterval(checkLiveDaq, 1000);
 
         drawVibrationOscilloscope();
     };
@@ -3955,7 +3947,8 @@
         captureState = 'VIBRATION_DONE';
         const carModel = document.getElementById('car-3d-model');
         if (carModel) carModel.classList.remove('recording-vib');
-        clearInterval(vibInterval);
+        if (checkLiveDaqInterval) clearInterval(checkLiveDaqInterval);
+        checkLiveDaqInterval = setInterval(checkLiveDaq, 3000);
         clearInterval(recordTimer);
         cancelAnimationFrame(vibAnimFrame);
 
@@ -3965,6 +3958,7 @@
         if (channels) channels.style.display = 'none';
 
         if (vibrationSamples.length === 0) {
+            alert('⚠️ No live accelerometer samples received from ESP32 node.\n\nPlease verify the sensor node is powered and streaming, or import a vibration CSV file.');
             skipVibrationCapture();
             return;
         }
@@ -4003,9 +3997,7 @@
         document.getElementById('form_vibration_file').files = dt.files;
 
         // Determine sensor source transparency
-        const isDevice = !!latestDeviceAccel;
-        const source = isDevice ? 'device_sensor' : 'adxl345_live';
-        document.getElementById('form_vibration_source').value = source;
+        document.getElementById('form_vibration_source').value = 'adxl345_live';
 
         // UI indicators
         const probeVal = document.getElementById('probe-vib-val');
@@ -4022,9 +4014,7 @@
             vibStrip.style.display = 'flex';
             const meta = document.getElementById('vibration-meta');
             if (meta) {
-                meta.innerHTML = isDevice
-                    ? `<span style="color:#10b981;font-weight:700;">[PHYSICAL SENSOR]</span> Mobile Device Accelerometer (${vibrationSamples.length} samples @ 50Hz)`
-                    : `<span style="color:#0284c7;font-weight:700;">[HARDWARE DAQ]</span> ESP32 ADXL345 Telemetry (${vibrationSamples.length} samples @ 50Hz)`;
+                meta.innerHTML = `<span style="color:#0284c7;font-weight:700;">[HARDWARE DAQ]</span> ESP32 ADXL345 Telemetry (${vibrationSamples.length} samples @ 100Hz)`;
             }
         }
 
@@ -4762,7 +4752,7 @@
                     overlay.innerHTML = 'ESP32 DAQ Node: <strong style="color:#f87171;">OFFLINE</strong> · Connect ESP32 for live capture, or click <strong>"Upload Audio"</strong> (.wav/.mp3)';
                 }
             } else if (captureState === 'AUDIO_DONE') {
-                if (btnStartVib && !latestDeviceAccel) {
+                if (btnStartVib) {
                     btnStartVib.classList.add('h-diag-btn-gated');
                     btnStartVib.innerHTML = '<span style="font-size:0.8rem;margin-right:2px;">🔒</span> Live Vibration (ESP32 Offline)';
                     btnStartVib.title = 'ESP32 DAQ is offline. Import a vibration CSV or skip vibration for audio-only analysis.';
@@ -4780,6 +4770,10 @@
             .then(data => {
                 if (data.online) {
                     updateEsp32ConnectionState(true, data);
+
+                    if (captureState === 'RECORDING_VIBRATION') {
+                        ingestLiveVibrationPacket(data);
+                    }
 
                     // Update gauges and workbench only if user hasn't chosen to skip
                     if (!window._userSkippedAuxHardware) {
@@ -4924,7 +4918,7 @@
         }
         return false;
     };
-    setInterval(checkLiveDaq, 3000);
+    checkLiveDaqInterval = setInterval(checkLiveDaq, 3000);
     checkLiveDaq();
 
 })();

@@ -179,6 +179,29 @@ class MlBackendService
     }
 
     /**
+     * Resolve the best available Python executable (virtualenv first, system python fallback).
+     */
+    public function resolvePythonBinary(): string
+    {
+        $configured = config('services.ml_backend.python_binary');
+        if (! empty($configured) && (file_exists($configured) || is_executable($configured))) {
+            return $configured;
+        }
+
+        $winVenv = base_path('../ml_backend/.venv/Scripts/python.exe');
+        if (file_exists($winVenv)) {
+            return $winVenv;
+        }
+
+        $unixVenv = base_path('../ml_backend/.venv/bin/python');
+        if (file_exists($unixVenv)) {
+            return $unixVenv;
+        }
+
+        return 'python';
+    }
+
+    /**
      * Trigger Random Forest retraining via FastAPI (or local Python fallback).
      */
     public function triggerRetrain(array $records = [], bool $augmentSynthetic = true, int $syntheticPerClass = 100): array
@@ -189,7 +212,7 @@ class MlBackendService
                 $tmpJson = null;
                 try {
                     $cmd = [
-                        'python',
+                        $this->resolvePythonBinary(),
                         $trainScript,
                         $augmentSynthetic ? '--generate-synthetic' : '--no-synthetic',
                         '--samples',
@@ -218,8 +241,8 @@ class MlBackendService
                             'success' => true,
                             'message' => 'Random Forest model retrained successfully via Python pipeline with FFT & Explainable AI.',
                             'output' => trim($process->getOutput()),
-                            'test_accuracy' => $meta['accuracy'] ?? 0.985,
-                            'f1_macro' => $meta['f1_macro'] ?? 0.985,
+                            'test_accuracy' => $meta['accuracy'] ?? null,
+                            'f1_macro' => $meta['f1_macro'] ?? null,
                             'n_samples' => $meta['n_samples'] ?? ($syntheticPerClass * 4),
                             'meta' => $meta,
                         ];
@@ -255,8 +278,8 @@ class MlBackendService
                 return array_merge($json, [
                     'status' => 'success',
                     'success' => true,
-                    'test_accuracy' => $meta['accuracy'] ?? ($json['test_accuracy'] ?? 0.985),
-                    'f1_macro' => $meta['f1_macro'] ?? ($json['f1_macro'] ?? 0.985),
+                    'test_accuracy' => $meta['accuracy'] ?? ($json['test_accuracy'] ?? null),
+                    'f1_macro' => $meta['f1_macro'] ?? ($json['f1_macro'] ?? null),
                     'n_samples' => $meta['n_samples'] ?? ($json['n_samples'] ?? 0),
                 ]);
             }
@@ -498,7 +521,7 @@ class MlBackendService
                 'value' => 0,
                 'unit' => 'sensors',
                 'impact_pct' => 20.0,
-                'explanation' => 'No active engine coolant thermal signature (>45°C) or alternator bus voltage (>12.2V) verified.',
+                'explanation' => 'No active engine coolant thermal signature (>45°C) or alternator bus voltage (>13.2V) verified.',
             ];
 
             return $contributions;
@@ -618,7 +641,7 @@ class MlBackendService
         // Browser-simulated synthetic vibration (synthetic JS math) does NOT represent physical engine block coupling.
         $isHardwareVibration = (in_array($vibrationSource, ['adxl345_live', 'device_sensor', 'csv_import'], true) || (is_null($vibrationSource) && $rmsG > 0.04));
         $hasMechanicalCoupling = $isHardwareVibration && ($peakG >= 0.08 || $rmsG >= 0.04);
-        $hasActiveTelemetry = (! is_null($tempC) && $tempC >= 45.0) || (! is_null($voltage) && $voltage >= 12.2) || (! is_null($rpm) && $rpm >= 300);
+        $hasActiveTelemetry = (! is_null($tempC) && $tempC >= 45.0) || (! is_null($voltage) && $voltage >= 13.2) || (! is_null($rpm) && $rpm >= 300);
 
         if (! $hasMechanicalCoupling && ! $hasActiveTelemetry) {
             $gateWarning = 'SIGNAL GATE: No physical engine block vibration (hardware uncoupled) or operating telemetry detected. Ambient noise filter engaged.';

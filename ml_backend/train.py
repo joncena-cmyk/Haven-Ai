@@ -500,7 +500,7 @@ def generate_synthetic_samples(n_per_class: int = 150) -> Tuple[np.ndarray, np.n
             elif condition == "loose_component":
                 peak_g = float(rng.uniform(0.60, 1.70))
                 rms_g = float(rng.uniform(0.30, 0.75))
-                dom_hz = float(rng.uniform(24.0, 56.0))
+                dom_hz = float(rng.uniform(22.0, 48.0))
                 entropy = float(rng.uniform(0.20, 0.44))
                 rms_audio = float(rng.uniform(0.05, 0.12))
                 zcr = float(rng.uniform(0.06, 0.13))
