@@ -729,39 +729,6 @@
             </div>
         </div>
 
-        {{-- CARD 4: HAVEN AI COPILOT CARD --}}
-        <div class="h-diag-card ai-copilot-card">
-            <div class="h-diag-card-head">
-                <div style="display:flex;align-items:center;gap:0.4rem;">
-                    <div class="h-diag-orb-small"></div>
-                    <span class="h-diag-card-title">HAVEN AI ASSISTANT</span>
-                </div>
-                <span class="h-diag-card-status-badge ok">GROQ 120B LIVE</span>
-            </div>
-
-            <div class="h-diag-ai-body" id="ai-quick-feed">
-                <div class="h-diag-ai-msg bot">
-                    <p>
-                        <strong>Diagnostic Summary:</strong>
-                        {{ $aiRecommendations['summary'] ?? ('Acoustic and vibration data classified engine state as ' . ($diagnostic->condition_label ?? 'Normal Operation') . '. ' . ($diagnostic->confidence_percent ? 'Confidence: ' . $diagnostic->confidence_percent : '')) }}
-                    </p>
-                </div>
-            </div>
-
-            <div class="h-diag-ai-card-input-row">
-                <input type="text" id="ai-quick-input" placeholder="Ask about this diagnosis..." onkeydown="if(event.key==='Enter') sendQuickAi();">
-                <button type="button" class="h-diag-ai-send-btn" onclick="sendQuickAi()">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                </button>
-            </div>
-
-            <div class="h-diag-ai-quick-tags">
-                <span class="tag" onclick="askPreset('Can I safely drive the car?')">Safe to drive?</span>
-                <span class="tag" onclick="askPreset('Estimated repair cost?')">Cost estimate</span>
-                <span class="tag" onclick="askPreset('Recommended inspection steps?')">Inspection checklist</span>
-            </div>
-        </div>
-
     </div>
 
     {{-- ═══════════════════════════════════════════════════════════════
@@ -1929,15 +1896,15 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 }
 
-/* ── 3. Four Bottom Executive Cards Grid ── */
+/* ── 3. Bottom Executive DAQ Cards Grid (3 Columns) ── */
 .h-diag-grid-cards {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.25rem;
     margin-bottom: 1.5rem;
 }
-@media (max-width: 1100px) {
-    .h-diag-grid-cards { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 992px) {
+    .h-diag-grid-cards { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 }
 @media (max-width: 640px) {
     .h-diag-grid-cards { grid-template-columns: 1fr; }
@@ -2444,35 +2411,6 @@ document.addEventListener('DOMContentLoaded', function() {
         thread.scrollTop = thread.scrollHeight;
     }
 });
-
-// Quick embedded card functions
-window.sendQuickAi = function() {
-    const qIn = document.getElementById('ai-quick-input');
-    const val = qIn ? qIn.value.trim() : '';
-    if (!val) return;
-    qIn.value = '';
-    const feed = document.getElementById('ai-quick-feed');
-    if (feed) {
-        feed.innerHTML += `<div class="h-diag-ai-msg bot" style="margin-top:0.35rem;border-top:1px solid #e2e8f0;padding-top:0.35rem;"><p><strong>You:</strong> ${escapeHtml(val)}</p></div>`;
-    }
-    fetch('{{ route('diagnostics.ai.ask', $diagnostic) }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-        body: JSON.stringify({ question: val })
-    })
-    .then(r => r.json())
-    .then(d => {
-        if (feed) {
-            feed.innerHTML += `<div class="h-diag-ai-msg bot" style="margin-top:0.35rem;"><p><strong>AI:</strong> ${escapeHtml(d.answer || 'Response recorded.')}</p></div>`;
-            feed.scrollTop = feed.scrollHeight;
-        }
-    });
-};
-
-window.askPreset = function(q) {
-    const qIn = document.getElementById('ai-quick-input');
-    if (qIn) { qIn.value = q; sendQuickAi(); }
-};
 
 function escapeHtml(t) {
     const div = document.createElement('div');
