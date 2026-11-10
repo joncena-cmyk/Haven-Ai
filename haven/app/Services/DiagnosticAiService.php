@@ -76,7 +76,7 @@ class DiagnosticAiService
                         '4. Check for varnished hydraulic lash adjusters (HLA); bleed or replace sticky lifters.',
                         '5. Connect an OBD-II scanner to read live knock sensor retard data and fault codes (P0325–P0330).',
                     ],
-                    'cost_estimate' => '$60 – $180 (Valve Lash Adjustment / Valve Cover Gasket) to $350 – $750 (Camshaft / Lifter Replacement)',
+                    'cost_estimate' => '₱3,500 – ₱10,000 (Valve Lash Adjustment / Valve Cover Gasket) to ₱20,000 – ₱42,000 (Camshaft / Lifter Replacement)',
                     'prompt_suggestions' => [
                         'What is the difference between lifter tick and rod knock?',
                         'How do I test my knock sensor with a multimeter?',
@@ -90,7 +90,7 @@ class DiagnosticAiService
                     'condition' => 'Engine Misfire & Combustion Dropout',
                     'safety_status' => 'HIGH ATTENTION · DRIVE WITH CAUTION',
                     'safety_color' => 'amber',
-                    'drive_safety' => 'Driveable only at low speed to the nearest service shop. Avoid full throttle; unburnt fuel entering the exhaust will overheat and melt the catalytic converter (replacement cost $800+).',
+                    'drive_safety' => 'Driveable only at low speed to the nearest service shop. Avoid full throttle; unburnt fuel entering the exhaust will overheat and melt the catalytic converter (replacement cost ₱45,000+).',
                     'urgency' => 'Inspect Within 24–48 Hours',
                     'summary' => "Cyclic acoustic dropouts and torque fluctuation ({$peakG}g Peak, {$rmsG}g RMS) detected on your {$vehicleName} ({$engine}). A cylinder is failing to combust cleanly every 720° of crankshaft rotation.",
                     'probable_causes' => [
@@ -107,7 +107,7 @@ class DiagnosticAiService
                         '4. Inspect ignition coil boots for white carbon tracking lines or heat cracks.',
                         '5. Test fuel injector pulse using a noid light or stethoscope click check.',
                     ],
-                    'cost_estimate' => '$25 – $90 (Spark Plug / DIY Coil) to $250 – $450 (Shop Diagnostics & Replacement)',
+                    'cost_estimate' => '₱1,500 – ₱5,000 (Spark Plug / DIY Ignition Coil) to ₱12,000 – ₱25,000 (Shop Diagnostics & Replacement)',
                     'prompt_suggestions' => [
                         'How do I do the ignition coil swap test?',
                         'Will a misfire damage my catalytic converter?',
@@ -138,7 +138,7 @@ class DiagnosticAiService
                         '4. Clean throttle body throat and throttle plate using dedicated throttle body spray cleaner.',
                         '5. Perform visual and smoke/carb-cleaner spray check around intake vacuum lines to find unmetered air leaks.',
                     ],
-                    'cost_estimate' => '$20 – $50 (DIY Bracket / Cleaner) to $140 – $320 (Motor Mount Replacement)',
+                    'cost_estimate' => '₱1,200 – ₱3,000 (DIY Bracket / Throttle Cleaner) to ₱7,500 – ₱18,000 (Engine Support / Motor Mount Replacement)',
                     'prompt_suggestions' => [
                         'How can I tell if my engine mount is bad?',
                         'How do I perform an engine idle relearn?',
@@ -151,7 +151,7 @@ class DiagnosticAiService
                     'condition' => 'Engine Overheating & Thermal Stress',
                     'safety_status' => 'CRITICAL EMERGENCY · SHUT DOWN ENGINE',
                     'safety_color' => 'red',
-                    'drive_safety' => 'Severe danger of catastrophic engine seizure, warped aluminum cylinder head, and blown head gasket ($2,000+ repair). Do NOT drive under any circumstances if coolant is boiling.',
+                    'drive_safety' => 'Severe danger of catastrophic engine seizure, warped aluminum cylinder head, and blown head gasket (₱100,000+ repair). Do NOT drive under any circumstances if coolant is boiling.',
                     'urgency' => 'Immediate Action Before Re-Starting',
                     'summary' => "Acoustic thermal stress signatures and friction vibrations detected on your {$vehicleName}. High-frequency cavitation and metal thermal expansion indicate cooling system failure.",
                     'probable_causes' => [
@@ -168,7 +168,7 @@ class DiagnosticAiService
                         '4. Check upper and lower radiator hoses: if upper is scalding hot and lower is cold, thermostat is stuck shut.',
                         '5. Refill cooling system with proper 50/50 ethylene glycol coolant once engine is completely cool.',
                     ],
-                    'cost_estimate' => '$30 – $70 (Thermostat / Cap) to $250 – $600 (Water Pump / Radiator Replacement)',
+                    'cost_estimate' => '₱1,800 – ₱4,000 (Thermostat / Radiator Cap) to ₱14,000 – ₱35,000 (Water Pump / Radiator Replacement)',
                     'prompt_suggestions' => [
                         'How long should I wait before opening the radiator cap?',
                         'How do I check if my thermostat is stuck closed?',
@@ -197,7 +197,7 @@ class DiagnosticAiService
                         '3. Firmly attach the ESP32 ADXL345 vibration sensor to an engine metal bracket or cylinder head.',
                         '4. Avoid loud public crowds, heavy traffic, or background talking during recording.',
                     ],
-                    'cost_estimate' => '$0.00 (Re-test with device near engine bay)',
+                    'cost_estimate' => '₱0.00 (Re-test with device near engine bay)',
                     'prompt_suggestions' => [
                         'Where should I place my phone or mic to record the engine?',
                         'How do I attach the ESP32 vibration sensor to the car?',
@@ -223,7 +223,7 @@ class DiagnosticAiService
                         '2. Inspect air filter and fluid levels (coolant, brake fluid, transmission fluid).',
                         '3. Re-run HAVEN diagnostics every 6 months or whenever an unfamiliar sound develops.',
                     ],
-                    'cost_estimate' => '$0 (No repairs needed)',
+                    'cost_estimate' => '₱0 (No repairs needed)',
                     'prompt_suggestions' => [
                         'What is the best oil viscosity for my engine?',
                         'How often should I change spark plugs?',
@@ -509,7 +509,7 @@ class DiagnosticAiService
                 ."1. **Cylinder Head Warpage:** Within 60–90 seconds of steam generation, the aluminum head bows, rupturing the multi-layer steel (MLS) head gasket.\n"
                 ."2. **Cylinder Scoring:** Heat causes aluminum pistons to swell inside the cylinders, scuffing and scoring the cylinder walls.\n"
                 ."3. **Engine Seizure:** At extreme temperatures, connecting rod bearings weld to the crankshaft journals, locking the engine completely.\n"
-                .'• **Cost difference:** $50 (tow truck) vs $2,500–$5,000 (complete engine rebuild). Never drive an overheating vehicle.';
+                .'• **Cost difference:** ₱2,500 (flatbed tow truck) vs ₱120,000–₱250,000 (complete engine rebuild). Never drive an overheating vehicle.';
         }
 
         // 13. "What is the best oil viscosity for my engine?"
@@ -539,7 +539,7 @@ class DiagnosticAiService
                 ."• **Detected Condition:** {$recs['condition']}\n"
                 ."• **Estimated Cost Range:** {$recs['cost_estimate']}\n"
                 ."• **Urgency:** {$recs['urgency']}\n\n"
-                .'💡 *Money-Saving Tip:* If this is a DIY job (such as cleaning the throttle body, replacing a single ignition coil, or changing spark plugs), parts typically cost under $50 on RockAuto or Amazon. If visiting an independent repair shop, request an OBD-II diagnostic scan first before authorizing parts replacement.';
+                .'💡 *Money-Saving Tip:* If this is a DIY job (such as cleaning the throttle body, replacing a single ignition coil, or changing spark plugs), parts typically cost under ₱2,500 on Shopee, Lazada, or local auto supply shops. If visiting an independent talyer or repair shop, request an OBD-II diagnostic scan first before authorizing parts replacement.';
         }
 
         // -------------------------------------------------------------

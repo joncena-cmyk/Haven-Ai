@@ -928,8 +928,8 @@
     @if($diagnostic->notes || $diagnostic->fault_detail)
         <div class="section-block">
             <div class="section-title">
-                <span>Technician Physical Observation Notes</span>
-                <span class="badge">Inspection Log</span>
+                <span>Vehicle Owner &amp; Diagnostic Notes</span>
+                <span class="badge">Session Log</span>
             </div>
             <div style="border:1px solid #e2e8f0;border-radius:8px;padding:0.85rem 1rem;background:#f8fafc;font-size:0.8rem;color:#334155;line-height:1.6;">
                 {{ $diagnostic->fault_detail ?: $diagnostic->notes }}
@@ -938,26 +938,29 @@
     @endif
 
     {{-- ═══════════════════════════════════════════════════════════════
-         7. CERTIFIED TECHNICIAN INSPECTION SIGN-OFF
+         7. VEHICLE OWNER & WORKSHOP SERVICE HANDOVER (OPTIONAL)
          ═══════════════════════════════════════════════════════════════ --}}
     <div class="section-block">
         <div class="signoff-box">
-            <div class="signoff-title">Certified Technician Verification &amp; Inspection Sign-Off</div>
+            <div class="signoff-title">Vehicle Owner &amp; Repair Shop Service Record (Optional)</div>
+            <div style="font-size:0.72rem;color:#64748b;margin-top:-0.45rem;margin-bottom:0.75rem;line-height:1.45;">
+                You can print and hand this report directly to your local mechanic or auto repair shop (talyer) so they can verify the diagnosed fault and document their service.
+            </div>
             <div class="signoff-grid">
                 <div class="signoff-col">
-                    <span class="signoff-label">Operator / Tech</span>
-                    <div class="signoff-line">{{ $diagnostic->operator ?: (auth()->user()?->name ?? 'Primary Operator') }}</div>
+                    <span class="signoff-label">Vehicle Owner / Driver</span>
+                    <div class="signoff-line">{{ $diagnostic->operator ?: (auth()->user()?->name ?? 'Vehicle Owner') }}</div>
                 </div>
                 <div class="signoff-col">
-                    <span class="signoff-label">Certifying Mechanic</span>
-                    <div class="signoff-line">{{ $diagnostic->verified_by ?: 'Certified Diagnostic Inspector' }}</div>
+                    <span class="signoff-label">Servicing Talyer / Mechanic</span>
+                    <div class="signoff-line">{{ $diagnostic->verified_by ?: '' }}</div>
                 </div>
                 <div class="signoff-col">
-                    <span class="signoff-label">Inspection Date</span>
-                    <div class="signoff-line">{{ now()->format('M j, Y') }}</div>
+                    <span class="signoff-label">Diagnostic Date</span>
+                    <div class="signoff-line">{{ $diagnostic->created_at->format('M j, Y') }}</div>
                 </div>
                 <div class="signoff-col">
-                    <span class="signoff-label">Inspector Signature</span>
+                    <span class="signoff-label">Mechanic Stamp / Signature</span>
                     <div class="signoff-line"></div>
                 </div>
             </div>
