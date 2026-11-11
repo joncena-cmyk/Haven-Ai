@@ -335,103 +335,68 @@
                     {{-- Ground Shadow --}}
                     <ellipse cx="370" cy="330" rx="310" ry="32" fill="#0f172a" opacity="0.12" filter="url(#softShadow)"/>
 
-                    {{-- Main Car Silhouette --}}
-                    <g transform="translate(40, 20)">
-                        {{-- Lower Chassis Body --}}
-                        <path d="M 120 250 C 140 250, 180 270, 260 270 L 440 270 C 490 270, 520 250, 590 240 C 620 235, 640 220, 650 200 C 655 190, 650 175, 630 165 C 590 145, 520 120, 470 100 C 400 70, 310 68, 230 85 C 170 98, 120 125, 90 160 C 70 185, 75 210, 85 225 Z"
-                              fill="url(#bodySilverGrad)" stroke="#94a3b8" stroke-width="1.5"/>
+                    {{-- Main 2D Car Illustration --}}
+                    <image href="{{ asset('images/vehicles/2d-car.png') }}" x="20" y="25" width="700" height="325" preserveAspectRatio="xMidYMid meet"/>
 
+                    {{-- Holographic Engine Bay Overlay (Aligned to Front Hood of 2D Coupe) --}}
+                    <g transform="translate(335, 32)">
                         {{-- Active Engine Bay Holographic Zone --}}
                         <path id="hood-holo-zone" class="h-diag-holo-hood"
-                              d="M 95 165 C 120 135, 170 110, 230 95 C 270 125, 290 170, 270 215 C 200 230, 130 220, 95 165 Z"
-                              fill="url(#hoodGlowGrad)" stroke="{{ $condColor['icon'] }}" stroke-dasharray="3 3" stroke-width="1.8"/>
-
-                        {{-- ── 3D Vehicle Component-Specific Anatomical Fault Overlays ── --}}
+                              d="M 110 120 C 165 122, 235 135, 280 162 C 282 185, 265 205, 235 208 L 120 208 C 108 180, 106 148, 110 120 Z"
+                              fill="url(#hoodGlowGrad)" stroke="{{ $condColor['icon'] }}" stroke-dasharray="4 3" stroke-width="1.8"/>
 
                         {{-- 1. Valvetrain & Camshaft Zone (Valve Lash / Clearance Tap) --}}
                         <g id="component-valvetrain" class="h-diag-fault-component {{ $canon === 'valve_clearance' ? 'fault-active valve' : '' }}">
                             <path class="h-diag-component-path"
-                                  d="M 148 132 C 172 118, 208 110, 238 114 L 244 134 C 212 130, 175 138, 146 146 Z"
-                                  fill="{{ $canon === 'valve_clearance' ? 'rgba(239, 68, 68, 0.45)' : 'rgba(148, 163, 184, 0.15)' }}"
-                                  stroke="{{ $canon === 'valve_clearance' ? '#ef4444' : '#64748b' }}"
-                                  stroke-width="{{ $canon === 'valve_clearance' ? '2.5' : '1' }}"
+                                  d="M 135 132 L 235 142 L 232 156 L 132 146 Z"
+                                  fill="{{ $canon === 'valve_clearance' ? 'rgba(239, 68, 68, 0.45)' : 'rgba(56, 189, 248, 0.18)' }}"
+                                  stroke="{{ $canon === 'valve_clearance' ? '#ef4444' : '#38bdf8' }}"
+                                  stroke-width="{{ $canon === 'valve_clearance' ? '2.5' : '1.2' }}"
                                   filter="{{ $canon === 'valve_clearance' ? 'url(#valvetrainTapFilter)' : 'none' }}"/>
-                            <circle cx="168" cy="132" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#94a3b8' }}" class="h-diag-valvetrain-tap"/>
-                            <circle cx="188" cy="129" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#94a3b8' }}" class="h-diag-valvetrain-tap delay-1"/>
-                            <circle cx="208" cy="126" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#94a3b8' }}" class="h-diag-valvetrain-tap delay-2"/>
-                            <circle cx="228" cy="124" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#94a3b8' }}" class="h-diag-valvetrain-tap delay-3"/>
+                            <circle cx="150" cy="140" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#38bdf8' }}" class="h-diag-valvetrain-tap"/>
+                            <circle cx="172" cy="142" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#38bdf8' }}" class="h-diag-valvetrain-tap delay-1"/>
+                            <circle cx="194" cy="144" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#38bdf8' }}" class="h-diag-valvetrain-tap delay-2"/>
+                            <circle cx="216" cy="146" r="3.5" fill="{{ $canon === 'valve_clearance' ? '#ef4444' : '#38bdf8' }}" class="h-diag-valvetrain-tap delay-3"/>
                             @if($canon === 'valve_clearance')
-                                <circle cx="198" cy="128" r="8" fill="none" stroke="#ef4444" stroke-width="2" class="h-diag-shockwave-ring"/>
-                                <circle cx="198" cy="128" r="16" fill="none" stroke="#ef4444" stroke-width="1.5" class="h-diag-shockwave-ring delay-ring"/>
+                                <circle cx="184" cy="143" r="8" fill="none" stroke="#ef4444" stroke-width="2" class="h-diag-shockwave-ring"/>
+                                <circle cx="184" cy="143" r="16" fill="none" stroke="#ef4444" stroke-width="1.5" class="h-diag-shockwave-ring delay-ring"/>
                             @endif
                         </g>
 
                         {{-- 2. Combustion Chamber & Cylinders Zone (Misfire Detonation) --}}
                         <g id="component-combustion" class="h-diag-fault-component {{ $canon === 'misfire' ? 'fault-active misfire' : '' }}">
-                            <rect x="156" y="148" width="16" height="34" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(148, 163, 184, 0.12)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#64748b' }}" stroke-width="1"/>
-                            <rect x="178" y="146" width="16" height="34" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(148, 163, 184, 0.12)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#64748b' }}" stroke-width="1"/>
-                            <rect x="200" y="144" width="16" height="34" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.65)' : 'rgba(148, 163, 184, 0.12)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#64748b' }}" stroke-width="{{ $canon === 'misfire' ? '2.5' : '1' }}" filter="{{ $canon === 'misfire' ? 'url(#misfireFlameFilter)' : 'none' }}"/>
-                            <rect x="222" y="142" width="16" height="34" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(148, 163, 184, 0.12)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#64748b' }}" stroke-width="1"/>
+                            <rect x="140" y="156" width="16" height="30" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(15, 23, 42, 0.45)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#38bdf8' }}" stroke-width="1"/>
+                            <rect x="162" y="158" width="16" height="30" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(15, 23, 42, 0.45)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#38bdf8' }}" stroke-width="1"/>
+                            <rect x="184" y="160" width="16" height="30" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.65)' : 'rgba(15, 23, 42, 0.45)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#38bdf8' }}" stroke-width="{{ $canon === 'misfire' ? '2.5' : '1' }}" filter="{{ $canon === 'misfire' ? 'url(#misfireFlameFilter)' : 'none' }}"/>
+                            <rect x="206" y="162" width="16" height="30" rx="2" fill="{{ $canon === 'misfire' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(15, 23, 42, 0.45)' }}" stroke="{{ $canon === 'misfire' ? '#f59e0b' : '#38bdf8' }}" stroke-width="1"/>
                             @if($canon === 'misfire')
-                                <path d="M 208 140 L 210 148 L 205 152 L 213 160 L 206 166 L 211 174" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-diag-misfire-spark"/>
-                                <circle cx="208" cy="158" r="14" fill="rgba(245, 158, 11, 0.25)" class="h-diag-misfire-glow"/>
+                                <path d="M 192 152 L 194 160 L 189 164 L 197 172 L 190 178 L 195 186" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-diag-misfire-spark"/>
+                                <circle cx="192" cy="170" r="14" fill="rgba(245, 158, 11, 0.25)" class="h-diag-misfire-glow"/>
                             @endif
                         </g>
 
                         {{-- 3. Powertrain Mounts & Subframe Bushing Zone (Loose Component / Vibration) --}}
                         <g id="component-mounts" class="h-diag-fault-component {{ $canon === 'loose_component' ? 'fault-active mounts' : '' }}">
-                            <path d="M 134 208 Q 192 222 254 204" fill="none" stroke="{{ $canon === 'loose_component' ? '#eab308' : '#64748b' }}" stroke-width="{{ $canon === 'loose_component' ? '3' : '1.5' }}"/>
-                            <ellipse cx="140" cy="208" rx="10" ry="7" fill="{{ $canon === 'loose_component' ? 'rgba(234, 179, 8, 0.55)' : 'rgba(148, 163, 184, 0.18)' }}" stroke="{{ $canon === 'loose_component' ? '#eab308' : '#64748b' }}" stroke-width="2" filter="{{ $canon === 'loose_component' ? 'url(#mountOscillationFilter)' : 'none' }}"/>
-                            <ellipse cx="250" cy="204" rx="10" ry="7" fill="{{ $canon === 'loose_component' ? 'rgba(234, 179, 8, 0.55)' : 'rgba(148, 163, 184, 0.18)' }}" stroke="{{ $canon === 'loose_component' ? '#eab308' : '#64748b' }}" stroke-width="2" filter="{{ $canon === 'loose_component' ? 'url(#mountOscillationFilter)' : 'none' }}"/>
+                            <path d="M 128 198 Q 184 208 242 198" fill="none" stroke="{{ $canon === 'loose_component' ? '#eab308' : '#f97316' }}" stroke-width="{{ $canon === 'loose_component' ? '3' : '1.5' }}"/>
+                            <ellipse cx="134" cy="198" rx="9" ry="6" fill="{{ $canon === 'loose_component' ? 'rgba(234, 179, 8, 0.55)' : 'rgba(249, 115, 22, 0.35)' }}" stroke="{{ $canon === 'loose_component' ? '#eab308' : '#f97316' }}" stroke-width="2" filter="{{ $canon === 'loose_component' ? 'url(#mountOscillationFilter)' : 'none' }}"/>
+                            <ellipse cx="236" cy="198" rx="9" ry="6" fill="{{ $canon === 'loose_component' ? 'rgba(234, 179, 8, 0.55)' : 'rgba(249, 115, 22, 0.35)' }}" stroke="{{ $canon === 'loose_component' ? '#eab308' : '#f97316' }}" stroke-width="2" filter="{{ $canon === 'loose_component' ? 'url(#mountOscillationFilter)' : 'none' }}"/>
                             @if($canon === 'loose_component')
-                                <path d="M 124 208 Q 140 198 156 208 Q 172 218 188 208 Q 204 198 220 208 Q 236 218 252 208 Q 266 198 276 208" fill="none" stroke="#eab308" stroke-width="2.5" class="h-diag-mount-ripple"/>
+                                <path d="M 118 198 Q 134 188 150 198 Q 166 208 182 198 Q 198 188 214 198 Q 230 208 246 198" fill="none" stroke="#eab308" stroke-width="2.5" class="h-diag-mount-ripple"/>
                             @endif
                         </g>
 
                         {{-- 4. Nominal Operational Baseline (Normal Condition) --}}
                         @if($canon === 'normal')
                         <g id="component-normal-harmony" class="h-diag-fault-component normal-active">
-                            <ellipse cx="198" cy="165" rx="58" ry="42" fill="rgba(16, 185, 129, 0.12)" stroke="#10b981" stroke-width="2" stroke-dasharray="4 4" class="h-diag-harmonic-halo"/>
+                            <ellipse cx="184" cy="168" rx="58" ry="38" fill="rgba(16, 185, 129, 0.14)" stroke="#10b981" stroke-width="2" stroke-dasharray="4 4" class="h-diag-harmonic-halo"/>
                         </g>
                         @endif
-
-                        {{-- Aerodynamic Windshield & Greenhouse Glass --}}
-                        <path d="M 235 90 C 310 75, 395 76, 465 102 C 430 140, 390 155, 275 145 C 255 125, 245 105, 235 90 Z"
-                              fill="url(#glassGrad)" stroke="#475569" stroke-width="1.2"/>
-                        <path d="M 285 145 C 395 155, 435 140, 470 105 L 530 125 C 570 145, 595 165, 605 175 L 480 185 Z"
-                              fill="#0f172a" opacity="0.85"/>
-
-                        {{-- Front Wheel --}}
-                        <g transform="translate(160, 250)">
-                            <ellipse cx="0" cy="0" rx="42" ry="48" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
-                            <ellipse cx="0" cy="0" rx="30" ry="34" fill="#0f172a"/>
-                            <circle cx="0" cy="0" r="14" fill="#94a3b8"/>
-                            <line x1="-22" y1="0" x2="22" y2="0" stroke="#cbd5e1" stroke-width="3"/>
-                            <line x1="0" y1="-26" x2="0" y2="26" stroke="#cbd5e1" stroke-width="3"/>
-                        </g>
-
-                        {{-- Rear Wheel --}}
-                        <g transform="translate(510, 230)">
-                            <ellipse cx="0" cy="0" rx="46" ry="52" fill="#1e293b" stroke="#f97316" stroke-width="2.5"/>
-                            <ellipse cx="0" cy="0" rx="32" ry="36" fill="#0f172a"/>
-                            <circle cx="0" cy="0" r="15" fill="#f97316"/>
-                            <line x1="-24" y1="0" x2="24" y2="0" stroke="#f97316" stroke-width="3"/>
-                            <line x1="0" y1="-28" x2="0" y2="28" stroke="#f97316" stroke-width="3"/>
-                        </g>
-
-                        {{-- Creases --}}
-                        <path d="M 160 210 Q 320 220 530 190" stroke="#94a3b8" stroke-width="2" fill="none"/>
-                        <path d="M 190 230 Q 340 240 480 235" stroke="#cbd5e1" stroke-width="1.5" fill="none"/>
-
-                        {{-- Lights --}}
-                        <polygon points="85,190 110,180 100,205 82,205" fill="#38bdf8" opacity="0.9"/>
-                        <polygon points="635,175 648,185 640,195 628,185" fill="#ef4444" opacity="0.85"/>
                     </g>
                 </svg>
 
                 {{-- Interactive Telemetry Pins with Diagnosed Focus --}}
                 {{-- Pin 1: INMP441 Acoustic Mic on Hood --}}
-                <div class="h-diag-pin hood-pin {{ in_array($canon, ['valve_clearance', 'misfire', 'normal']) ? 'active' : '' }}" style="top:32%; left:22%;">
+                <div class="h-diag-pin hood-pin {{ in_array($canon, ['valve_clearance', 'misfire', 'normal']) ? 'active' : '' }}" style="top:34%; left:73%;">
                     <div class="h-diag-pin-beacon {{ $canon === 'valve_clearance' ? 'red' : ($canon === 'misfire' ? 'orange' : '') }}"></div>
                     <div class="h-diag-pin-core {{ $canon === 'valve_clearance' ? 'red' : ($canon === 'misfire' ? 'orange' : 'blue') }}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
@@ -443,7 +408,7 @@
                 </div>
 
                 {{-- Pin 2: ADXL345 Vibration Sensor on Powertrain --}}
-                <div class="h-diag-pin engine-pin {{ $canon === 'loose_component' ? 'active' : '' }}" style="top:52%; left:36%;">
+                <div class="h-diag-pin engine-pin {{ $canon === 'loose_component' ? 'active' : '' }}" style="top:54%; left:66%;">
                     <div class="h-diag-pin-beacon {{ $canon === 'loose_component' ? 'orange' : '' }}"></div>
                     <div class="h-diag-pin-core {{ $canon === 'loose_component' ? 'orange' : 'blue' }}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -455,7 +420,7 @@
                 </div>
 
                 {{-- Pin 3: DS18B20 Thermal Probe (Contextual DB Recorded) --}}
-                <div class="h-diag-pin temp-pin" style="top:38%; left:48%;">
+                <div class="h-diag-pin temp-pin" style="top:38%; left:54%;">
                     <div class="h-diag-pin-core orange">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
                     </div>
@@ -466,7 +431,7 @@
                 </div>
 
                 {{-- Pin 4: INA219 Voltage & Power (Contextual DB Recorded) --}}
-                <div class="h-diag-pin battery-pin" style="top:62%; left:62%;">
+                <div class="h-diag-pin battery-pin" style="top:62%; left:46%;">
                     <div class="h-diag-pin-core dark">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="10" x2="23" y2="14"/></svg>
                     </div>
@@ -477,7 +442,7 @@
                 </div>
 
                 {{-- Pin 5: Hall Tachometer RPM (Contextual DB Recorded) --}}
-                <div class="h-diag-pin rpm-pin" style="top:44%; left:78%;">
+                <div class="h-diag-pin rpm-pin" style="top:46%; left:28%;">
                     <div class="h-diag-pin-core green">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg>
                     </div>
@@ -2463,8 +2428,14 @@ function initDiagnosticSketchfab() {
                 api.start();
                 api.addEventListener('viewerready', function() {
                     diagnosticViewerReady = true;
-                    // Initial perspective
-                    api.setCameraLookAt([0, -3.8, 1.4], [0, 0, 0.4], 0.45);
+                    api.getCameraLookAt(function(err, camera) {
+                        if (!err && camera && camera.position && camera.target) {
+                            window.diagnosticInitialCamera = {
+                                position: camera.position.slice(),
+                                target: camera.target.slice()
+                            };
+                        }
+                    });
                 });
             },
             error: function() {
@@ -2528,14 +2499,22 @@ window.toggleVehiclePerspective = function() {
     if (lbl) lbl.textContent = angles[currentPerspective];
     
     if (diagnosticSketchfabApi && diagnosticViewDimension === '3d') {
-        const cameraPositions = [
-            [[0, -3.8, 1.4], [0, 0, 0.4]],       // 360 Studio (isometric)
-            [[0, -2.4, 0.8], [0, 0.8, 0.5]],     // Front powertrain
-            [[-1.8, -1.2, 1.2], [0, 0.5, 0.4]],  // Acoustic Bay
-            [[0, -0.1, -2.2], [0, 0, 0.2]],      // Undercarriage
-        ];
-        const [eye, target] = cameraPositions[currentPerspective];
-        diagnosticSketchfabApi.setCameraLookAt(eye, target, 0.45);
+        const initCam = window.diagnosticInitialCamera;
+        if (initCam && initCam.position && initCam.target) {
+            const t = initCam.target;
+            const dx = initCam.position[0] - t[0];
+            const dy = initCam.position[1] - t[1];
+            const dz = initCam.position[2] - t[2];
+            const r = Math.max(1.0, Math.sqrt(dx * dx + dy * dy + dz * dz));
+            const cameraPositions = [
+                [initCam.position, t],                                              // 360 Studio (default framed)
+                [[t[0], t[1] - r * 0.72, t[2] + r * 0.22], t],                      // Front powertrain
+                [[t[0] - r * 0.55, t[1] - r * 0.45, t[2] + r * 0.35], t],           // Acoustic Bay
+                [[t[0], t[1] - r * 0.08, t[2] - r * 0.65], t],                      // Undercarriage
+            ];
+            const [eye, target] = cameraPositions[currentPerspective];
+            diagnosticSketchfabApi.setCameraLookAt(eye, target, 0.45);
+        }
     } else {
         const car = document.getElementById('car-stage-wrap');
         const transforms = ['rotate(0deg)', 'rotate(4deg) scale(1.05)', 'rotate(-3deg) scale(1.03)', 'rotate(0deg) scale(0.95)'];

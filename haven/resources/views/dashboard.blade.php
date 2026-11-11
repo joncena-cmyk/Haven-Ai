@@ -3,7 +3,8 @@
     $user            = Auth::user();
     $vehicleCount    = $user->vehicles()->count();
     $diagCount       = $user->diagnostics()->count();
-    $lastDiag        = $user->diagnostics()->with('vehicle')->latest()->first();
+    $lastDiag        = $user->diagnostics()->whereNotNull('ml_condition')->with('vehicle')->latest()->first()
+        ?? $user->diagnostics()->with('vehicle')->latest()->first();
     $recentVehicles  = $user->vehicles()->withCount('diagnostics')->latest()->take(5)->get();
     $recentDiags     = $user->diagnostics()->with('vehicle')->latest()->take(5)->get();
 @endphp

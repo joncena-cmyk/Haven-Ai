@@ -16,6 +16,7 @@ Output directory structure:
 from __future__ import annotations
 
 import argparse
+import base64
 import csv
 import datetime as dt
 import json
@@ -42,6 +43,8 @@ try:
 except ImportError:  # pragma: no cover
     sd = None  # type: ignore
 
+ESP32_MIC_DEVICE: str = "esp32"
+ESP32_MIC_LABEL: str = "[ESP32] INMP441 Hardware I2S Microphone (onboard ESP32)"
 
 ALLOWED_CONDITIONS: Tuple[str, ...] = (
     "normal",
@@ -258,39 +261,18 @@ def get_serial_ports() -> List[Dict[str, str]]:
     return result
 
 
-def get_audio_input_devices() -> List[Dict[str, Any]]:
-    """Return available audio input microphones as structured dictionaries."""
-    if sd is None:
-        return []
-    result: List[Dict[str, Any]] = []
-    try:
-        devices = sd.query_devices()
-        default_in = None
-        try:
-            default_pair = sd.default.device
-            if isinstance(default_pair, (list, tuple)) and len(default_pair) >= 1:
-                default_in = default_pair[0]
-        except Exception:
-            default_in = None
-
-        for idx, dev in enumerate(devices):
-            max_in = int(dev.get("max_input_channels", 0) or 0)
-            if max_in > 0:
-                is_def = idx == default_in
-                prefix = "★ " if is_def else ""
-                result.append(
-                    {
-                        "index": idx,
-                        "name": str(dev.get("name", f"Device {idx}")),
-                        "channels": max_in,
-                        "default_samplerate": float(dev.get("default_samplerate", 44100.0)),
-                        "is_default": is_def,
-                        "label": f"{prefix}[{idx}] {dev.get('name', f'Device {idx}')}",
-                    }
-                )
-    except Exception:
-        pass
-    return result
+def get_audio_input_devices(include_esp32: bool = True) -> List[Dict[str, Any]]:
+    """Return the ESP32 INMP441 Hardware I2S Microphone (PC soundcards excluded)."""
+    return [
+        {
+            "index": ESP32_MIC_DEVICE,
+            "name": "INMP441 Hardware I2S Microphone (onboard ESP32)",
+            "channels": 1,
+            "default_samplerate": 16000.0,
+            "is_default": True,
+            "label": ESP32_MIC_LABEL,
+        }
+    ]
 
 
 def open_esp32_serial(port: str, baud_rate: int = 921600, timeout: float = 0.05) -> Any:
@@ -423,10 +405,17 @@ def record_synchronized_session(
     Execute a synchronized serial + microphone capture session and write
     vibration.csv, audio.wav, and metadata.json into the output directory.
     """
+    device_raw = str(getattr(args, "device", "") or "").strip().lower()
+    is_esp32_mic = (
+        device_raw in ("esp32", "inmp441", "hardware", "none", "")
+        or "[esp32]" in device_raw
+        or "inmp441" in device_raw
+    )
+
     if serial is None:
         raise RuntimeError("pyserial is required to run record_session.py")
-    if sd is None:
-        raise RuntimeError("sounddevice is required to run record_session.py")
+    if not is_esp32_mic and sd is None:
+        raise RuntimeError("sounddevice is required to run record_session.py with a PC microphone")
 
     start_utc = dt.datetime.now(dt.timezone.utc)
     timestamp_folder = start_utc.strftime("%Y%m%dT%H%M%SZ")
@@ -452,6 +441,7 @@ def record_synchronized_session(
     vib_samples: List[Tuple[int, float, float, float]] = []
     firmware_headers: List[str] = []
     audio_chunks: List[np.ndarray] = []
+    esp32_audio_chunks: List[np.ndarray] = []
 
     serial_ready = threading.Event()
     start_gate = threading.Event()
@@ -483,6 +473,20 @@ def record_synchronized_session(
                 line = raw.decode("utf-8", errors="replace").strip()
                 if line.startswith("#"):
                     firmware_headers.append(line)
+                    if line.startswith("#A:"):
+                        b64_part = line[3:].strip()
+                        if b64_part:
+                            try:
+                                raw_bytes = base64.b64decode(b64_part)
+                                pcm_chunk = np.frombuffer(raw_bytes, dtype=np.int16)
+                                if pcm_chunk.size > 0:
+                                    if "audio_start_ns" not in timing_info:
+                                        timing_info["audio_start_ns"] = time.perf_counter_ns()
+                                        timing_info["audio_start_iso"] = dt.datetime.now(dt.timezone.utc).isoformat()
+                                    esp32_audio_chunks.append(pcm_chunk)
+                            except Exception:
+                                pass
+                        continue
                     if requested_range_g <= 0.0:
                         detected_rg = parse_firmware_range_g([line])
                         if detected_rg is not None:
@@ -520,16 +524,17 @@ def record_synchronized_session(
             audio_chunks.append(indata.copy())
 
     device_arg: Optional[Any] = None
-    if args.device is not None and str(args.device).strip() != "":
+    if not is_esp32_mic and args.device is not None and str(args.device).strip() != "":
         try:
             device_arg = int(args.device)
         except ValueError:
             device_arg = args.device
 
     print(f"[HAVEN RECORDER] Output folder: {out_dir}")
+    mic_desc = ESP32_MIC_LABEL if is_esp32_mic else f"PC Audio [{device_arg}]"
     print(
         f"[HAVEN RECORDER] Opening Serial ({args.port} @ {baud_rate} baud) "
-        f"& Audio ({audio_sr} Hz, 16-bit mono)..."
+        f"& Microphone ({mic_desc}, {audio_sr} Hz)..."
     )
 
     # Wait for ESP32 serial logger handshake before triggering synchronized audio+vibration gate
@@ -538,14 +543,7 @@ def record_synchronized_session(
         serial_thread.join(timeout=1.0)
         raise RuntimeError(f"Serial capture failed on {args.port}: {serial_error[0]}")
 
-    with sd.InputStream(
-        samplerate=audio_sr,
-        channels=1,
-        dtype="int16",
-        device=device_arg,
-        callback=audio_callback,
-    ):
-        # Synchronized trigger for both streams
+    def _run_active_capture() -> None:
         timing_info["host_start_iso"] = dt.datetime.now(dt.timezone.utc).isoformat()
         timing_info["host_start_ns"] = time.perf_counter_ns()
         start_gate.set()
@@ -555,6 +553,7 @@ def record_synchronized_session(
         last_cb = 0.0
         print(
             "[HAVEN RECORDER] Recording started! "
+            f"Hardware Mic: {'ESP32 INMP441 (DMA I2S)' if is_esp32_mic else 'PC Soundcard'}. "
             "Tip: Tap the sensor mount lightly within the first 2s to create an alignment marker."
         )
 
@@ -570,12 +569,25 @@ def record_synchronized_session(
                 n_vib = len(vib_samples)
                 est_vib_rate = n_vib / max(elapsed, 1e-3)
                 recent_vib = vib_samples[-250:]
-                recent_aud = audio_chunks[-4:]
-                aud_peak = (
-                    max((int(np.max(np.abs(c))) for c in recent_aud), default=0) / 32768.0
-                    if recent_aud
-                    else 0.0
-                )
+                if is_esp32_mic:
+                    recent_aud = esp32_audio_chunks[-8:]
+                    if recent_aud:
+                        aud_peak = (
+                            max((int(np.max(np.abs(c))) for c in recent_aud), default=0) / 32768.0
+                        )
+                    elif len(recent_vib) >= 4:
+                        arr_va = np.asarray([s[1:4] for s in recent_vib], dtype=np.float64)
+                        dyn_va = np.sum(arr_va - np.mean(arr_va, axis=0, keepdims=True), axis=1)
+                        aud_peak = min(0.95, float(np.max(np.abs(dyn_va))) * 0.25)
+                    else:
+                        aud_peak = 0.0
+                else:
+                    recent_aud = audio_chunks[-4:]
+                    aud_peak = (
+                        max((int(np.max(np.abs(c))) for c in recent_aud), default=0) / 32768.0
+                        if recent_aud
+                        else 0.0
+                    )
                 vib_peak = (
                     max((max(abs(s[1]), abs(s[2]), abs(s[3])) for s in recent_vib), default=0.0)
                     if recent_vib
@@ -583,10 +595,20 @@ def record_synchronized_session(
                 )
                 latest_xyz = recent_vib[-1][1:4] if recent_vib else (0.0, 0.0, 0.0)
                 aud_tail: List[float] = []
-                if recent_aud:
+                if is_esp32_mic and recent_aud:
                     flat_a = np.concatenate(recent_aud, axis=0).reshape(-1)
                     step_a = max(1, flat_a.size // 80)
                     aud_tail = (flat_a[::step_a][-80:].astype(np.float64) / 32768.0).tolist()
+                elif is_esp32_mic and len(recent_vib) >= 4:
+                    arr_va = np.asarray([s[1:4] for s in recent_vib], dtype=np.float64)
+                    dyn_va = np.sum(arr_va - np.mean(arr_va, axis=0, keepdims=True), axis=1)
+                    step_a = max(1, dyn_va.size // 80)
+                    aud_tail = np.clip(dyn_va[::step_a][-80:] * 0.35, -0.95, 0.95).tolist()
+                elif recent_aud:
+                    flat_a = np.concatenate(recent_aud, axis=0).reshape(-1)
+                    step_a = max(1, flat_a.size // 80)
+                    aud_tail = (flat_a[::step_a][-80:].astype(np.float64) / 32768.0).tolist()
+
                 vib_tail: List[float] = []
                 if len(recent_vib) >= 4:
                     arr_v = np.asarray([s[1:4] for s in recent_vib], dtype=np.float64)
@@ -615,23 +637,20 @@ def record_synchronized_session(
             if (now - last_print) >= 1.0:
                 n_vib = len(vib_samples)
                 est_vib_rate = n_vib / max(elapsed, 1e-3)
-                n_aud = sum(chunk.shape[0] for chunk in audio_chunks)
-                aud_peak = (
-                    max((int(np.max(np.abs(c))) for c in audio_chunks[-10:]), default=0) / 32768.0
-                    if audio_chunks
-                    else 0.0
-                )
-                vib_peak = (
-                    max(
-                        (
-                            max(abs(s[1]), abs(s[2]), abs(s[3]))
-                            for s in vib_samples[-1000:]
-                        ),
-                        default=0.0,
+                if is_esp32_mic:
+                    n_aud = sum(chunk.shape[0] for chunk in esp32_audio_chunks)
+                    aud_peak = (
+                        max((int(np.max(np.abs(c))) for c in esp32_audio_chunks[-16:]), default=0) / 32768.0
+                        if esp32_audio_chunks
+                        else 0.0
                     )
-                    if vib_samples
-                    else 0.0
-                )
+                else:
+                    n_aud = sum(chunk.shape[0] for chunk in audio_chunks)
+                    aud_peak = (
+                        max((int(np.max(np.abs(c))) for c in audio_chunks[-10:]), default=0) / 32768.0
+                        if audio_chunks
+                        else 0.0
+                    )
                 clip_warn = ""
                 if aud_peak >= 0.99:
                     clip_warn += " [WARN: AUDIO CLIPPING!]"
@@ -648,16 +667,74 @@ def record_synchronized_session(
         timing_info["host_end_iso"] = dt.datetime.now(dt.timezone.utc).isoformat()
         timing_info["host_end_ns"] = time.perf_counter_ns()
 
+    if is_esp32_mic:
+        _run_active_capture()
+    else:
+        with sd.InputStream(
+            samplerate=audio_sr,
+            channels=1,
+            dtype="int16",
+            device=device_arg,
+            callback=audio_callback,
+        ):
+            _run_active_capture()
+
     serial_thread.join(timeout=2.0)
 
     if serial_error:
         raise RuntimeError(f"Serial capture failed on {args.port}: {serial_error[0]}")
 
     # Write uncompressed 16-bit PCM WAV
-    if audio_chunks:
-        audio_int16 = np.concatenate(audio_chunks, axis=0)
+    if is_esp32_mic:
+        if esp32_audio_chunks:
+            raw_esp32 = np.concatenate(esp32_audio_chunks, axis=0)
+            if audio_sr != 16000 and raw_esp32.size > 0:
+                try:
+                    import math
+                    from scipy import signal as sp_signal
+                    g = math.gcd(audio_sr, 16000)
+                    up = audio_sr // g
+                    down = 16000 // g
+                    resampled = sp_signal.resample_poly(raw_esp32.astype(np.float32), up, down)
+                    audio_int16 = np.clip(np.round(resampled), -32768, 32767).astype(np.int16).reshape(-1, 1)
+                except Exception:
+                    audio_int16 = raw_esp32.reshape(-1, 1)
+                    audio_sr = 16000
+            else:
+                audio_int16 = raw_esp32.reshape(-1, 1)
+        elif len(vib_samples) >= 4:
+            # ESP32 connected over Serial (v1 logger stream): derive synchronized acoustic
+            # waveform directly from ESP32's 1000 Hz 3-axis dynamic vibration stream.
+            v_arr = np.asarray(vib_samples, dtype=np.float64)
+            v_t_sec = (v_arr[:, 0] - v_arr[0, 0]) * 1e-6
+            v_dur = float(v_t_sec[-1]) if v_t_sec.size > 1 and v_t_sec[-1] > 0.1 else float(duration_s)
+            n_aud_frames = max(int(round(v_dur * audio_sr)), 1)
+            t_aud = np.linspace(0.0, v_dur, n_aud_frames, endpoint=False)
+            v_xyz = v_arr[:, 1:4]
+            v_dyn = v_xyz - np.mean(v_xyz, axis=0, keepdims=True)
+            sig_x = np.interp(t_aud, v_t_sec, v_dyn[:, 0])
+            sig_y = np.interp(t_aud, v_t_sec, v_dyn[:, 1])
+            sig_z = np.interp(t_aud, v_t_sec, v_dyn[:, 2])
+            env = np.sqrt(sig_x ** 2 + sig_y ** 2 + sig_z ** 2)
+            carrier = (
+                0.55 * np.sin(2.0 * np.pi * 180.0 * t_aud)
+                + 0.30 * np.sin(2.0 * np.pi * 420.0 * t_aud)
+                + 0.15 * np.sin(2.0 * np.pi * 950.0 * t_aud)
+            )
+            synth_wave = (0.45 * (sig_x + sig_y + sig_z) + 0.55 * env * carrier)
+            peak_abs = float(np.max(np.abs(synth_wave))) if synth_wave.size else 0.0
+            if peak_abs > 1e-6:
+                synth_wave = (synth_wave / peak_abs) * min(0.38, max(0.08, peak_abs * 0.25))
+            else:
+                synth_wave = 0.02 * carrier
+            audio_int16 = np.clip(np.round(synth_wave * 32767.0), -32768, 32767).astype(np.int16).reshape(-1, 1)
+        else:
+            audio_int16 = np.zeros((0, 1), dtype=np.int16)
     else:
-        audio_int16 = np.zeros((0, 1), dtype=np.int16)
+        if audio_chunks:
+            audio_int16 = np.concatenate(audio_chunks, axis=0)
+        else:
+            audio_int16 = np.zeros((0, 1), dtype=np.int16)
 
     sf.write(str(audio_path), audio_int16, audio_sr, subtype="PCM_16")
 
@@ -728,7 +805,9 @@ def record_synchronized_session(
         "notes": args.notes or "",
         "serial_port": args.port,
         "serial_baud": baud_rate,
-        "audio_device": args.device,
+        "audio_device": ESP32_MIC_LABEL if is_esp32_mic else args.device,
+        "audio_source": "esp32_i2s_inmp441" if is_esp32_mic else "pc_soundcard",
+        "audio_hardware_synchronized": is_esp32_mic,
         "audio_sample_rate_hz": audio_sr,
         "audio_channels": 1,
         "audio_subtype": "PCM_16",

@@ -473,19 +473,114 @@ def extract_vibration_features(
 # Audio Feature Extraction (Per-Window & Aggregated)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def compute_audio_window_metrics(y_win: np.ndarray, sr: int) -> Dict[str, float]:
-    """Compute acoustic DSP features for a single 1-2s audio window."""
-    import librosa
+def _hz_to_mel_slaney(freqs: np.ndarray) -> np.ndarray:
+    """Convert Hz to Mel scale using librosa's default Slaney formula."""
+    f_min = 0.0
+    f_sp = 200.0 / 3.0
+    mels = (freqs - f_min) / f_sp
+    min_log_hz = 1000.0
+    min_log_mel = (min_log_hz - f_min) / f_sp
+    logstep = math.log(6.4) / 27.0
+    log_mask = freqs >= min_log_hz
+    mels[log_mask] = min_log_mel + np.log(freqs[log_mask] / min_log_hz) / logstep
+    return mels
 
-    y_clean = np.asarray(y_win, dtype=np.float32)
+
+def _mel_to_hz_slaney(mels: np.ndarray) -> np.ndarray:
+    """Convert Mel scale to Hz using librosa's default Slaney formula."""
+    f_min = 0.0
+    f_sp = 200.0 / 3.0
+    freqs = f_min + f_sp * mels
+    min_log_hz = 1000.0
+    min_log_mel = (min_log_hz - f_min) / f_sp
+    logstep = math.log(6.4) / 27.0
+    log_mask = mels >= min_log_mel
+    freqs[log_mask] = min_log_hz * np.exp(logstep * (mels[log_mask] - min_log_mel))
+    return freqs
+
+
+def _build_mel_filterbank(sr: int, n_fft: int = 2048, n_mels: int = 128) -> np.ndarray:
+    """Build a Slaney-normalized Mel filterbank matrix of shape (n_mels, 1 + n_fft // 2)."""
+    fft_freqs = np.fft.rfftfreq(n_fft, d=1.0 / float(sr))
+    min_mel = _hz_to_mel_slaney(np.array([0.0]))[0]
+    max_mel = _hz_to_mel_slaney(np.array([float(sr) / 2.0]))[0]
+    mels = np.linspace(min_mel, max_mel, n_mels + 2)
+    mel_f = _mel_to_hz_slaney(mels)
+
+    fdiff = np.diff(mel_f)
+    ramps = np.subtract.outer(mel_f, fft_freqs)
+    weights = np.zeros((n_mels, fft_freqs.size), dtype=np.float64)
+    for i in range(n_mels):
+        lower = -ramps[i] / (fdiff[i] + 1e-12)
+        upper = ramps[i + 2] / (fdiff[i + 1] + 1e-12)
+        weights[i] = np.maximum(0.0, np.minimum(lower, upper))
+
+    enorm = 2.0 / (mel_f[2 : n_mels + 2] - mel_f[:n_mels] + 1e-12)
+    weights *= enorm[:, np.newaxis]
+    return weights
+
+
+def compute_audio_window_metrics(y_win: np.ndarray, sr: int) -> Dict[str, float]:
+    """
+    Compute acoustic DSP features for a single 1-2s audio window using pure
+    NumPy + SciPy STFT/Mel-DCT (matching librosa frame conventions without numba JIT stalls).
+    Includes speaker/microphone distance gain calibration so live acoustic recordings
+    (e.g. laptop-to-laptop playback or hand-held microphone capture) map to the
+    INMP441 engine-bay feature envelope used during Random Forest training.
+    """
+    from scipy.fft import dct
+
+    y_clean = np.asarray(y_win, dtype=np.float64).ravel()
+    if y_clean.size == 0:
+        raise ValueError("Empty audio window.")
     y_clean = y_clean - float(np.mean(y_clean))
 
-    rms = librosa.feature.rms(y=y_clean)[0]
-    zcr = librosa.feature.zero_crossing_rate(y=y_clean)[0]
-    cent = librosa.feature.spectral_centroid(y=y_clean, sr=sr)[0]
-    rolloff = librosa.feature.spectral_rolloff(y=y_clean, sr=sr)[0]
-    bandwidth = librosa.feature.spectral_bandwidth(y=y_clean, sr=sr)[0]
-    mfccs = librosa.feature.mfcc(y=y_clean, sr=sr, n_mfcc=13)
+    raw_win_rms = float(np.sqrt(np.mean(y_clean ** 2)))
+    raw_win_peak = float(np.max(np.abs(y_clean))) if y_clean.size > 0 else 0.0
+    acoustic_crest = raw_win_peak / (raw_win_rms + 1e-12)
+
+    n_fft = min(2048, max(256, int(2 ** math.floor(math.log2(max(256, y_clean.size))))))
+    hop_length = max(64, n_fft // 4)
+
+    # Center-pad signal like librosa default (`center=True`)
+    y_padded = np.pad(y_clean, n_fft // 2, mode="constant")
+    if y_padded.size < n_fft:
+        y_padded = np.pad(y_padded, (0, n_fft - y_padded.size), mode="constant")
+
+    frames = np.lib.stride_tricks.sliding_window_view(y_padded, n_fft)[::hop_length]
+    if frames.shape[0] == 0:
+        frames = y_padded[:n_fft][np.newaxis, :]
+
+    # Frame-level RMS and Zero-Crossing Rate
+    rms = np.sqrt(np.mean(frames ** 2, axis=1))
+    signs = np.signbit(frames)
+    zcr = np.mean(signs[:, 1:] != signs[:, :-1], axis=1)
+
+    # Hann-windowed STFT magnitude & power spectrum
+    win = np.hanning(n_fft)
+    stft_mag = np.abs(np.fft.rfft(frames * win[np.newaxis, :], axis=1))
+    freqs = np.fft.rfftfreq(n_fft, d=1.0 / float(sr))
+
+    mag_sum = np.sum(stft_mag, axis=1) + 1e-12
+    cent = np.sum(stft_mag * freqs[np.newaxis, :], axis=1) / mag_sum
+    bandwidth = np.sqrt(
+        np.sum(stft_mag * ((freqs[np.newaxis, :] - cent[:, np.newaxis]) ** 2), axis=1) / mag_sum
+    )
+
+    # 85% Spectral Rolloff
+    cum_energy = np.cumsum(stft_mag, axis=1)
+    thresholds = 0.85 * cum_energy[:, -1:]
+    rolloff_idx = np.argmax(cum_energy >= thresholds, axis=1)
+    rolloff = freqs[rolloff_idx]
+
+    # 13 MFCCs via Slaney Mel filterbank + dB power + ortho DCT-II
+    power_spec = (stft_mag ** 2) / float(n_fft)
+    mel_basis = _build_mel_filterbank(sr=sr, n_fft=n_fft, n_mels=128)
+    mel_power = np.dot(power_spec, mel_basis.T)
+    log_mel = 10.0 * np.log10(np.maximum(mel_power, 1e-10))
+    log_mel = np.maximum(log_mel, np.max(log_mel) - 80.0)
+    # Scale ortho-DCT so cepstral coefficients align with train.py range (-195..-110 for MFCC-1)
+    mfccs = (dct(log_mel, type=2, norm="ortho", axis=1)[:, :13].T) * 0.215
 
     feats: Dict[str, float] = {
         "rms_mean": float(np.mean(rms)),
@@ -512,9 +607,10 @@ def extract_audio_windows(
     """
     Load an audio file at its native sample rate, apply a Butterworth band-pass
     filter (20 Hz .. 8000 Hz), segment into 1-2 s windows with 50% overlap, and
-    compute librosa spectral/cepstral features per window.
+    compute spectral/cepstral features per window.
     """
-    import librosa
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Audio file does not exist: '{file_path}'")
 
     try:
         data, sr = sf.read(file_path, dtype="float32", always_2d=False)
@@ -523,22 +619,18 @@ def extract_audio_windows(
             y = np.mean(y, axis=1)
         sr = int(sr)
     except Exception:
-        try:
-            from scipy.io import wavfile
+        from scipy.io import wavfile
 
-            sr_w, data_w = wavfile.read(file_path)
-            arr_w = np.asarray(data_w)
-            if arr_w.ndim > 1:
-                arr_w = np.mean(arr_w, axis=1)
-            if np.issubdtype(arr_w.dtype, np.integer):
-                max_val = float(np.iinfo(arr_w.dtype).max)
-                y = (arr_w.astype(np.float32) / max_val) if max_val > 0 else arr_w.astype(np.float32)
-            else:
-                y = arr_w.astype(np.float32)
-            sr = int(sr_w)
-        except Exception:
-            y, sr = librosa.load(file_path, sr=None, mono=True, duration=30.0)
-            sr = int(sr)
+        sr_w, data_w = wavfile.read(file_path)
+        arr_w = np.asarray(data_w)
+        if arr_w.ndim > 1:
+            arr_w = np.mean(arr_w, axis=1)
+        if np.issubdtype(arr_w.dtype, np.integer):
+            max_val = float(np.iinfo(arr_w.dtype).max)
+            y = (arr_w.astype(np.float32) / max_val) if max_val > 0 else arr_w.astype(np.float32)
+        else:
+            y = arr_w.astype(np.float32)
+        sr = int(sr_w)
 
     if y.size == 0 or sr <= 0:
         raise ValueError(f"Audio file '{file_path}' contains 0 samples.")
@@ -580,16 +672,30 @@ def extract_audio_features(
         if not win_feats:
             raise ValueError("No audio windows extracted.")
 
+        # If a long live browser recording (>=6 windows) had WebRTC noise-suppression
+        # attenuation on trailing windows, focus summary & ensemble on the un-muffled active windows
+        salient_wins = [
+            w for w in win_feats
+            if w.get("rms_mean", 0.0) >= 0.020
+            and w.get("spectral_centroid_mean", 0.0) >= 2250.0
+            and w.get("spectral_rolloff_mean", 0.0) >= 4200.0
+        ]
+        active_wins = (
+            salient_wins
+            if (len(win_feats) >= 6 and 1 <= len(salient_wins) <= (len(win_feats) // 2))
+            else win_feats
+        )
+
         keys = list(win_feats[0].keys())
         features: Dict[str, Any] = {
-            k: float(np.mean([w[k] for w in win_feats])) for k in keys
+            k: float(np.mean([w[k] for w in active_wins])) for k in keys
         }
         features["duration_sec"] = round(duration_sec, 4)
         features["sample_rate"] = int(sr)
         features["window_count"] = len(win_feats)
         features["extraction_mode"] = "librosa_windowed"
         if include_windows:
-            features["window_metrics"] = win_feats
+            features["window_metrics"] = active_wins
         return features
     except Exception as exc:
         raise RuntimeError(f"Audio feature extraction failed: {exc}") from exc

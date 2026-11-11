@@ -246,6 +246,49 @@ class TelemetryIngestController extends Controller
         ];
 
         // 7. Live Telemetry Cache (Always updated for live hardware verification)
+        // Guard against empty USB-relay status-line fallback pings overwriting real sensor packets
+        $isEmptyFallbackPing = ! $saveSession
+            && $tempC === null
+            && $peakG === null
+            && $voltageV === null
+            && ($audioRms === null || (float) $audioRms <= 0)
+            && ($rpm === null || (int) $rpm === 0);
+
+        $existingLive = Cache::get('telemetry:live:'.$vehicle->id)
+            ?? ($vehicle->user_id ? Cache::get('telemetry:live:user:'.$vehicle->user_id) : null);
+
+        if ($isEmptyFallbackPing && is_array($existingLive)) {
+            $hasExistingSensorData = ($existingLive['temperature_c'] ?? null) !== null
+                || ($existingLive['peak_g'] ?? null) !== null
+                || ($existingLive['voltage_v'] ?? null) !== null
+                || (($existingLive['audio_rms'] ?? 0) > 0)
+                || (($existingLive['rpm'] ?? 0) > 0);
+
+            if ($hasExistingSensorData) {
+                $existingLive['online'] = true;
+                $existingLive['diff_seconds'] = 0;
+                $existingLive['last_seen_human'] = 'Just now';
+                $existingLive['timestamp'] = now()->toIso8601String();
+                Cache::put('telemetry:live:'.$vehicle->id, $existingLive, 900);
+                if ($vehicle->user_id) {
+                    Cache::put('telemetry:live:user:'.$vehicle->user_id, $existingLive, 900);
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'mode' => 'live_check',
+                    'message' => 'Heartbeat refreshed; preserved active sensor telemetry.',
+                    'components_health' => $existingLive['components_health'] ?? $componentsHealth,
+                    'metrics' => [
+                        'temperature_c' => $existingLive['temperature_c'] ?? null,
+                        'rpm' => $existingLive['rpm'] ?? 0,
+                        'voltage_v' => $existingLive['voltage_v'] ?? null,
+                        'peak_g' => $existingLive['peak_g'] ?? null,
+                    ],
+                ], 200);
+            }
+        }
+
         $livePayload = [
             'online' => true,
             'diff_seconds' => 0,
@@ -277,20 +320,24 @@ class TelemetryIngestController extends Controller
             'timestamp' => now()->toIso8601String(),
         ];
 
-        Cache::put('telemetry:live:'.$vehicle->id, $livePayload, 30);
+        Cache::put('telemetry:live:'.$vehicle->id, $livePayload, 900);
         if ($vehicle->user_id) {
-            Cache::put('telemetry:live:user:'.$vehicle->user_id, $livePayload, 30);
+            Cache::put('telemetry:live:user:'.$vehicle->user_id, $livePayload, 900);
         }
 
-        // Rolling 30-packet history buffer for live oscilloscope chart
+        // Rolling 30-packet history buffer for live oscilloscope chart (filter out empty status-line pings)
         $historyKey = 'telemetry:history:'.$vehicle->id;
-        $history = Cache::get($historyKey, []);
-        $history[] = [
-            'time' => now()->format('H:i:s'),
-            'rpm' => $rpm !== null ? (int) $rpm : 0,
-            'temp' => $tempC !== null ? (float) $tempC : null,
-            'peak' => ! is_null($peakG) ? (float) $peakG : null,
-        ];
+        $history = array_values(array_filter(Cache::get($historyKey, []), function ($pt) {
+            return ! (($pt['temp'] ?? null) === null && ($pt['peak'] ?? null) === null && (int) ($pt['rpm'] ?? 0) === 0);
+        }));
+        if (! $isEmptyFallbackPing) {
+            $history[] = [
+                'time' => now()->format('H:i:s'),
+                'rpm' => $rpm !== null ? (int) $rpm : 0,
+                'temp' => $tempC !== null ? (float) $tempC : null,
+                'peak' => ! is_null($peakG) ? (float) $peakG : null,
+            ];
+        }
         if (count($history) > 30) {
             $history = array_slice($history, -30);
         }
@@ -452,10 +499,11 @@ class TelemetryIngestController extends Controller
         }
 
         if ($cached) {
-            // Revalidate freshness from stored timestamp: ESP32 sends every 5s (plus up to 5s HTTP timeout); 20s = timeout
+            // Revalidate freshness from stored timestamp: ESP32 sends every 5s (plus up to 5s HTTP timeout).
+            // 45s grace tolerates Wi-Fi hiccups, slow Apache responses and missed packets without flapping offline.
             $ts = $cached['timestamp'] ?? null;
             $diffSec = $ts ? abs(now()->diffInSeconds(Carbon::parse($ts))) : 999;
-            $isLive = ($diffSec <= 20);
+            $isLive = ($diffSec <= 45);
 
             $cached['diff_seconds'] = $diffSec;
             $cached['online'] = $isLive;

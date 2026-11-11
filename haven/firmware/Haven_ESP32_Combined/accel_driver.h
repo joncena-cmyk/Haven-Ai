@@ -3,8 +3,6 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <SPI.h>
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
 
 // ============================================================================
 // HAVEN AI — Swappable 3-Axis Accelerometer Driver Layer (Phase 3)
@@ -55,22 +53,16 @@ public:
       return false;
     }
 
-    if (!_mpu.begin(_addr, &Wire)) {
-      _ready = false;
-      return false;
-    }
-
-    // Configure ±8g full-scale range (4096 LSB/g)
-    _mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
-    _mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-
-    // Disable the restrictive 21 Hz low-pass filter; use widest DLPF (260 Hz)
-    _mpu.setFilterBandwidth(MPU6050_BAND_260_HZ);
-    _bwHz = 260;
-
+    // Wake up MPU6050 (PWR_MGMT_1 = 0x00)
+    writeRegister(0x6B, 0x00);
+    // Configure ±8g full-scale range (4096 LSB/g, ACCEL_CONFIG 0x1C = 0x10)
+    writeRegister(0x1C, 0x10);
+    // Configure ±500 deg/s gyro range (GYRO_CONFIG 0x1B = 0x08)
+    writeRegister(0x1B, 0x08);
     // Explicitly write SMPLRT_DIV (0x19) = 0x00 and CONFIG (0x1A) = 0x00 (260 Hz DLPF)
     writeRegister(0x19, 0x00);
     writeRegister(0x1A, 0x00);
+    _bwHz = 260;
 
     _ready = true;
     return true;
@@ -130,7 +122,6 @@ private:
   uint8_t _addr;
   bool _ready;
   int _bwHz;
-  Adafruit_MPU6050 _mpu;
 };
 
 // ────────────────────────────────────────────────────────────────────────────

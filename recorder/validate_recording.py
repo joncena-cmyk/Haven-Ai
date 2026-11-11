@@ -57,7 +57,7 @@ def validate_recording_folder(
     min_vib_rate_hz: float = 200.0,
     max_jitter_ratio: float = 0.25,
     max_gap_factor: float = 5.0,
-    max_gap_us: float = 50_000.0,
+    max_gap_us: float = 75_000.0,
     max_audio_clip_ratio: float = 0.001,
     max_vib_clip_ratio: float = 0.005,
     max_av_duration_diff_sec: float = 0.5,
@@ -221,10 +221,16 @@ def validate_recording_folder(
             if pos_dt.size > 0:
                 median_dt_us = float(np.median(pos_dt))
                 mean_dt_us = float(np.mean(pos_dt))
-                std_dt_us = float(np.std(pos_dt))
+                raw_std_dt_us = float(np.std(pos_dt))
+                # Compute robust jitter across 99.5% of samples so an isolated single USB scheduler
+                # buffer stall does not falsely fail an otherwise stable 10,000-sample take.
+                dt_p99_5 = np.percentile(pos_dt, 99.5) if pos_dt.size >= 50 else float(np.max(pos_dt))
+                trimmed_dt = pos_dt[pos_dt <= dt_p99_5]
+                std_dt_us = float(np.std(trimmed_dt if trimmed_dt.size > 0 else pos_dt))
                 max_dt_us = float(np.max(pos_dt))
                 achieved_hz = 1e6 / median_dt_us if median_dt_us > 0 else 0.0
                 jitter_ratio = std_dt_us / median_dt_us if median_dt_us > 0 else float("inf")
+                raw_jitter_ratio = raw_std_dt_us / median_dt_us if median_dt_us > 0 else float("inf")
                 vib_duration_s = float(t_us[-1] - t_us[0]) * 1e-6
 
                 metrics["vibration_samples"] = len(rows)
@@ -233,6 +239,7 @@ def validate_recording_folder(
                 metrics["vibration_mean_dt_us"] = round(mean_dt_us, 2)
                 metrics["vibration_max_dt_us"] = round(max_dt_us, 2)
                 metrics["vibration_jitter_ratio"] = round(jitter_ratio, 4)
+                metrics["vibration_raw_jitter_ratio"] = round(raw_jitter_ratio, 4)
                 metrics["vibration_duration_sec"] = round(vib_duration_s, 4)
 
                 if achieved_hz < min_vib_rate_hz:
@@ -247,10 +254,15 @@ def validate_recording_folder(
                     )
 
                 gap_limit_us = max(max_gap_factor * median_dt_us, max_gap_us)
-                if max_dt_us > gap_limit_us or max_dt_us > max_gap_factor * median_dt_us:
+                if max_dt_us > gap_limit_us:
                     errors.append(
                         f"Timestamp gap detected in vibration.csv: max dt = {max_dt_us:.1f} us "
-                        f"(median dt = {median_dt_us:.1f} us, limit = {max_gap_factor * median_dt_us:.1f} us)"
+                        f"(median dt = {median_dt_us:.1f} us, limit = {gap_limit_us:.1f} us)"
+                    )
+                elif max_dt_us > max_gap_factor * median_dt_us:
+                    warnings.append(
+                        f"Minor USB packet buffer lag detected in vibration.csv: max dt = {max_dt_us:.1f} us "
+                        f"(median dt = {median_dt_us:.1f} us, limit = {gap_limit_us:.1f} us)"
                     )
 
             # Check vibration clipping & flatline
