@@ -3,17 +3,13 @@
 #include <DNSServer.h>
 #include <HTTPClient.h>
 #include <Wire.h>
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_INA219.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
 #include <driver/i2s.h>
-#include <ArduinoJson.h>
 #include <Preferences.h>
 #include <esp_timer.h>
 #include <math.h>
+#include "sensor_shims.h"
 #include "accel_driver.h"
+#include <ArduinoJson.h>
 
 #if __has_include("secrets.h")
   #include "secrets.h"
@@ -164,6 +160,24 @@ void IRAM_ATTR countPulse() {
 // ============================================================
 // INMP441 MICROPHONE SETUP & READ
 // ============================================================
+static const char B64_TABLE[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static void encodeBase64(const uint8_t* in, size_t inLen, char* out, size_t outMax) {
+  size_t o = 0;
+  for (size_t i = 0; i < inLen; i += 3) {
+    if (o + 4 >= outMax) break;
+    uint32_t b0 = in[i];
+    uint32_t b1 = (i + 1 < inLen) ? in[i + 1] : 0;
+    uint32_t b2 = (i + 2 < inLen) ? in[i + 2] : 0;
+    uint32_t triple = (b0 << 16) | (b1 << 8) | b2;
+    out[o++] = B64_TABLE[(triple >> 18) & 0x3F];
+    out[o++] = B64_TABLE[(triple >> 12) & 0x3F];
+    out[o++] = (i + 1 < inLen) ? B64_TABLE[(triple >> 6) & 0x3F] : '=';
+    out[o++] = (i + 2 < inLen) ? B64_TABLE[triple & 0x3F] : '=';
+  }
+  out[o] = '\0';
+}
+
 void setupMicrophone() {
   i2s_config_t config = {};
   config.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX);
@@ -620,8 +634,18 @@ void enterLoggerMode() {
   btStop();
 
   Serial.flush();
+  Serial.setTxBufferSize(4096);
   Serial.updateBaudRate(LOGGER_BAUD_RATE);
+  Serial.setTimeout(5);
   delay(50);
+
+  // Initialize INMP441 Microphone for simultaneous hardware audio capture
+  if (!micReady) {
+    setupMicrophone();
+  }
+  if (micReady) {
+    i2s_zero_dma_buffer(I2S_NUM_0);
+  }
 
   mpuReady = accelDriver->begin(true);
 
@@ -646,14 +670,15 @@ void enterLoggerMode() {
 
   Serial.println();
   Serial.printf(
-    "# HAVEN_LOGGER_V1 SENSOR=%s RANGE_G=%d DLPF_HZ=%d TARGET_RATE_HZ=%d ACHIEVED_RATE_HZ=%.1f VALID_READS=%d/%d\n",
+    "# HAVEN_LOGGER_V1 SENSOR=%s RANGE_G=%d DLPF_HZ=%d TARGET_RATE_HZ=%d ACHIEVED_RATE_HZ=%.1f VALID_READS=%d/%d MIC=%s MIC_RATE_HZ=16000\n",
     accelDriver->sensorName(),
     accelDriver->rangeG(),
     accelDriver->bandwidthHz(),
     (int)(1000000 / LOGGER_TARGET_PERIOD_US),
     achievedHz,
     validReads,
-    kCalibSamples
+    kCalibSamples,
+    micReady ? "INMP441_I2S" : "NONE"
   );
 
   // Auxiliary 3-component telemetry snapshot (DS18B20 Temp, Hall RPM, INA219 Voltage/Current)
@@ -680,87 +705,97 @@ void enterLoggerMode() {
 }
 
 void checkSerialModeCommand() {
+  static char cmdBuf[128];
+  static size_t cmdLen = 0;
   while (Serial.available() > 0) {
-    String raw = Serial.readStringUntil('\n');
-    raw.trim();
-    if (raw.length() == 0) continue;
+    char c = (char)Serial.read();
+    if (c == '\r') continue;
+    if (c == '\n') {
+      cmdBuf[cmdLen] = '\0';
+      String raw = String(cmdBuf);
+      cmdLen = 0;
+      raw.trim();
+      if (raw.length() == 0) continue;
 
-    String upper = raw;
-    upper.toUpperCase();
+      String upper = raw;
+      upper.toUpperCase();
 
-    if (upper == "LOGGER" && !loggerModeActive) {
-      enterLoggerMode();
-      return;
-    } else if (upper == "LIVE" && loggerModeActive) {
-      ESP.restart();
-      return;
-    } else if (upper == "PING") {
-      Serial.println("PONG:HAVEN_ESP32_NODE");
-      continue;
-    } else if (upper == "SCAN_WIFI") {
-      int n = WiFi.scanNetworks();
-      DynamicJsonDocument doc(4096);
-      JsonArray arr = doc.createNestedArray("networks");
-      for (int i = 0; i < n && i < 20; i++) {
-        JsonObject item = arr.createNestedObject();
-        item["ssid"] = WiFi.SSID(i);
-        item["rssi"] = WiFi.RSSI(i);
-      }
-      WiFi.scanDelete();
-      Serial.print("WIFI_LIST:");
-      serializeJson(doc, Serial);
-      Serial.println();
-      continue;
-    } else if (upper.startsWith("SET_CONFIG:")) {
-      String jsonStr = raw.substring(11);
-      StaticJsonDocument<768> doc;
-      DeserializationError err = deserializeJson(doc, jsonStr);
-      if (err) {
-        Serial.println("ERR:INVALID_JSON");
+      if (upper == "LOGGER" && !loggerModeActive) {
+        enterLoggerMode();
+        return;
+      } else if (upper == "LIVE" && loggerModeActive) {
+        ESP.restart();
+        return;
+      } else if (upper == "PING") {
+        Serial.println("PONG:HAVEN_ESP32_NODE");
+        continue;
+      } else if (upper == "SCAN_WIFI") {
+        int n = WiFi.scanNetworks();
+        DynamicJsonDocument doc(4096);
+        JsonArray arr = doc.createNestedArray("networks");
+        for (int i = 0; i < n && i < 20; i++) {
+          JsonObject item = arr.createNestedObject();
+          item["ssid"] = WiFi.SSID(i);
+          item["rssi"] = WiFi.RSSI(i);
+        }
+        WiFi.scanDelete();
+        Serial.print("WIFI_LIST:");
+        serializeJson(doc, Serial);
+        Serial.println();
+        continue;
+      } else if (upper.startsWith("SET_CONFIG:")) {
+        String jsonStr = raw.substring(11);
+        StaticJsonDocument<768> doc;
+        DeserializationError err = deserializeJson(doc, jsonStr);
+        if (err) {
+          Serial.println("ERR:INVALID_JSON");
+          continue;
+        }
+        const char* newSsid = doc["ssid"] | "";
+        if (strlen(newSsid) == 0) {
+          Serial.println("ERR:MISSING_SSID");
+          continue;
+        }
+        copyBounded(wifiSSID, sizeof(wifiSSID), newSsid);
+        copyBounded(wifiPassword, sizeof(wifiPassword), doc["pass"] | "");
+        if (doc.containsKey("server")) {
+          copyBounded(havenServerUrl, sizeof(havenServerUrl), doc["server"] | "");
+        }
+        if (doc.containsKey("key")) {
+          copyBounded(havenDeviceKey, sizeof(havenDeviceKey), doc["key"] | "");
+        }
+        int newVid = doc["vehicle_id"] | vehicleId;
+        if (newVid > 0) vehicleId = newVid;
+
+        prefs.begin("haven", false);
+        prefs.putString("ssid", wifiSSID);
+        prefs.putString("pass", wifiPassword);
+        prefs.putString("server", havenServerUrl);
+        prefs.putString("key", havenDeviceKey);
+        prefs.putInt("vid", vehicleId);
+        prefs.end();
+
+        Serial.println("OK:SAVED");
+        Serial.flush();
+        delay(400);
+        ESP.restart();
+        return;
+      } else if (upper == "GET_CONFIG") {
+        StaticJsonDocument<256> doc;
+        doc["device"] = "HAVEN_ESP32_NODE";
+        doc["ssid"] = wifiSSID;
+        doc["server"] = havenServerUrl;
+        doc["key_set"] = (strlen(havenDeviceKey) > 0);
+        doc["vehicle_id"] = vehicleId;
+        doc["connected"] = (WiFi.status() == WL_CONNECTED);
+        doc["ip"] = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : "";
+        Serial.print("CONFIG:");
+        serializeJson(doc, Serial);
+        Serial.println();
         continue;
       }
-      const char* newSsid = doc["ssid"] | "";
-      if (strlen(newSsid) == 0) {
-        Serial.println("ERR:MISSING_SSID");
-        continue;
-      }
-      copyBounded(wifiSSID, sizeof(wifiSSID), newSsid);
-      copyBounded(wifiPassword, sizeof(wifiPassword), doc["pass"] | "");
-      if (doc.containsKey("server")) {
-        copyBounded(havenServerUrl, sizeof(havenServerUrl), doc["server"] | "");
-      }
-      if (doc.containsKey("key")) {
-        copyBounded(havenDeviceKey, sizeof(havenDeviceKey), doc["key"] | "");
-      }
-      int newVid = doc["vehicle_id"] | vehicleId;
-      if (newVid > 0) vehicleId = newVid;
-
-      prefs.begin("haven", false);
-      prefs.putString("ssid", wifiSSID);
-      prefs.putString("pass", wifiPassword);
-      prefs.putString("server", havenServerUrl);
-      prefs.putString("key", havenDeviceKey);
-      prefs.putInt("vid", vehicleId);
-      prefs.end();
-
-      Serial.println("OK:SAVED");
-      Serial.flush();
-      delay(400);
-      ESP.restart();
-      return;
-    } else if (upper == "GET_CONFIG") {
-      StaticJsonDocument<256> doc;
-      doc["device"] = "HAVEN_ESP32_NODE";
-      doc["ssid"] = wifiSSID;
-      doc["server"] = havenServerUrl;
-      doc["key_set"] = (strlen(havenDeviceKey) > 0);
-      doc["vehicle_id"] = vehicleId;
-      doc["connected"] = (WiFi.status() == WL_CONNECTED);
-      doc["ip"] = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : "";
-      Serial.print("CONFIG:");
-      serializeJson(doc, Serial);
-      Serial.println();
-      continue;
+    } else if (cmdLen < sizeof(cmdBuf) - 1) {
+      cmdBuf[cmdLen++] = c;
     }
   }
 }
@@ -775,6 +810,7 @@ void runLoggerLoop() {
     nextLoggerSampleUs = nowUs + LOGGER_TARGET_PERIOD_US;
   }
 
+  // 1. Read and transmit 1000 Hz accelerometer sample
   float ax = 0.0f, ay = 0.0f, az = 0.0f;
   if (accelDriver->readSampleG(ax, ay, az)) {
     char lineBuf[64];
@@ -782,6 +818,51 @@ void runLoggerLoop() {
     if (len > 0) {
       Serial.write((const uint8_t*)lineBuf, (size_t)len);
     }
+  }
+
+  // 2. Stream INMP441 I2S Audio chunks interleaved with vibration (16-bit PCM base64)
+  if (micReady) {
+    int32_t i2sSamples[64];
+    size_t bytesRead = 0;
+    esp_err_t res = i2s_read(I2S_NUM_0, i2sSamples, sizeof(i2sSamples), &bytesRead, 0);
+    if (res == ESP_OK && bytesRead > 0) {
+      int count = bytesRead / sizeof(int32_t);
+      int16_t pcm16[64];
+      for (int i = 0; i < count; i++) {
+        int32_t s = i2sSamples[i] >> 14;
+        if (s > 32767) s = 32767;
+        else if (s < -32768) s = -32768;
+        pcm16[i] = (int16_t)s;
+      }
+      char b64Buf[200];
+      encodeBase64((const uint8_t*)pcm16, count * sizeof(int16_t), b64Buf, sizeof(b64Buf));
+      char audLine[220];
+      int aLen = snprintf(audLine, sizeof(audLine), "#A:%s\n", b64Buf);
+      if (aLen > 0) {
+        Serial.write((const uint8_t*)audLine, (size_t)aLen);
+      }
+    }
+  }
+
+  // 3. Periodic auxiliary telemetry update (DS18B20 Temp, Hall RPM, INA219 Voltage/Current) every 2s
+  static int64_t lastAuxTelemetryUs = 0;
+  if (nowUs - lastAuxTelemetryUs >= 2000000) {
+    lastAuxTelemetryUs = nowUs;
+    float liveTemp = NAN;
+    if (ds18DeviceCount > 0) {
+      liveTemp = tempSensor.getTempCByIndex(0);
+      tempSensor.requestTemperatures();
+    }
+    float liveVolt = inaReady ? ina219.getBusVoltage_V() : NAN;
+    float liveMA   = inaReady ? ina219.getCurrent_mA() : NAN;
+    float liveRpm  = rpm;
+    Serial.printf(
+      "# HAVEN_AUX_TELEMETRY TEMP_C=%s RPM=%.0f VOLTAGE_V=%s CURRENT_MA=%s\n",
+      (!isnan(liveTemp) && liveTemp > -50 && liveTemp < 130) ? String(liveTemp, 1).c_str() : "NULL",
+      liveRpm,
+      (!isnan(liveVolt) && liveVolt >= 0) ? String(liveVolt, 2).c_str() : "NULL",
+      (!isnan(liveMA)) ? String(liveMA, 1).c_str() : "NULL"
+    );
   }
 
   if (Serial.available() > 0) {
@@ -797,6 +878,7 @@ void setup() {
   // the loop is blocked in an HTTP POST. Must be set before Serial.begin().
   Serial.setRxBufferSize(1024);
   Serial.begin(loggerModeActive ? LOGGER_BAUD_RATE : 115200);
+  Serial.setTimeout(5);
   delay(500);
 
   // Check if host recorder sent "LOGGER" command during boot window

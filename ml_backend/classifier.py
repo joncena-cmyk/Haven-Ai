@@ -15,6 +15,11 @@ Condition classes (UMak CET Capstone Scope):
 import math
 import os
 import pickle
+
+os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
+os.environ.setdefault("JOBLIB_MULTIPROCESSING", "0")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import numpy as np
 import logging
 
@@ -63,6 +68,14 @@ class EngineClassifier:
                 self._model = payload.get("model") or payload  # support both formats
                 self._audio_model = payload.get("audio_model") if isinstance(payload, dict) else None
                 self._vibration_model = payload.get("vibration_model") if isinstance(payload, dict) else None
+                for pipe in (self._model, self._audio_model, self._vibration_model):
+                    if pipe is not None:
+                        if hasattr(pipe, "n_jobs"):
+                            pipe.n_jobs = 1
+                        if hasattr(pipe, "named_steps"):
+                            for step in pipe.named_steps.values():
+                                if hasattr(step, "n_jobs"):
+                                    step.n_jobs = 1
                 self._model_meta = payload.get("meta", {}) if isinstance(payload, dict) else {}
                 self._model_mtime = mtime
                 logger.info("Trained model loaded from model.pkl")
@@ -125,6 +138,7 @@ class EngineClassifier:
         rms_audio_std = _safe_float(features.get("rms_std"), 0.0)
         centroid = _safe_float(features.get("spectral_centroid_mean"), 0.0)
         rolloff = _safe_float(features.get("spectral_rolloff_mean"), 0.0)
+        mfcc1 = _safe_float(features.get("mfcc_1_mean"), 0.0)
 
         vibration_source = features.get("vibration_source")
         has_mechanical = (vibration_source not in ("simulated", "skipped")) and (peak_g >= 0.08 or rms_g >= 0.04)
@@ -134,19 +148,20 @@ class EngineClassifier:
             or (_has_finite_value(rpm) and float(rpm) >= 300.0)
         )
         # Acoustic engine presence requires sustained energy and plausible engine spectral envelope
-        # (accepts quiet normal 4-cyl idle down to rms >= 0.018 while rejecting silent room & claps)
         is_sustained_audio = (rms_audio_std == 0.0) or (rms_audio_std <= rms_audio * 2.2)
         has_engine_spectrum = (centroid == 0.0 and rms_audio >= 0.08) or (350.0 <= centroid <= 6500.0 and rolloff >= 700.0)
-        has_strong_audio = (rms_audio >= 0.018) and is_sustained_audio and has_engine_spectrum
+        has_strong_audio = (rms_audio >= 0.0065) and is_sustained_audio and has_engine_spectrum
 
         # Engine presence gating
         if not has_mechanical and not has_telemetry and not has_strong_audio:
+            gate_conf = round(min(0.92, max(0.76, 0.91 - (rms_audio * 12.0) - (zcr * 0.15))), 4)
+            rem_conf = round(max(0.01, 1.0 - gate_conf), 4)
             return {
                 "condition": "ambient_noise",
-                "confidence": 0.95,
+                "confidence": gate_conf,
                 "top_classes": [
-                    {"condition": "ambient_noise", "confidence": 0.95},
-                    {"condition": "normal", "confidence": 0.05}
+                    {"condition": "ambient_noise", "confidence": gate_conf},
+                    {"condition": "normal", "confidence": rem_conf}
                 ],
                 "mode": "live_ml",
                 "feature_contributions": self.explain_prediction(features, "ambient_noise"),
@@ -157,6 +172,21 @@ class EngineClassifier:
             result = self._predict_trained(features)
         else:
             result = self._predict_rule_based(features)
+
+        if result.get("condition") == "ambient_noise":
+            amb_conf = float(result.get("confidence", 0.86))
+            top_cls = result.get("top_classes") or [
+                {"condition": "ambient_noise", "confidence": round(amb_conf, 4)},
+                {"condition": "normal", "confidence": round(max(0.01, 1.0 - amb_conf), 4)},
+            ]
+            return {
+                "condition": "ambient_noise",
+                "confidence": round(amb_conf, 4),
+                "top_classes": top_cls,
+                "mode": result.get("mode", "live_ml"),
+                "feature_contributions": self.explain_prediction(features, "ambient_noise"),
+                "warnings": ["SIGNAL GATE: No physical engine block vibration (hardware uncoupled) or sustained powertrain acoustic signature detected. Ambient noise filter engaged."]
+            }
 
         result["feature_contributions"] = self.explain_prediction(features, result.get("condition", "normal"))
         return result
@@ -506,6 +536,57 @@ class EngineClassifier:
                 else:
                     proba = proba_summary
                 labels = list(active_model.classes_) if hasattr(active_model, "classes_") else CLASSES
+
+                # When both audio and vibration are present and the 34-feature real audio_model is available,
+                # blend its real-engine acoustic probabilities into the multimodal ensemble
+                aud_order = self._model_meta.get("audio_feature_order", [])
+                if (not use_audio_only) and has_audio and self._audio_model is not None and len(aud_order) > 9:
+                    aud_row = [float(features[k]) if _has_finite_value(features.get(k)) else np.nan for k in aud_order]
+                    if not all(np.isnan(v) for v in aud_row):
+                        p_aud_sum = self._audio_model.predict_proba(np.array([aud_row], dtype=np.float64))[0]
+                        p_aud = p_aud_sum
+                        if isinstance(win_dicts, list) and len(win_dicts) > 0:
+                            aud_w_rows = [
+                                [float(wd[k]) if _has_finite_value(wd.get(k)) else np.nan for k in aud_order]
+                                for wd in win_dicts if isinstance(wd, dict)
+                            ]
+                            aud_w_rows = [r for r in aud_w_rows if not all(np.isnan(v) for v in r)]
+                            if aud_w_rows:
+                                p_aud_w = self._audio_model.predict_proba(np.asarray(aud_w_rows, dtype=np.float64))
+                                p_aud = 0.50 * p_aud_sum + 0.50 * np.mean(p_aud_w, axis=0)
+                        aud_labels = list(self._audio_model.classes_)
+                        aud_map = {str(lbl): float(pr) for lbl, pr in zip(aud_labels, p_aud)}
+                        blended = np.array(
+                            [0.25 * float(p_m) + 0.75 * aud_map.get(str(lbl), 0.0) for lbl, p_m in zip(labels, proba)],
+                            dtype=np.float64,
+                        )
+                        if float(np.sum(blended)) > 0:
+                            proba = blended / float(np.sum(blended))
+                # Order-preserving probability calibration using window dispersion & acoustic variance
+                # Prevents unpruned Random Forest leaves from saturating at 95%-100% while strictly
+                # preserving the predicted class (argmax) and class ranking.
+                win_disp = 0.0
+                if X_wins is not None and len(X_wins) > 1 and hasattr(active_model, "predict_proba"):
+                    try:
+                        win_disp = float(np.mean(np.std(active_model.predict_proba(X_wins), axis=0)))
+                    except Exception:
+                        win_disp = 0.0
+                rms_m = max(_safe_float(features.get("rms_mean"), 0.05), 1e-4)
+                rms_s = _safe_float(features.get("rms_std"), 0.01)
+                cent_m = max(_safe_float(features.get("spectral_centroid_mean"), 1000.0), 1.0)
+                cent_s = _safe_float(features.get("spectral_centroid_std"), 150.0)
+                zcr_m = max(_safe_float(features.get("zcr_mean"), 0.05), 1e-4)
+                zcr_s = _safe_float(features.get("zcr_std"), 0.01)
+                acoustic_var = (
+                    0.35 * min(1.5, rms_s / rms_m)
+                    + 0.35 * min(1.5, cent_s / cent_m)
+                    + 0.30 * min(1.5, zcr_s / zcr_m)
+                )
+                alpha = min(0.28, max(0.08, 0.07 + 0.14 * acoustic_var + 0.35 * win_disp))
+                n_cls = max(1, len(proba))
+                proba = (1.0 - alpha) * proba + alpha * (1.0 / float(n_cls))
+                proba = proba / float(np.sum(proba))
+
                 best_idx = int(np.argmax(proba))
                 pred = labels[best_idx]
                 confidence = float(proba[best_idx])
@@ -576,19 +657,21 @@ class EngineClassifier:
         crest       = _safe_float(features.get("crest_factor"), 0.0)
         zcr         = _safe_float(features.get("zcr_mean"), 0.0)
         centroid    = _safe_float(features.get("spectral_centroid_mean"), 0.0)
+        rolloff     = _safe_float(features.get("spectral_rolloff_mean"), 0.0)
         rms_audio   = _safe_float(features.get("rms_mean"), 0.0)
         mfcc1       = _safe_float(features.get("mfcc_1_mean"), 0.0)
         temp_c      = features.get("temperature_c")
         rpm         = features.get("rpm")
         voltage_v   = features.get("voltage_v")
+        has_vib     = (peak_g > 0.0 or rms_g > 0.0) and str(features.get("vibration_source") or "").lower() != "skipped"
 
-        # 1. Improper Valve Clearance: High Crest Factor (> 3.8), impulsive Peak G (> 1.35g dynamic), high acoustic frequency (> 2600 Hz)
+        # 1. Improper Valve Clearance: High Crest Factor (> 3.8), impulsive Peak G (> 1.35g dynamic), or bright metallic acoustic tapping (> 2200 Hz)
         if crest > 4.0 or peak_g > 1.8:
             scores["valve_clearance"] += 0.65
         elif crest > 3.5 and peak_g > 1.25:
             scores["valve_clearance"] += 0.35
-        if centroid > 2600 and rms_audio > 0.06:
-            scores["valve_clearance"] += 0.25
+        if centroid > 2200 and (rms_audio > 0.03 or rolloff > 4200):
+            scores["valve_clearance"] += 0.65 if not has_vib else 0.35
 
         # 2. Engine Misfire: Unstable combustion -> elevated ZCR, cyclic torque dips
         if zcr > 0.17:
@@ -603,11 +686,13 @@ class EngineClassifier:
             scores["loose_component"] += 0.60
         elif rms_g > 0.28 and peak_g > 0.65:
             scores["loose_component"] += 0.35
-        if centroid < 1700 and rms_audio > 0.04 and crest < 3.0 and rms_g > 0.25:
+        if centroid < 1700 and rms_audio > 0.04 and ((has_vib and crest < 3.0 and rms_g > 0.25) or (not has_vib and centroid > 950 and rms_audio > 0.08)):
             scores["loose_component"] += 0.25
 
-        # 4. Normal Engine Operation: Default when gravity-removed signals reside within manufacturer baseline envelope
-        if peak_g <= 0.85 and rms_g <= 0.28 and crest <= 3.6:
+        # 4. Normal Engine Operation: Default when signals reside within manufacturer baseline envelope
+        if has_vib and peak_g <= 0.85 and rms_g <= 0.28 and crest <= 3.6:
+            scores["normal"] += 0.45
+        elif not has_vib and centroid <= 2000 and zcr <= 0.12 and rms_audio <= 0.075:
             scores["normal"] += 0.45
 
         if all(s == 0.0 for k, s in scores.items() if k != "normal"):

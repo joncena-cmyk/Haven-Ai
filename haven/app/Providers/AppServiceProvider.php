@@ -36,7 +36,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('telemetry-ingest', function (Request $request) {
             $vehicleKey = (string) ($request->input('vehicle_id') ?? 'unknown');
 
-            return Limit::perMinute(30)->by($vehicleKey.'|'.$request->ip());
+            return Limit::perMinute(120)->by($vehicleKey.'|'.$request->ip());
         });
     }
 }

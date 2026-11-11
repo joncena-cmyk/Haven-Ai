@@ -77,18 +77,31 @@ class NhtsaVehicleService
             return [];
         }
 
-        $cacheKey = 'nhtsa.models.v1.'.md5(mb_strtolower($make).'|'.($year ?: 'any'));
+        $cacheKey = 'nhtsa.models.v2.'.md5(mb_strtolower($make).'|'.($year ?: 'any'));
 
         return Cache::remember($cacheKey, now()->addHours(12), function () use ($make, $year) {
+            $names = [];
+
+            // 1. Seed with HAVEN's verified 3D Digital Twin & PH/Asian catalog models for this Make
+            foreach (\App\Models\Vehicle::catalogModelsForMake($make) as $verifiedModel) {
+                $names[mb_strtoupper($verifiedModel)] = $verifiedModel;
+            }
+
+            // 2. Merge with NHTSA vPIC models when reachable
             $path = $year
                 ? 'GetModelsForMakeYear/make/'.$this->pathSegment($make).'/modelyear/'.$year
                 : 'GetModelsForMake/'.$this->pathSegment($make);
 
-            $names = [];
-            foreach ($this->results($path) as $row) {
-                $name = $this->clean($row['Model_Name'] ?? $row['Model'] ?? '');
-                if ($name !== '') {
-                    $names[mb_strtoupper($name)] = $name;
+            try {
+                foreach ($this->results($path) as $row) {
+                    $name = $this->clean($row['Model_Name'] ?? $row['Model'] ?? '');
+                    if ($name !== '') {
+                        $names[mb_strtoupper($name)] = $name;
+                    }
+                }
+            } catch (RuntimeException $e) {
+                if ($names === []) {
+                    throw $e;
                 }
             }
 

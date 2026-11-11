@@ -375,7 +375,7 @@
                                                 $vehTs = $vehTelemetry['timestamp'] ?? $vehTelemetry['received_at'] ?? null;
                                                 $isOnline = !empty($vehTelemetry['online'])
                                                     && !empty($vehTs)
-                                                    && abs(\Illuminate\Support\Carbon::parse($vehTs)->diffInSeconds(now())) <= 20;
+                                                    && abs(\Illuminate\Support\Carbon::parse($vehTs)->diffInSeconds(now())) <= 45;
                                                 $rawKey = (string) ($veh->device_key ?? '');
                                                 $maskedKey = strlen($rawKey) > 12
                                                     ? substr($rawKey, 0, 12) . str_repeat('•', 16)

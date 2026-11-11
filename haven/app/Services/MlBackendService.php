@@ -188,14 +188,21 @@ class MlBackendService
             return $configured;
         }
 
-        $winVenv = base_path('../ml_backend/.venv/Scripts/python.exe');
-        if (file_exists($winVenv)) {
-            return $winVenv;
-        }
+        $candidates = [
+            base_path('../ml_backend/.venv/Scripts/python.exe'),
+            base_path('../ml_backend/.venv/bin/python'),
+            'C:/Users/AMIR/AppData/Local/Programs/Python/Python312/python.exe',
+            'C:/Users/AMIR/AppData/Local/Programs/Python/Python311/python.exe',
+            (getenv('LOCALAPPDATA') ?: '') . '/Programs/Python/Python312/python.exe',
+            (getenv('LOCALAPPDATA') ?: '') . '/Programs/Python/Python311/python.exe',
+            'C:/Python312/python.exe',
+            'C:/Python311/python.exe',
+        ];
 
-        $unixVenv = base_path('../ml_backend/.venv/bin/python');
-        if (file_exists($unixVenv)) {
-            return $unixVenv;
+        foreach ($candidates as $candidate) {
+            if (! empty($candidate) && file_exists($candidate)) {
+                return $candidate;
+            }
         }
 
         return 'python';
@@ -474,22 +481,37 @@ class MlBackendService
         ]);
 
         $pyCode = <<<'PY'
-import sys, os, json, warnings
+import sys, os, math, json, warnings
 warnings.filterwarnings("ignore")
 ml_dir = sys.argv[1]
 cfg = json.loads(sys.argv[2])
 sys.path.insert(0, ml_dir)
-import features, main
+import features, classifier
+
+def _sanitize_json_floats(obj):
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _sanitize_json_floats(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_json_floats(v) for v in obj]
+    return obj
 
 aud_feat, aud_wins = {}, []
 vib_feat, vib_wins = {}, []
 if cfg.get("audio_path") and os.path.exists(cfg["audio_path"]):
-    aud_feat = features.extract_audio_features(cfg["audio_path"])
-    aud_wins = aud_feat.pop("_windows", [])
+    aud_feat = features.extract_audio_features(cfg["audio_path"], include_windows=True)
+    aud_wins = aud_feat.pop("window_metrics", aud_feat.pop("_windows", []))
 if cfg.get("vib_path") and os.path.exists(cfg["vib_path"]):
     ext = os.path.splitext(cfg["vib_path"])[1].lstrip(".") or "csv"
-    vib_feat = features.extract_vibration_features(cfg["vib_path"], ext=ext, sample_rate_hz=cfg.get("sample_rate_hz"), rpm=cfg.get("rpm"))
-    vib_wins = vib_feat.pop("_windows", [])
+    vib_feat = features.extract_vibration_features(
+        cfg["vib_path"],
+        ext=ext,
+        sample_rate_hz=cfg.get("sample_rate_hz"),
+        rpm=cfg.get("rpm"),
+        include_windows=True,
+    )
+    vib_wins = vib_feat.pop("window_metrics", vib_feat.pop("_windows", []))
 
 win_list = []
 if aud_wins and vib_wins:
@@ -509,10 +531,12 @@ ctx = {
     "temperature_c": cfg.get("temperature_c"),
     "voltage_v": cfg.get("voltage_v"),
     "current_ma": cfg.get("current_ma"),
+    "vibration_source": "csv" if vib_feat else "skipped",
 }
 all_feat = {**aud_feat, **vib_feat, **ctx, "_window_features": win_list}
-res = main.classifier.predict(all_feat)
-out = main._sanitize_json_floats({
+clf = classifier.EngineClassifier()
+res = clf.predict(all_feat)
+out = _sanitize_json_floats({
     "diagnostic_id": cfg.get("diagnostic_id"),
     "vehicle_id": cfg.get("vehicle_id"),
     "condition": res["condition"],
@@ -532,9 +556,19 @@ print("__HAVEN_JSON__" + json.dumps(out))
 PY;
 
         try {
-            $process = new Process([$this->resolvePythonBinary(), '-c', $pyCode, $mlDir, $payload]);
+            $env = array_merge(getenv() ?: [], [
+                'LOKY_MAX_CPU_COUNT' => '1',
+                'JOBLIB_MULTIPROCESSING' => '0',
+                'OMP_NUM_THREADS' => '1',
+                'NUMBA_DISABLE_JIT' => '1',
+                'PYTHONIOENCODING' => 'utf-8',
+                'SYSTEMROOT' => getenv('SYSTEMROOT') ?: 'C:\\Windows',
+                'TEMP' => sys_get_temp_dir(),
+                'TMP' => sys_get_temp_dir(),
+            ]);
+            $process = new Process([$this->resolvePythonBinary(), '-c', $pyCode, $mlDir, $payload], $mlDir, $env);
             $process->setWorkingDirectory($mlDir);
-            $process->setTimeout(30);
+            $process->setTimeout(60);
             $process->run();
 
             if ($process->isSuccessful()) {
@@ -547,6 +581,8 @@ PY;
                         return $decoded;
                     }
                 }
+            } else {
+                Log::warning('Local Python ML process returned non-zero: '.$process->getErrorOutput());
             }
         } catch (\Throwable $e) {
             Log::warning('Local Python ML fallback failed: '.$e->getMessage());

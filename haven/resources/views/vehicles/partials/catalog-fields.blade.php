@@ -157,6 +157,7 @@
             showCustom(kind, false);
             input.value = select.value;
         }
+        window.dispatchEvent(new CustomEvent('haven:catalog-updated'));
     }
 
     const POPULAR_MAKES = [
@@ -165,6 +166,48 @@
         'Volkswagen', 'BMW', 'Mercedes-Benz', 'Audi', 'Lexus',
         'Geely', 'MG', 'Changan', 'Chery', 'BYD', 'Peugeot', 'Volvo',
     ];
+
+    const HAVEN_3D_CATALOG = @json(\App\Models\Vehicle::SKETCHFAB_CATALOG);
+    window.HAVEN_3D_CATALOG = HAVEN_3D_CATALOG;
+
+    window.resolveHaven3dUid = function (make, model) {
+        const mk = (make || '').trim().toLowerCase();
+        const md = (model || '').trim().toLowerCase();
+        if (!md) return null;
+        const normMd = md.replace(/[- ]+/g, '');
+
+        for (const [catMake, models] of Object.entries(HAVEN_3D_CATALOG)) {
+            if (!mk || catMake.toLowerCase() === mk || mk.includes(catMake.toLowerCase())) {
+                for (const [catModel, uid] of Object.entries(models)) {
+                    const cm = catModel.toLowerCase();
+                    const normCm = cm.replace(/[- ]+/g, '');
+                    if (md === cm || normMd === normCm || md.includes(cm) || (normCm && normMd.includes(normCm))) {
+                        return uid;
+                    }
+                }
+            }
+        }
+        for (const models of Object.values(HAVEN_3D_CATALOG)) {
+            for (const [catModel, uid] of Object.entries(models)) {
+                const cm = catModel.toLowerCase();
+                const normCm = cm.replace(/[- ]+/g, '');
+                if (normCm.length >= 3 && (md === cm || normMd === normCm || md.includes(cm))) {
+                    return uid;
+                }
+            }
+        }
+        return null;
+    };
+
+    function getLocal3dModelsForMake(make) {
+        const mk = (make || '').trim().toLowerCase();
+        for (const [catMake, models] of Object.entries(HAVEN_3D_CATALOG)) {
+            if (catMake.toLowerCase() === mk) {
+                return Object.keys(models);
+            }
+        }
+        return [];
+    }
 
     function fillSelect(select, items, placeholder, selected, isMakeSelect = false) {
         const current = (selected || '').trim();
@@ -181,7 +224,6 @@
             const popGroup = document.createElement('optgroup');
             popGroup.label = '⭐ Popular Passenger Vehicles';
 
-            const popLower = new Set(POPULAR_MAKES.map(m => m.toLowerCase()));
             const availablePop = [];
 
             POPULAR_MAKES.forEach(popName => {
@@ -192,7 +234,8 @@
             availablePop.forEach(name => {
                 const opt = document.createElement('option');
                 opt.value = name;
-                opt.textContent = name;
+                const count3d = getLocal3dModelsForMake(name).length;
+                opt.textContent = count3d > 0 ? `${name} (${count3d} 3D Models)` : name;
                 if (current && name.toLowerCase() === current.toLowerCase()) {
                     opt.selected = true;
                     matched = true;
@@ -201,20 +244,50 @@
             });
             select.appendChild(popGroup);
 
-                        // Note: Only popular makes are displayed as per project scope; the full A–Z list has been removed.
+            // Note: Only popular makes are displayed as per project scope; the full A–Z list has been removed.
             // The full A–Z list has been removed per project scope; only popular makes are displayed.
 
         } else {
-            items.forEach(name => {
+            const activeMake = (makeSelect && makeSelect.value !== CUSTOM) ? makeSelect.value : (makeInput ? makeInput.value : '');
+            const local3d = getLocal3dModelsForMake(activeMake);
+            const allNamesMap = new Map();
+            local3d.forEach(m => allNamesMap.set(m.toLowerCase(), m));
+            items.forEach(m => {
+                if (!allNamesMap.has(m.toLowerCase())) {
+                    allNamesMap.set(m.toLowerCase(), m);
+                }
+            });
+            const mergedItems = Array.from(allNamesMap.values());
+
+            const twinGroup = document.createElement('optgroup');
+            twinGroup.label = '★ 3D Digital Twin Ready';
+            const stdGroup = document.createElement('optgroup');
+            stdGroup.label = 'Standard Catalog (2D Blueprint)';
+
+            let hasTwin = false;
+            let hasStd = false;
+
+            mergedItems.forEach(name => {
                 const opt = document.createElement('option');
                 opt.value = name;
-                opt.textContent = name;
+                const uid = window.resolveHaven3dUid(activeMake, name);
+                if (uid) {
+                    opt.textContent = `★ ${name} — 3D Twin Ready`;
+                    twinGroup.appendChild(opt);
+                    hasTwin = true;
+                } else {
+                    opt.textContent = name;
+                    stdGroup.appendChild(opt);
+                    hasStd = true;
+                }
                 if (current && name.toLowerCase() === current.toLowerCase()) {
                     opt.selected = true;
                     matched = true;
                 }
-                select.appendChild(opt);
             });
+
+            if (hasTwin) select.appendChild(twinGroup);
+            if (hasStd) select.appendChild(stdGroup);
         }
 
         const other = document.createElement('option');
@@ -250,11 +323,14 @@
                 syncFromSelect('make');
             }
         } catch (e) {
-            fillSelect(makeSelect, [], 'Catalog unavailable — type manually', preferred);
-            makeSelect.value = CUSTOM;
+            const matched = fillSelect(makeSelect, POPULAR_MAKES, '— Select make —', preferred, true);
             makeSelect.disabled = false;
-            showCustom('make', true);
-            if (preferred) makeInput.value = preferred;
+            if (preferred && !matched) {
+                showCustom('make', true);
+                makeInput.value = preferred;
+            } else {
+                syncFromSelect('make');
+            }
         }
     }
 
@@ -265,6 +341,7 @@
             modelSelect.disabled = false;
             showCustom('model', true);
             if (preferred) modelInput.value = preferred;
+            window.dispatchEvent(new CustomEvent('haven:catalog-updated'));
             return;
         }
 
@@ -285,12 +362,25 @@
                 syncFromSelect('model');
             }
         } catch (e) {
-            fillSelect(modelSelect, [], 'Catalog unavailable — type manually', preferred);
-            modelSelect.value = CUSTOM;
-            modelSelect.disabled = false;
-            showCustom('model', true);
-            if (preferred) modelInput.value = preferred;
+            const fallbackModels = getLocal3dModelsForMake(make);
+            if (fallbackModels.length > 0) {
+                const matched = fillSelect(modelSelect, fallbackModels, '— Select model —', preferred);
+                modelSelect.disabled = false;
+                if (preferred && !matched) {
+                    showCustom('model', true);
+                    modelInput.value = preferred;
+                } else {
+                    syncFromSelect('model');
+                }
+            } else {
+                fillSelect(modelSelect, [], 'Catalog unavailable — type manually', preferred);
+                modelSelect.value = CUSTOM;
+                modelSelect.disabled = false;
+                showCustom('model', true);
+                if (preferred) modelInput.value = preferred;
+            }
         }
+        window.dispatchEvent(new CustomEvent('haven:catalog-updated'));
     }
 
     window.quickSelectMake = function (brand) {

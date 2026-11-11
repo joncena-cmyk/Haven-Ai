@@ -106,12 +106,12 @@
                     <span class="h-diagnosis-flow-label">Vehicle</span>
                 </div>
                 <div class="h-diagnosis-flow-line is-complete"></div>
-                <div class="h-diagnosis-flow-step is-active" data-flow-step="capture">
+                <div class="h-diagnosis-flow-step is-active" data-flow-step="capture" onclick="triggerAudioUpload()" style="cursor:pointer;" title="Click to upload or capture engine audio">
                     <span class="h-diagnosis-flow-number">2</span>
                     <span class="h-diagnosis-flow-label">Acoustics</span>
                 </div>
                 <div class="h-diagnosis-flow-line"></div>
-                <div class="h-diagnosis-flow-step" data-flow-step="vibration">
+                <div class="h-diagnosis-flow-step" data-flow-step="vibration" onclick="openSampleUploadModal()" style="cursor:pointer;" title="Click to import ADXL345 vibration CSV">
                     <span class="h-diagnosis-flow-number">3</span>
                     <span class="h-diagnosis-flow-label">Vibration</span>
                 </div>
@@ -137,15 +137,15 @@
 
             {{-- Dynamic Mini Step Ticker --}}
             <div class="h-diag-pipeline-ticker" id="diag-pipeline-ticker">
-                <div class="h-ticker-item active" id="tick-audio">
+                <div class="h-ticker-item active" id="tick-audio" onclick="triggerAudioUpload()" style="cursor:pointer;" title="Click to upload engine audio">
                     <span class="h-ticker-bullet"></span>
                     <span class="h-ticker-txt">ACOUSTIC INMP441 (ML)</span>
                 </div>
-                <div class="h-ticker-item" id="tick-vib">
+                <div class="h-ticker-item" id="tick-vib" onclick="openSampleUploadModal()" style="cursor:pointer;" title="Click to import ADXL345 vibration CSV">
                     <span class="h-ticker-bullet"></span>
                     <span class="h-ticker-txt">VIBRATION ADXL345 (ML)</span>
                 </div>
-                <div class="h-ticker-item active" id="tick-aux">
+                <div class="h-ticker-item active" id="tick-aux" onclick="openManualTelemetryDrawer()" style="cursor:pointer;" title="Click to enter contextual hardware telemetry">
                     <span class="h-ticker-bullet"></span>
                     <span class="h-ticker-txt">AUX DAQ: DS18B20 · HALL · INA219 (DB)</span>
                 </div>
@@ -249,78 +249,43 @@
                     {{-- Ground Shadow --}}
                     <ellipse cx="370" cy="330" rx="310" ry="32" fill="#0f172a" opacity="0.12" filter="url(#softShadow)"/>
 
-                    {{-- Main Car Silhouette (Isometric Perspective) --}}
-                    <g transform="translate(40, 20)">
-                        {{-- Lower Chassis Body --}}
-                        <path d="M 120 250 C 140 250, 180 270, 260 270 L 440 270 C 490 270, 520 250, 590 240 C 620 235, 640 220, 650 200 C 655 190, 650 175, 630 165 C 590 145, 520 120, 470 100 C 400 70, 310 68, 230 85 C 170 98, 120 125, 90 160 C 70 185, 75 210, 85 225 Z"
-                              fill="url(#bodySilverGrad)" stroke="#94a3b8" stroke-width="1.5"/>
+                    {{-- Main 2D Car Illustration --}}
+                    <image href="{{ asset('images/vehicles/2d-car.png') }}" x="20" y="25" width="700" height="325" preserveAspectRatio="xMidYMid meet"/>
 
+                    {{-- Holographic Engine Bay Overlay (Aligned to Front Hood of 2D Coupe) --}}
+                    <g transform="translate(335, 32)">
                         {{-- Active Engine Bay Holographic Zone (Hood Inspection Area) --}}
                         <path id="hood-holo-zone" class="h-diag-holo-hood"
-                              d="M 95 165 C 120 135, 170 110, 230 95 C 270 125, 290 170, 270 215 C 200 230, 130 220, 95 165 Z"
-                              fill="url(#hoodGlowGrad)" stroke="#0284c7" stroke-dasharray="3 3" stroke-width="1.5"/>
+                              d="M 110 120 C 165 122, 235 135, 280 162 C 282 185, 265 205, 235 208 L 120 208 C 108 180, 106 148, 110 120 Z"
+                              fill="url(#hoodGlowGrad)" stroke="#38bdf8" stroke-dasharray="4 3" stroke-width="1.6"/>
 
-                        {{-- ── 3D Vehicle Component Overlays (Workbench Diagnostic Inspection) ── --}}
                         {{-- 1. Valvetrain & Camshaft Zone --}}
                         <g id="wb-component-valvetrain" class="h-diag-fault-component" onclick="focusPin('audio')" style="cursor:pointer;" title="Valvetrain Camshaft & Lash Tappet Inspection Zone">
                             <path class="h-diag-component-path"
-                                  d="M 148 132 C 172 118, 208 110, 238 114 L 244 134 C 212 130, 175 138, 146 146 Z"
-                                  fill="rgba(56, 189, 248, 0.18)"
+                                  d="M 135 132 L 235 142 L 232 156 L 132 146 Z"
+                                  fill="rgba(56, 189, 248, 0.22)"
                                   stroke="#38bdf8"
                                   stroke-width="1.5"/>
-                            <circle cx="168" cy="132" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap"/>
-                            <circle cx="188" cy="129" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap delay-1"/>
-                            <circle cx="208" cy="126" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap delay-2"/>
-                            <circle cx="228" cy="124" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap delay-3"/>
+                            <circle cx="150" cy="140" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap"/>
+                            <circle cx="172" cy="142" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap delay-1"/>
+                            <circle cx="194" cy="144" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap delay-2"/>
+                            <circle cx="216" cy="146" r="3.5" fill="#38bdf8" class="h-diag-valvetrain-tap delay-3"/>
                         </g>
 
                         {{-- 2. Combustion Chamber & Cylinders Zone --}}
                         <g id="wb-component-combustion" class="h-diag-fault-component" style="cursor:pointer;" title="Engine Block & Cylinder Combustion Chambers">
-                            <rect x="156" y="148" width="16" height="34" rx="2" fill="rgba(148, 163, 184, 0.14)" stroke="#64748b" stroke-width="1"/>
-                            <rect x="178" y="146" width="16" height="34" rx="2" fill="rgba(148, 163, 184, 0.14)" stroke="#64748b" stroke-width="1"/>
-                            <rect x="200" y="144" width="16" height="34" rx="2" fill="rgba(148, 163, 184, 0.14)" stroke="#64748b" stroke-width="1"/>
-                            <rect x="222" y="142" width="16" height="34" rx="2" fill="rgba(148, 163, 184, 0.14)" stroke="#64748b" stroke-width="1"/>
+                            <rect x="140" y="156" width="16" height="30" rx="2" fill="rgba(15, 23, 42, 0.45)" stroke="#38bdf8" stroke-width="1"/>
+                            <rect x="162" y="158" width="16" height="30" rx="2" fill="rgba(15, 23, 42, 0.45)" stroke="#38bdf8" stroke-width="1"/>
+                            <rect x="184" y="160" width="16" height="30" rx="2" fill="rgba(15, 23, 42, 0.45)" stroke="#38bdf8" stroke-width="1"/>
+                            <rect x="206" y="162" width="16" height="30" rx="2" fill="rgba(15, 23, 42, 0.45)" stroke="#38bdf8" stroke-width="1"/>
                         </g>
 
                         {{-- 3. Powertrain Mounts & Subframe Bushing Zone --}}
                         <g id="wb-component-mounts" class="h-diag-fault-component" onclick="focusPin('vibration')" style="cursor:pointer;" title="Subframe Engine Mounts & Chassis Dampener Zone">
-                            <path d="M 134 208 Q 192 222 254 204" fill="none" stroke="#64748b" stroke-width="1.5"/>
-                            <ellipse cx="140" cy="208" rx="10" ry="7" fill="rgba(249, 115, 22, 0.2)" stroke="#f97316" stroke-width="1.8"/>
-                            <ellipse cx="250" cy="204" rx="10" ry="7" fill="rgba(249, 115, 22, 0.2)" stroke="#f97316" stroke-width="1.8"/>
+                            <path d="M 128 198 Q 184 208 242 198" fill="none" stroke="#f97316" stroke-width="1.5"/>
+                            <ellipse cx="134" cy="198" rx="9" ry="6" fill="rgba(249, 115, 22, 0.35)" stroke="#f97316" stroke-width="1.8"/>
+                            <ellipse cx="236" cy="198" rx="9" ry="6" fill="rgba(249, 115, 22, 0.35)" stroke="#f97316" stroke-width="1.8"/>
                         </g>
-
-                        {{-- Aerodynamic Windshield & Greenhouse Glass --}}
-                        <path d="M 235 90 C 310 75, 395 76, 465 102 C 430 140, 390 155, 275 145 C 255 125, 245 105, 235 90 Z"
-                              fill="url(#glassGrad)" stroke="#475569" stroke-width="1.2"/>
-                        <path d="M 285 145 C 395 155, 435 140, 470 105 L 530 125 C 570 145, 595 165, 605 175 L 480 185 Z"
-                              fill="#0f172a" opacity="0.85"/>
-
-                        {{-- Front Wheel (Alloy Rim) --}}
-                        <g transform="translate(160, 250)">
-                            <ellipse cx="0" cy="0" rx="42" ry="48" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
-                            <ellipse cx="0" cy="0" rx="30" ry="34" fill="#0f172a"/>
-                            <circle cx="0" cy="0" r="14" fill="#94a3b8"/>
-                            <line x1="-22" y1="0" x2="22" y2="0" stroke="#cbd5e1" stroke-width="3"/>
-                            <line x1="0" y1="-26" x2="0" y2="26" stroke="#cbd5e1" stroke-width="3"/>
-                        </g>
-
-                        {{-- Rear Wheel (Alloy Rim with Telemetry Brake Heat Glow) --}}
-                        <g transform="translate(510, 230)">
-                            <ellipse cx="0" cy="0" rx="46" ry="52" fill="#1e293b" stroke="#f97316" stroke-width="2.5"/>
-                            <circle cx="0" cy="0" r="40" fill="url(#wheelGlow)"/>
-                            <ellipse cx="0" cy="0" rx="32" ry="36" fill="#0f172a"/>
-                            <circle cx="0" cy="0" r="15" fill="#f97316"/>
-                            <line x1="-24" y1="0" x2="24" y2="0" stroke="#f97316" stroke-width="3"/>
-                            <line x1="0" y1="-28" x2="0" y2="28" stroke="#f97316" stroke-width="3"/>
-                        </g>
-
-                        {{-- Distinctive Side Crease & Aerodynamic Panels --}}
-                        <path d="M 160 210 Q 320 220 530 190" stroke="#94a3b8" stroke-width="2" fill="none"/>
-                        <path d="M 190 230 Q 340 240 480 235" stroke="#cbd5e1" stroke-width="1.5" fill="none"/>
-
-                        {{-- Headlight & Tail Reflector Accents --}}
-                        <polygon points="85,190 110,180 100,205 82,205" fill="#38bdf8" opacity="0.9"/>
-                        <polygon points="635,175 648,185 640,195 628,185" fill="#ef4444" opacity="0.85"/>
                     </g>
                 </svg>
 
@@ -328,7 +293,7 @@
                      INTERACTIVE TELEMETRY PINS OVERLAY
                      ═══════════════════════════════════════════════════════════════ --}}
                 {{-- Pin 1: INMP441 Acoustic Mic on Hood --}}
-                <div class="h-diag-pin hood-pin active" style="top:32%; left:22%;" onclick="focusPin('audio')" title="INMP441 Acoustic MEMS Sensor (Click to focus recording)">
+                <div class="h-diag-pin hood-pin active" style="top:34%; left:73%;" onclick="focusPin('audio')" title="INMP441 Acoustic MEMS Sensor (Click to focus recording)">
                     <div class="h-diag-pin-beacon"></div>
                     <div class="h-diag-pin-core blue">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
@@ -340,7 +305,7 @@
                 </div>
 
                 {{-- Pin 2: ADXL345 / MPU6050 Vibration Sensor on Powertrain --}}
-                <div class="h-diag-pin engine-pin" style="top:52%; left:36%;" onclick="focusPin('vibration')" title="ADXL345 Vibration Accelerometer (Click to view vibration)">
+                <div class="h-diag-pin engine-pin" style="top:54%; left:66%;" onclick="focusPin('vibration')" title="ADXL345 Vibration Accelerometer (Click to view vibration)">
                     <div class="h-diag-pin-beacon orange"></div>
                     <div class="h-diag-pin-core orange">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -352,7 +317,7 @@
                 </div>
 
                 {{-- Pin 3: DS18B20 Coolant / Block Temperature Sensor (Contextual DB Recorded) --}}
-                <div class="h-diag-pin temp-pin" style="top:38%; left:48%;" onclick="focusPin('temp')" title="DS18B20 Thermal Probe (Click to adjust contextual telemetry)">
+                <div class="h-diag-pin temp-pin" style="top:38%; left:54%;" onclick="focusPin('temp')" title="DS18B20 Thermal Probe (Click to adjust contextual telemetry)">
                     <div class="h-diag-pin-core orange">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
                     </div>
@@ -363,7 +328,7 @@
                 </div>
 
                 {{-- Pin 4: INA219 Power & Battery Bus (Contextual DB Recorded) --}}
-                <div class="h-diag-pin battery-pin" style="top:62%; left:62%;" onclick="focusPin('battery')" title="INA219 Voltage & Current Sensor">
+                <div class="h-diag-pin battery-pin" style="top:62%; left:46%;" onclick="focusPin('battery')" title="INA219 Voltage & Current Sensor">
                     <div class="h-diag-pin-core dark">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="10" x2="23" y2="14"/></svg>
                     </div>
@@ -374,7 +339,7 @@
                 </div>
 
                 {{-- Pin 5: Hall Tachometer RPM (Contextual DB Recorded) --}}
-                <div class="h-diag-pin rpm-pin" style="top:44%; left:78%;" onclick="focusPin('rpm')" title="Hall RPM Tachometer Sensor">
+                <div class="h-diag-pin rpm-pin" style="top:46%; left:28%;" onclick="focusPin('rpm')" title="Hall RPM Tachometer Sensor">
                     <div class="h-diag-pin-core green">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg>
                     </div>
@@ -425,7 +390,7 @@
                 </div>
 
                 {{-- Probe 2: Vibration ADXL345 --}}
-                <div class="h-diag-probe-item">
+                <div class="h-diag-probe-item" onclick="openSampleUploadModal()" style="cursor:pointer;" title="Click to import ADXL345 vibration CSV">
                     <div class="h-diag-probe-pillar">
                         <div class="h-diag-probe-bar blue" style="height: 54%;"></div>
                         <div class="h-diag-probe-cap"></div>
@@ -691,9 +656,9 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
                     Skip Vibration (Audio Only)
                 </button>
-                <button type="button" id="btn-open-file-modal" class="h-diag-btn-secondary" onclick="openSampleUploadModal()">
+                <button type="button" id="btn-open-file-modal" class="h-diag-btn-secondary" onclick="openSampleUploadModal()" style="display:inline-flex;align-items:center;gap:0.45rem;position:relative;z-index:10;cursor:pointer;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                    Import Vibration CSV
+                    <span>Import Vibration CSV</span>
                 </button>
                 <button type="button" id="btn-sample-telemetry" class="h-diag-btn-secondary" onclick="captureLiveTelemetrySnapshot(true)" title="Snapshot real-time Coolant Temperature, Engine RPM, and Battery Voltage from vehicle" style="display:inline-flex;align-items:center;gap:0.35rem;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -2720,35 +2685,42 @@
 /* ── Modals & Drawers ── */
 .h-diag-modal-backdrop {
     position: fixed !important;
+    inset: 0 !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    background: rgba(15, 23, 42, 0.7) !important;
+    background: rgba(7, 11, 19, 0.78) !important;
     backdrop-filter: blur(8px) !important;
-    z-index: 99999 !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    z-index: 2147483647 !important;
     display: none;
     align-items: center !important;
     justify-content: center !important;
-    padding: 1.5rem !important;
+    padding: 1.25rem !important;
     margin: 0 !important;
-    overflow-y: auto !important;
+    box-sizing: border-box !important;
 }
 .h-diag-modal-backdrop.is-open {
     display: flex !important;
 }
 .h-diag-modal-box {
-    background: #ffffff;
+    background: var(--ds-modal-bg, #0d111a);
+    border: 1px solid var(--ds-border, #1e293b);
+    color: var(--ds-text, #f8fafc);
     border-radius: 18px;
-    max-width: 500px;
-    width: 100%;
+    max-width: 480px;
+    width: calc(100vw - 2.5rem);
     padding: 1.5rem;
-    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
-    margin: auto !important;
-    position: relative;
-    max-height: 90vh;
+    box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(56, 189, 248, 0.18);
+    margin: 0 auto !important;
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    max-height: 88vh;
     overflow-y: auto;
 }
 .h-diag-modal-header {
@@ -3347,10 +3319,18 @@
     window.focusPin = function(type) {
         if (type === 'audio') {
             document.getElementById('recording-workbench').scrollIntoView({ behavior: 'smooth' });
-            startAudioRecording();
+            if (window.isEsp32Online) {
+                startAudioRecording();
+            } else {
+                triggerAudioUpload();
+            }
         } else if (type === 'vibration') {
-            document.getElementById('recording-workbench').scrollIntoView({ behavior: 'smooth' });
-            startVibrationRecording();
+            if (window.isEsp32Online) {
+                document.getElementById('recording-workbench').scrollIntoView({ behavior: 'smooth' });
+                startVibrationRecording();
+            } else {
+                openSampleUploadModal();
+            }
         } else if (type === 'battery' || type === 'rpm' || type === 'temp') {
             openManualTelemetryDrawer();
         }
@@ -3401,7 +3381,15 @@
         }
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                    channelCount: 1
+                },
+                video: false
+            });
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const source = audioCtx.createMediaStreamSource(stream);
             analyser = audioCtx.createAnalyser();
@@ -3821,12 +3809,19 @@
                 if (!hasHardwareVib) {
                     btnStartVib.classList.add('h-diag-btn-gated');
                     btnStartVib.innerHTML = '<span style="font-size:0.8rem;margin-right:2px;">🔒</span> Live Vibration (ESP32 Offline)';
-                    btnStartVib.title = 'ESP32 DAQ is offline. Import a vibration CSV or skip vibration for audio-only analysis.';
+                    btnStartVib.title = 'ESP32 DAQ is offline. Click to import a vibration CSV file.';
                 } else {
                     btnStartVib.classList.remove('h-diag-btn-gated');
                     btnStartVib.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Start Vibration Capture';
                     btnStartVib.title = 'Start live vibration capture from ESP32 ADXL345 node';
                 }
+            }
+            const importVibBtn = document.getElementById('btn-open-file-modal');
+            if (importVibBtn) {
+                importVibBtn.style.display = 'inline-flex';
+                importVibBtn.style.background = '#0284c7';
+                importVibBtn.style.color = '#ffffff';
+                importVibBtn.style.borderColor = '#38bdf8';
             }
             const skipVibBtn = document.getElementById('btn-skip-vib');
             if (skipVibBtn) skipVibBtn.style.display = 'inline-flex';
@@ -3895,7 +3890,7 @@
 
     window.startVibrationRecording = function() {
         if (!window.isEsp32Online) {
-            alert('⚠️ ESP32 DAQ Hardware Node Offline\n\nLive vibration capture requires the physical ESP32 accelerometer node streaming over Wi-Fi.\n\nPlease import an ADXL345 vibration CSV file or click "Skip Vibration" for audio-only analysis.');
+            openSampleUploadModal();
             return;
         }
 
@@ -4213,12 +4208,28 @@
         if (formTargetRpm) formTargetRpm.value = targetRpm;
     };
 
-    // 7. Modals & Sample Uploads
+    // 7. Modals & Sample Uploads — portal directly to document.body so they always center in the viewport
+    function ensureModalInBody(el) {
+        if (el && el.parentElement !== document.body) {
+            document.body.appendChild(el);
+        }
+    }
+    ['modal-sample-upload', 'drawer-manual-telemetry'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) ensureModalInBody(el);
+    });
+
     window.openSampleUploadModal = () => {
         const el = document.getElementById('modal-sample-upload');
         if (el) {
+            ensureModalInBody(el);
             el.classList.add('is-open');
             el.style.setProperty('display', 'flex', 'important');
+            el.style.setProperty('position', 'fixed', 'important');
+            el.style.setProperty('inset', '0', 'important');
+            el.style.setProperty('align-items', 'center', 'important');
+            el.style.setProperty('justify-content', 'center', 'important');
+            el.style.setProperty('z-index', '2147483647', 'important');
         }
     };
     window.closeSampleUploadModal = () => {
@@ -4231,8 +4242,14 @@
     window.openManualTelemetryDrawer = () => {
         const el = document.getElementById('drawer-manual-telemetry');
         if (el) {
+            ensureModalInBody(el);
             el.classList.add('is-open');
             el.style.setProperty('display', 'flex', 'important');
+            el.style.setProperty('position', 'fixed', 'important');
+            el.style.setProperty('inset', '0', 'important');
+            el.style.setProperty('align-items', 'center', 'important');
+            el.style.setProperty('justify-content', 'center', 'important');
+            el.style.setProperty('z-index', '2147483647', 'important');
         }
     };
     window.closeManualTelemetryDrawer = () => {
@@ -4770,6 +4787,7 @@
         }
     }
 
+    let daqOfflineStreak = 0;
     function checkLiveDaq() {
         const sel = document.getElementById('vehicle-switcher');
         const vid = (sel && sel.value) ? sel.value : '{{ $selectedVehicle?->id ?? '' }}';
@@ -4777,6 +4795,12 @@
         fetch('/api/v1/telemetry/latest?vehicle_id=' + encodeURIComponent(vid), { headers: { 'Accept': 'application/json' } })
             .then(res => res.json())
             .then(data => {
+                // Debounce: stay ONLINE until 4 consecutive offline polls
+                if (data.online) {
+                    daqOfflineStreak = 0;
+                } else if (window.isEsp32Online && ++daqOfflineStreak < 4) {
+                    return;
+                }
                 if (data.online) {
                     updateEsp32ConnectionState(true, data);
 
@@ -4859,7 +4883,8 @@
                 }
             })
             .catch(() => {
-                updateEsp32ConnectionState(false, null);
+                // Network blip: keep current state; only drop to offline after repeated failures
+                if (++daqOfflineStreak >= 4) updateEsp32ConnectionState(false, null);
             });
     }
 

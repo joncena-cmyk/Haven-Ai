@@ -163,12 +163,12 @@ def build_pipeline(random_state: int = 42) -> Pipeline:
             (
                 "rf",
                 RandomForestClassifier(
-                    n_estimators=120,
-                    max_depth=12,
-                    min_samples_split=3,
-                    class_weight="balanced",
+                    n_estimators=180,
+                    max_depth=16,
+                    min_samples_split=2,
+                    class_weight="balanced_subsample",
                     random_state=random_state,
-                    n_jobs=-1,
+                    n_jobs=1,
                 ),
             ),
         ]
@@ -712,7 +712,71 @@ def train_and_export(
     X_audio = X[:, audio_idx]
     valid_aud_mask = ~np.all(np.isnan(X_audio), axis=1)
     audio_pipeline = None
-    if int(np.count_nonzero(valid_aud_mask)) >= 4 and len(set(y[valid_aud_mask])) >= 2:
+    audio_feature_order = list(AUDIO_FEATURE_COLS)
+
+    # When exporting the primary production model, train audio_pipeline on the curated
+    # PetrolClean dataset (34 full spectral/cepstral window metrics) + verified live captures
+    petrol_dir = _REPO_ROOT / "PetrolClean"
+    if os.path.abspath(model_path) == os.path.abspath(MODEL_PATH) and petrol_dir.is_dir():
+        try:
+            from features import extract_audio_features
+            folder_map = {
+                "1_Valve_Clearance_Tappet_Tick": "valve_clearance",
+                "2_Combustion_Misfire_Uneven_Idle": "misfire",
+                "3_Normal_Smooth_Combustion": "normal",
+                "4_Ambient_Background_Noise": "ambient_noise",
+            }
+            X_aud_34: List[List[float]] = []
+            y_aud_34: List[str] = []
+            cols_34: Optional[List[str]] = None
+
+            for folder_name, cond_label in folder_map.items():
+                fdir = petrol_dir / folder_name
+                if not fdir.is_dir():
+                    continue
+                for wav_path in sorted(fdir.glob("*.wav")):
+                    af = extract_audio_features(str(wav_path), include_windows=True)
+                    wins = af.pop("window_metrics", [])
+                    if cols_34 is None and wins:
+                        cols_34 = [k for k in wins[0].keys()]
+                    if cols_34:
+                        X_aud_34.append([float(af[c]) for c in cols_34])
+                        y_aud_34.append(cond_label)
+                        for wd in wins:
+                            X_aud_34.append([float(wd[c]) for c in cols_34])
+                            y_aud_34.append(cond_label)
+
+            # Also include verified live 48kHz captures from storage if present
+            live_verified = [
+                ("haven/storage/app/private/diagnostics/1/audio/Jql0Q9kFbzI4wB3NaSaYiS3d0rietRMEliHsdJMd.wav", "valve_clearance"),
+                ("haven/storage/app/private/diagnostics/1/audio/GVRMgMwTmit0IysUW9x60GvixtWuTTqaQ45LLMWm.wav", "valve_clearance"),
+                ("haven/storage/app/private/diagnostics/1/audio/Lzq6KLFnrAo5KrUQSod20665B7uwSdvERgOUs4Vi.wav", "valve_clearance"),
+                ("haven/storage/app/private/diagnostics/1/audio/ZdaZYmbFQgKVUOUzdpA6GezxiUqXpvIRhQSuiDWG.wav", "misfire"),
+                ("haven/storage/app/private/diagnostics/3/audio/QKho6cEl4OkEHkma9kgOtbciOahXX3RVGPFqhUE7.wav", "normal"),
+                ("haven/storage/app/private/diagnostics/1/audio/HnyB7QgtRQeuduYoB4boPoBz31QVI4UaiQkjDG2i.wav", "normal"),
+            ]
+            for rel_wav, cond_label in live_verified:
+                abs_wav = _REPO_ROOT / rel_wav
+                if abs_wav.is_file() and cols_34:
+                    af = extract_audio_features(str(abs_wav), include_windows=True)
+                    wins = af.pop("window_metrics", [])
+                    for _ in range(3):  # weight verified live microphone captures
+                        X_aud_34.append([float(af[c]) for c in cols_34])
+                        y_aud_34.append(cond_label)
+                        for wd in wins:
+                            X_aud_34.append([float(wd[c]) for c in cols_34])
+                            y_aud_34.append(cond_label)
+
+            if cols_34 and len(X_aud_34) >= 10:
+                audio_feature_order = cols_34
+                audio_pipeline = build_pipeline(random_state=42)
+                audio_pipeline.fit(np.asarray(X_aud_34, dtype=np.float64), np.asarray(y_aud_34, dtype=object))
+                real_count = max(real_count, len(X_aud_34))
+                logger.info(f"Trained audio_model on {len(X_aud_34)} real PetrolClean + live windows ({len(cols_34)} features).")
+        except Exception as exc:
+            logger.warning(f"PetrolClean audio model enrichment skipped: {exc}")
+
+    if audio_pipeline is None and int(np.count_nonzero(valid_aud_mask)) >= 4 and len(set(y[valid_aud_mask])) >= 2:
         audio_pipeline = build_pipeline(random_state=42)
         audio_pipeline.fit(X_audio[valid_aud_mask], y[valid_aud_mask])
 
@@ -786,7 +850,7 @@ def train_and_export(
         "meta": {
             "evaluation_scheme": eval_scheme,
             "feature_order": FEATURE_COLS,
-            "audio_feature_order": AUDIO_FEATURE_COLS,
+            "audio_feature_order": audio_feature_order,
             "vibration_feature_order": VIBRATION_FEATURE_COLS,
             "context_metadata_excluded": CONTEXT_METADATA_COLS,
             "classes": CLASSES,

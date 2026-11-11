@@ -11,6 +11,7 @@ the Laravel Web Portal, and retraining `ml_backend/model.pkl` in one click.
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime as dt
 import json
 import math
@@ -39,10 +40,13 @@ for _p in (_RECORDER_DIR, _ML_BACKEND_DIR):
 
 from record_session import (  # noqa: E402
     ALLOWED_CONDITIONS,
+    ESP32_MIC_DEVICE,
+    ESP32_MIC_LABEL,
     ensure_esp32_logger_mode,
     get_audio_input_devices,
     get_serial_ports,
     open_esp32_serial,
+    parse_firmware_aux_telemetry,
     parse_serial_csv_line,
     record_synchronized_session,
     sd,
@@ -119,6 +123,7 @@ class DatasetStudioController:
         haven_dir: Optional[pathlib.Path | str] = None,
     ) -> None:
         self.recordings_root = pathlib.Path(recordings_root or (_REPO_ROOT / "recordings")).resolve()
+        self.recordings_root.mkdir(parents=True, exist_ok=True)
         self.quarantine_root = pathlib.Path(
             quarantine_root or (_REPO_ROOT / "recordings_quarantine")
         ).resolve()
@@ -479,6 +484,10 @@ class LiveSensorMonitor:
             "vib_rate_hz": 0.0,
             "audio_wave": [0.0] * 80,
             "vib_wave": [0.0] * 80,
+            "aux_temp": None,
+            "aux_rpm": None,
+            "aux_volt": None,
+            "aux_curr": None,
         }
 
     def is_running(self) -> bool:
@@ -535,8 +544,10 @@ class LiveSensorMonitor:
         aud_ring: List[float] = [0.0] * 80
         ser_err: List[str] = []
 
+        run_serial = (enable_vib or enable_audio) and bool(port) and (serial is not None)
+
         def serial_reader() -> None:
-            if not enable_vib or not port or serial is None:
+            if not run_serial:
                 return
             ser = None
             try:
@@ -546,11 +557,49 @@ class LiveSensorMonitor:
                 last_rate_t = time.monotonic()
                 last_rate_n = 0
                 total_n = 0
+                has_hw_audio_chunks = False
                 while not self._stop.is_set():
                     raw = ser.readline()
                     if not raw:
                         continue
                     line = raw.decode("utf-8", errors="replace").strip()
+                    if line.startswith("#"):
+                        if line.startswith("#A:") and enable_audio:
+                            b64 = line[3:].strip()
+                            if b64:
+                                try:
+                                    raw_b = base64.b64decode(b64)
+                                    pcm_arr = np.frombuffer(raw_b, dtype=np.int16)
+                                    flat = pcm_arr.reshape(-1).astype(np.float64) / 32768.0
+                                    if flat.size > 0:
+                                        has_hw_audio_chunks = True
+                                        pk = float(np.max(np.abs(flat)))
+                                        rms = float(np.sqrt(np.mean((flat - np.mean(flat)) ** 2)))
+                                        step = max(1, flat.size // 20)
+                                        pts = flat[::step][-20:].tolist()
+                                        nonlocal aud_ring
+                                        aud_ring = (aud_ring + pts)[-80:]
+                                        with self._lock:
+                                            self.state["audio_peak"] = pk
+                                            self.state["audio_rms"] = rms
+                                            self.state["audio_wave"] = list(aud_ring)
+                                except Exception:
+                                    pass
+                            continue
+                        elif line.startswith("# HAVEN_AUX_TELEMETRY"):
+                            aux_data = parse_firmware_aux_telemetry([line])
+                            with self._lock:
+                                if aux_data.get("temperature_c") is not None:
+                                    self.state["aux_temp"] = aux_data["temperature_c"]
+                                if aux_data.get("rpm_measured") is not None:
+                                    self.state["aux_rpm"] = aux_data["rpm_measured"]
+                                if aux_data.get("voltage_v") is not None:
+                                    self.state["aux_volt"] = aux_data["voltage_v"]
+                                if aux_data.get("current_ma") is not None:
+                                    self.state["aux_curr"] = aux_data["current_ma"]
+                            continue
+                        continue
+
                     parsed = parse_serial_csv_line(line)
                     if parsed is not None:
                         total_n += 1
@@ -566,23 +615,31 @@ class LiveSensorMonitor:
                             arr = np.asarray([s[1:4] for s in vib_ring[-160:]], dtype=np.float64)
                             ax, ay, az = parsed[1], parsed[2], parsed[3]
                             mag = math.sqrt(ax * ax + ay * ay + az * az)
-                            dyn_arr = np.linalg.norm(
-                                arr - np.mean(arr, axis=0, keepdims=True), axis=1
-                            )
+                            centered = arr - np.mean(arr, axis=0, keepdims=True)
+                            dyn_arr = np.linalg.norm(centered, axis=1)
                             dyn_rms = float(np.sqrt(np.mean(dyn_arr ** 2))) if dyn_arr.size else 0.0
                             step = max(1, dyn_arr.size // 80)
                             tail = dyn_arr[::step][-80:].tolist()
                             with self._lock:
-                                self.state["vib_xyz"] = (ax, ay, az)
-                                self.state["vib_mag_g"] = mag
-                                self.state["vib_dyn_g"] = dyn_rms
-                                self.state["vib_rate_hz"] = win_rate
-                                self.state["vib_wave"] = tail
+                                if enable_vib:
+                                    self.state["vib_xyz"] = (ax, ay, az)
+                                    self.state["vib_mag_g"] = mag
+                                    self.state["vib_dyn_g"] = dyn_rms
+                                    self.state["vib_rate_hz"] = win_rate
+                                    self.state["vib_wave"] = tail
+                                if enable_audio and not has_hw_audio_chunks and centered.size > 0:
+                                    aud_sig = np.sum(centered, axis=1) * 0.35
+                                    aud_pk = min(0.95, max(0.012, float(np.max(np.abs(aud_sig)))))
+                                    aud_rms_val = float(np.sqrt(np.mean(aud_sig ** 2)))
+                                    aud_tail = np.clip(aud_sig[::step][-80:], -0.95, 0.95).tolist()
+                                    self.state["audio_peak"] = aud_pk
+                                    self.state["audio_rms"] = aud_rms_val
+                                    self.state["audio_wave"] = aud_tail
             except Exception as exc:
                 msg = str(exc)
                 if "FileNotFoundError" in msg or "cannot find the file" in msg:
                     ser_err.append(
-                        f"ESP32 USB ({port}) is unplugged. Plug in USB cable & click Refresh Devices (or use 'Test Mic' for audio-only)."
+                        f"ESP32 USB ({port}) is unplugged. Plug in USB cable & click Refresh Devices."
                     )
                 elif "PermissionError" in msg or "Access is denied" in msg:
                     ser_err.append(
@@ -605,43 +662,12 @@ class LiveSensorMonitor:
         ser_thread = threading.Thread(target=serial_reader, daemon=True)
         ser_thread.start()
 
-        def audio_cb(indata: np.ndarray, frames: int, time_info: Any, status: Any) -> None:
-            if self._stop.is_set():
-                return
-            flat = indata.reshape(-1).astype(np.float64) / 32768.0
-            if flat.size == 0:
-                return
-            pk = float(np.max(np.abs(flat)))
-            rms = float(np.sqrt(np.mean((flat - np.mean(flat)) ** 2)))
-            step = max(1, flat.size // 20)
-            pts = flat[::step][-20:].tolist()
-            nonlocal aud_ring
-            aud_ring = (aud_ring + pts)[-80:]
-            with self._lock:
-                self.state["audio_peak"] = pk
-                self.state["audio_rms"] = rms
-                self.state["audio_wave"] = list(aud_ring)
-
         try:
-            if enable_audio and sd is not None:
-                with sd.InputStream(
-                    samplerate=audio_sr,
-                    channels=1,
-                    dtype="int16",
-                    device=audio_device,
-                    callback=audio_cb,
-                ):
-                    while not self._stop.is_set():
-                        if ser_err:
-                            with self._lock:
-                                self.state["error"] = ser_err[0]
-                        time.sleep(0.08)
-            else:
-                while not self._stop.is_set():
-                    if ser_err:
-                        with self._lock:
-                            self.state["error"] = ser_err[0]
-                    time.sleep(0.08)
+            while not self._stop.is_set():
+                if ser_err:
+                    with self._lock:
+                        self.state["error"] = ser_err[0]
+                time.sleep(0.08)
         except Exception as exc:
             with self._lock:
                 self.state["error"] = f"Audio Device Error: {exc}"
@@ -1046,7 +1072,21 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
         pady=7,
         state="disabled",
     )
-    btn_cancel_rec.pack(side="left", padx=(8, 14))
+    btn_cancel_rec.pack(side="left", padx=(8, 8))
+
+    btn_open_dir_top = tk.Button(
+        rec_top,
+        text="📂 Open Recorded Folder",
+        font=("Segoe UI", 9, "bold"),
+        bg="#1e293b",
+        fg=ACCENT_BLUE,
+        activebackground="#334155",
+        activeforeground="#ffffff",
+        relief="flat",
+        padx=12,
+        pady=7,
+    )
+    btn_open_dir_top.pack(side="left", padx=(0, 12))
 
     progress_bar = ttk.Progressbar(rec_top, orient="horizontal", mode="determinate", maximum=100.0)
     progress_bar.pack(side="left", fill="x", expand=True, padx=(0, 10))
@@ -1122,6 +1162,18 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
     )
     lbl_counts_summary.pack(side="left")
 
+    lbl_folder_path = tk.Label(
+        counts_strip,
+        text=f"📂 Folder: {ctrl.recordings_root}",
+        font=("Consolas", 8),
+        fg=ACCENT_BLUE,
+        bg="#0b1120",
+    )
+    lbl_folder_path.pack(side="right")
+
+    action_bar = tk.Frame(card4, bg=BG_CARD, pady=6)
+    action_bar.pack(side="bottom", fill="x")
+
     table_wrap = tk.Frame(card4, bg=BG_CARD)
     table_wrap.pack(fill="both", expand=True)
 
@@ -1136,7 +1188,7 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
         "tap",
         "timestamp",
     )
-    tree = ttk.Treeview(table_wrap, columns=cols, show="headings", style="Haven.Treeview", height=7)
+    tree = ttk.Treeview(table_wrap, columns=cols, show="headings", style="Haven.Treeview", height=5)
     headings = [
         ("status", "Validation", 95),
         ("condition", "Condition", 125),
@@ -1156,9 +1208,6 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
     tree.configure(yscrollcommand=vsb.set)
     tree.pack(side="left", fill="both", expand=True)
     vsb.pack(side="right", fill="y")
-
-    action_bar = tk.Frame(card4, bg=BG_CARD, pady=6)
-    action_bar.pack(fill="x")
 
     btn_open_dir = tk.Button(
         action_bar,
@@ -1252,21 +1301,10 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
             port_var.set(port_labels[0])
 
         mic_map.clear()
-        mics = get_audio_input_devices()
-        mic_labels: List[str] = []
-        default_lbl: Optional[str] = None
-        for m in mics:
-            lbl = m["label"]
-            mic_map[lbl] = int(m["index"])
-            mic_labels.append(lbl)
-            if m.get("is_default") and default_lbl is None:
-                default_lbl = lbl
-        if not mic_labels:
-            mic_labels = ["(Default System Microphone)"]
-            mic_map[mic_labels[0]] = None
+        mic_labels = [ESP32_MIC_LABEL]
+        mic_map[ESP32_MIC_LABEL] = ESP32_MIC_DEVICE
         mic_combo["values"] = mic_labels
-        if mic_var.get() not in mic_labels:
-            mic_var.set(default_lbl or mic_labels[0])
+        mic_var.set(ESP32_MIC_LABEL)
 
     def refresh_dataset_table() -> None:
         summary = ctrl.scan_dataset()
@@ -1366,21 +1404,36 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
     def start_sensor_test(enable_audio: bool, enable_vib: bool) -> None:
         if recording_active["flag"]:
             return
-        if enable_vib:
-            refresh_devices()
-        selected_port = port_map.get(port_var.get()) if enable_vib else None
-        if enable_vib and not selected_port:
-            if not enable_audio:
-                messagebox.showwarning(
-                    "ESP32 USB Cable Unplugged",
-                    "No ESP32 USB Serial port (e.g. COM4) was found.\n\n"
-                    "• Wi-Fi only sends 5-second dashboard summaries.\n"
-                    "• For 1000 Hz vibration testing & ML dataset recording, keep the ESP32 plugged into your laptop's USB port.\n\n"
-                    "Plug in the USB cable and click 'Test Vibration' again (or click 'Test Mic' to test audio only).",
-                )
-                return
-            enable_vib = False
+        refresh_devices()
         selected_mic = mic_map.get(mic_var.get()) if enable_audio else None
+        is_esp32_mic = (
+            selected_mic is not None
+            and (
+                str(selected_mic).lower() in ("esp32", "inmp441")
+                or "[esp32]" in str(mic_var.get()).lower()
+            )
+        )
+        needs_port = enable_vib or (enable_audio and is_esp32_mic)
+        selected_port = port_map.get(port_var.get()) if needs_port else None
+        if needs_port and not selected_port:
+            reason = (
+                "test 1000 Hz vibration and the ESP32 INMP441 microphone"
+                if (enable_vib and is_esp32_mic)
+                else (
+                    "test the onboard ESP32 INMP441 microphone"
+                    if is_esp32_mic
+                    else "test 1000 Hz vibration"
+                )
+            )
+            messagebox.showwarning(
+                "ESP32 USB Cable Required",
+                f"No ESP32 USB Serial port (e.g. COM4 / COM7) was found to {reason}.\n\n"
+                "• Wi-Fi sends 5-second dashboard summaries.\n"
+                "• For hardware sensor testing & ML dataset recording, keep the ESP32 plugged into your laptop's USB port.\n\n"
+                "Plug in the USB cable and click Refresh Devices.",
+            )
+            return
+
         monitor.start(
             port=selected_port,
             audio_device=selected_mic,
@@ -1388,7 +1441,19 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
             enable_vib=enable_vib,
         )
         btn_stop_preview.config(state="normal")
-        tag = "Mic + Vibration" if (enable_audio and enable_vib) else ("Mic Only (USB Unplugged)" if enable_audio else "Vibration Only")
+        tag = (
+            "ESP32 Mic + Vibration"
+            if (enable_audio and enable_vib and is_esp32_mic)
+            else (
+                "PC Mic + Vibration"
+                if (enable_audio and enable_vib)
+                else (
+                    "ESP32 Mic Only"
+                    if (enable_audio and is_esp32_mic)
+                    else ("PC Mic Only" if enable_audio else "Vibration Only")
+                )
+            )
+        )
         lbl_sensor_readout.config(text=f"Testing {tag}...", fg=ACCENT_GREEN)
 
     def set_banner(text: str, bg_color: str = "#0b1120", fg_color: str = "#cbd5e1", show_discard: bool = False) -> None:
@@ -1712,6 +1777,7 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
     btn_record.config(command=start_recording)
     btn_cancel_rec.config(command=cancel_recording)
     btn_quarantine_last.config(command=discard_last_failed)
+    btn_open_dir_top.config(command=open_selected_folder)
     btn_open_dir.config(command=open_selected_folder)
     btn_quarantine_sel.config(command=quarantine_selected)
     btn_sync_web.config(command=sync_selected_to_web)
@@ -1743,11 +1809,20 @@ def launch_gui(controller: Optional[DatasetStudioController] = None) -> None:
                 else:
                     status_str = f"BOTH LIVE · Mic {aud_pk:4.1f}% · {hz:4.0f} Hz"
                 lbl_sensor_readout.config(text=status_str, fg=ACCENT_GREEN)
+                aux_items = []
+                if snap.get("aux_temp") is not None:
+                    aux_items.append(f"Temp: {snap['aux_temp']:.1f}°C")
+                if snap.get("aux_rpm") is not None and snap["aux_rpm"] > 0:
+                    aux_items.append(f"RPM: {snap['aux_rpm']:.0f}")
+                if snap.get("aux_volt") is not None:
+                    aux_items.append(f"Batt: {snap['aux_volt']:.1f}V")
+                aux_str = f"  |  {' · '.join(aux_items)}" if aux_items else ""
+
                 lbl_xyz_detail.config(
                     text=(
                         f"Audio Peak: {aud_pk:4.1f}%  |  "
                         f"ESP32 Accel: X={ax:+.2f}g  Y={ay:+.2f}g  Z={az:+.2f}g  "
-                        f"(|a|={mag:.2f}g, ~{hz:.0f} Hz)"
+                        f"(|a|={mag:.2f}g, ~{hz:.0f} Hz){aux_str}"
                     )
                 )
                 draw_scope(snap["audio_wave"], snap["vib_wave"])

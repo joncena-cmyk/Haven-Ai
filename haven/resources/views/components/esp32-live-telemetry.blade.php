@@ -811,8 +811,8 @@ function startUsbTelemetryRelay(port, reader, writer, decoder, initialBuffer, me
                             audio: parseVal(m[5])
                         };
                         forwardTelemetry(pendingTelemetry);
-                    } else if (line.includes('HTTP Code:') || line.includes('[HAVEN] [FAIL]')) {
-                        // The ESP32 is running and attempting ingest! Trigger fallback ping
+                    } else if ((line.includes('HTTP Code:') || line.includes('[HAVEN] [FAIL]')) && !pendingTelemetry && !usbRelayIngested) {
+                        // Only send a heartbeat ping if no sensor summary line has been seen yet
                         forwardTelemetry({
                             temp: null,
                             rpm: 0,
@@ -1346,11 +1346,19 @@ async function flashWebSerial() {
             }
     }
 
+    let offlineStreak = 0;
     async function pollTelemetry() {
         try {
             const res = await fetch('/api/v1/telemetry/latest', { cache: 'no-store' });
             if (!res.ok) return;
             const data = await res.json();
+            // Debounce: only show OFFLINE after 3 consecutive offline polls (~9s) to avoid flicker
+            if (data && data.online === false) {
+                offlineStreak++;
+                if (wasOnline === true && offlineStreak < 3) return;
+            } else {
+                offlineStreak = 0;
+            }
             renderTelemetryData(data);
         } catch (e) {
             console.warn('[Haven IoT] Polling error:', e);

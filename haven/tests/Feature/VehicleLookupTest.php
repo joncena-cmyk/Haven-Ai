@@ -55,9 +55,13 @@ class VehicleLookupTest extends TestCase
         $response = $this->actingAs(User::factory()->create())
             ->getJson(route('vehicles.catalog.models', ['make' => 'Honda', 'year' => 2018]));
 
-        $response->assertOk()
-            ->assertJsonPath('models.0', 'Accord')
-            ->assertJsonPath('models.1', 'Civic');
+        $models = $response->assertOk()->json('models');
+
+        // The list merges NHTSA results with HAVEN's verified catalog models,
+        // so assert presence and alphabetical order rather than fixed positions.
+        $this->assertContains('Accord', $models);
+        $this->assertContains('Civic', $models);
+        $this->assertLessThan(array_search('Civic', $models), array_search('Accord', $models));
     }
 
     public function test_vin_decode_fills_vehicle_fields(): void

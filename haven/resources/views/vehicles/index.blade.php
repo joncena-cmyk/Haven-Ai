@@ -68,7 +68,7 @@
                 @php
                     $livePacket = \Illuminate\Support\Facades\Cache::get('telemetry:live:' . $vehicle->id);
                     $liveTs = is_array($livePacket) ? ($livePacket['timestamp'] ?? $livePacket['received_at'] ?? null) : null;
-                    $isOnline = !empty($livePacket['online']) && !empty($liveTs) && abs(\Carbon\Carbon::parse($liveTs)->diffInSeconds(now())) <= 15;
+                    $isOnline = !empty($livePacket['online']) && !empty($liveTs) && abs(\Carbon\Carbon::parse($liveTs)->diffInSeconds(now())) <= 45;
                     $latestDiag = $vehicle->diagnostics->first();
                     $diagCount = $vehicle->diagnostics_count ?? 0;
                     $isNew = $vehicle->created_at && $vehicle->created_at->diffInDays(now()) <= 7;

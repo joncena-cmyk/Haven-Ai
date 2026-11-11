@@ -237,16 +237,21 @@
                     
                     {{-- Top Status Pill Row --}}
                     <div class="h-card-header-clean">
-                        <div style="display:flex;align-items:center;gap:0.4rem;">
+                        <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                             <span id="preview-badge-scope" class="h-clean-badge h-badge-scope">In Scope</span>
-                            <span class="h-clean-badge h-badge-new">New</span>
+                            <span id="preview-badge-3d" class="h-clean-badge" style="display:none;background:rgba(14,165,233,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);">★ 3D Digital Twin</span>
                         </div>
-                        <span style="font-size:0.7rem;color:#71717a;font-family:var(--h-mono);font-weight:600;">PREVIEW</span>
+                        <button type="button" id="preview-3d-toggle" onclick="toggleShowroom3dMode()" style="display:none;background:rgba(15,23,42,0.85);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);border-radius:6px;padding:0.2rem 0.55rem;font-size:0.68rem;font-family:var(--h-mono);font-weight:700;cursor:pointer;">
+                            3D LIVE
+                        </button>
                     </div>
 
-                    {{-- Visual Stage: Seamless 3D Studio Car Render (No Framed Box, No Glowing Orb) --}}
-                    <div class="h-clean-stage" id="preview-stage">
+                    {{-- Visual Stage: Seamless 3D Studio Car Render or Interactive 3D Sketchfab Twin --}}
+                    <div class="h-clean-stage" id="preview-stage" style="position:relative;overflow:hidden;">
                         <img id="preview-live-img" src="{{ asset('images/vehicles/' . $activeBody . '.jpg') }}" alt="Live Car Photo" class="h-clean-car-img">
+                        <div id="preview-3d-wrap" style="display:none;width:100%;height:220px;border-radius:10px;overflow:hidden;background:#090d16;">
+                            <iframe id="preview-3d-iframe" title="3D Digital Twin Preview" style="width:100%;height:100%;border:0;" allow="autoplay; fullscreen; xr-spatial-tracking"></iframe>
+                        </div>
                     </div>
 
                     {{-- Identity --}}
@@ -278,8 +283,8 @@
                     {{-- Footer --}}
                     <div class="h-clean-footer">
                         <div class="h-clean-rating">
-                            <span class="h-gold-star" style="opacity:0.4;">★</span>
-                            <span class="h-status-text-empty">Ready for Baseline</span>
+                            <span class="h-gold-star" id="preview-footer-star" style="opacity:0.4;">★</span>
+                            <span class="h-status-text-empty" id="preview-footer-status">Ready for Baseline</span>
                         </div>
                         <div class="h-clean-diagnose-btn" style="pointer-events:none;opacity:0.8;">
                             <span>Diagnose</span>
@@ -416,13 +421,21 @@
         });
     }
 
+    let active3dUid = null;
+    let show3dInPreview = true;
+
+    function toggleShowroom3dMode() {
+        show3dInPreview = !show3dInPreview;
+        window.dispatchEvent(new CustomEvent('haven:catalog-updated'));
+    }
+
     // Real-Time Live Preview Synchronization
     document.addEventListener('DOMContentLoaded', function () {
-        const yearEl = document.getElementById('year');
-        const makeSelect = document.getElementById('make_select');
-        const makeInput = document.getElementById('make');
-        const modelSelect = document.getElementById('model_select');
-        const modelInput = document.getElementById('model');
+        const yearEl = document.getElementById('catalog_year') || document.getElementById('year');
+        const makeSelect = document.getElementById('catalog_make_select') || document.getElementById('make_select');
+        const makeInput = document.getElementById('catalog_make_input') || document.getElementById('make');
+        const modelSelect = document.getElementById('catalog_model_select') || document.getElementById('model_select');
+        const modelInput = document.getElementById('catalog_model_input') || document.getElementById('model');
         const nicknameEl = document.getElementById('nickname');
         const plateEl = document.getElementById('plate_number');
         const colorEl = document.getElementById('color');
@@ -434,6 +447,12 @@
         const pEngine = document.getElementById('preview-spec-engine');
         const pMileage = document.getElementById('preview-spec-mileage');
         const pBadgeScope = document.getElementById('preview-badge-scope');
+        const pBadge3d = document.getElementById('preview-badge-3d');
+        const pToggle3d = document.getElementById('preview-3d-toggle');
+        const pWrap3d = document.getElementById('preview-3d-wrap');
+        const pIframe3d = document.getElementById('preview-3d-iframe');
+        const pFooterStar = document.getElementById('preview-footer-star');
+        const pFooterStatus = document.getElementById('preview-footer-status');
 
         function syncLivePreview() {
             const yr = (yearEl && yearEl.value) ? yearEl.value : '2024';
@@ -471,6 +490,40 @@
                     pBadgeScope.textContent = 'Advisory';
                 }
             }
+
+            // 3D Digital Twin Check & Automatic Showroom Prompt
+            const uid = (typeof window.resolveHaven3dUid === 'function')
+                ? window.resolveHaven3dUid(mk, md)
+                : null;
+
+            if (uid) {
+                if (pBadge3d) pBadge3d.style.display = 'inline-flex';
+                if (pToggle3d) {
+                    pToggle3d.style.display = 'inline-block';
+                    pToggle3d.textContent = (show3dInPreview && !hasCustomPhoto) ? 'SWITCH TO 2D' : 'VIEW 3D TWIN';
+                }
+                if (pFooterStar) pFooterStar.style.opacity = '1';
+                if (pFooterStatus) pFooterStatus.textContent = '3D Digital Twin Ready';
+
+                if (show3dInPreview && !hasCustomPhoto) {
+                    if (liveImg) liveImg.style.display = 'none';
+                    if (pWrap3d) pWrap3d.style.display = 'block';
+                    if (pIframe3d && active3dUid !== uid) {
+                        active3dUid = uid;
+                        pIframe3d.src = `https://sketchfab.com/models/${uid}/embed?autospin=0.2&autostart=1&ui_infos=0&ui_watermark=0&ui_controls=1&transparent=1&dnt=1`;
+                    }
+                } else {
+                    if (pWrap3d) pWrap3d.style.display = 'none';
+                    if (liveImg) liveImg.style.display = 'block';
+                }
+            } else {
+                if (pBadge3d) pBadge3d.style.display = 'none';
+                if (pToggle3d) pToggle3d.style.display = 'none';
+                if (pWrap3d) pWrap3d.style.display = 'none';
+                if (liveImg) liveImg.style.display = 'block';
+                if (pFooterStar) pFooterStar.style.opacity = '0.4';
+                if (pFooterStatus) pFooterStatus.textContent = 'Ready for Baseline (2D)';
+            }
         }
 
         [yearEl, nicknameEl, plateEl, colorEl, engineEl, mileageEl].forEach(el => {
@@ -483,6 +536,7 @@
         if (makeInput) makeInput.addEventListener('input', syncLivePreview);
         if (modelSelect) modelSelect.addEventListener('change', syncLivePreview);
         if (modelInput) modelInput.addEventListener('input', syncLivePreview);
+        window.addEventListener('haven:catalog-updated', syncLivePreview);
 
         setTimeout(syncLivePreview, 350);
     });
